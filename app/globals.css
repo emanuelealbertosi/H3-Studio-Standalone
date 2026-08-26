@@ -109,6 +109,10 @@
   font-size: 11px;
 }
 
+.setup-card > footer p.setup-validation {
+  color: #f3bd52;
+}
+
 .setup-card > footer button,
 .setup-complete button {
   border-color: var(--accent);

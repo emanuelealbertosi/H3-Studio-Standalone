@@ -1989,6 +1989,16 @@ function SetupWizard({ status }: { status: SetupStatus }) {
   const [saving, setSaving] = useState(false);
   const [restartRequired, setRestartRequired] = useState(false);
 
+  const outputDirMissing = !settings.comfyOutputDir.trim()
+    || settings.comfyOutputDir.includes("comfy-output-not-configured");
+  const setupBlockingMessage = password.length < 10
+    ? `La password deve contenere almeno 10 caratteri (${password.length}/10).`
+    : password !== confirmPassword
+      ? "Le due password non coincidono."
+      : outputDirMissing
+        ? "Indica la cartella output reale della tua ComfyUI."
+        : null;
+
   async function completeSetup() {
     if (password !== confirmPassword) {
       setMessage("Le due password non coincidono");
@@ -2054,7 +2064,7 @@ function SetupWizard({ status }: { status: SetupStatus }) {
           <label>
             <span>Password Admin</span>
             <input autoComplete="new-password" minLength={10} onChange={(event) => setPassword(event.target.value)} type="password" value={password} />
-            <small>Almeno 10 caratteri</small>
+            <small>{password.length < 10 ? `${password.length}/10 caratteri` : "Password valida"}</small>
           </label>
           <label>
             <span>Ripeti password</span>
@@ -2077,8 +2087,8 @@ function SetupWizard({ status }: { status: SetupStatus }) {
           </label>
         </div>
         <footer>
-          <p>{message}</p>
-          <button disabled={saving || password.length < 10 || !settings.comfyOutputDir.trim()} onClick={() => void completeSetup()} type="button">
+          <p className={setupBlockingMessage ? "setup-validation" : undefined}>{setupBlockingMessage ?? message}</p>
+          <button disabled={saving || setupBlockingMessage !== null} onClick={() => void completeSetup()} type="button">
             {saving ? "Configurazione…" : "Completa configurazione"}
           </button>
         </footer>
