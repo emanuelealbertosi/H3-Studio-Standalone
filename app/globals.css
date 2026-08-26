@@ -259,6 +259,17 @@ a:focus-visible {
   margin-top: auto;
 }
 
+.source-entry {
+  margin-top: 4px;
+  text-decoration: none;
+}
+
+.source-entry .rail-icon {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .workspace {
   min-width: 0;
 }

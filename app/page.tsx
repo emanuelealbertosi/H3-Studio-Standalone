@@ -3593,6 +3593,16 @@ function StudioApp() {
           <span className="rail-icon">⌘</span>
           Admin
         </button>
+        <a
+          className="rail-item source-entry"
+          href="https://github.com/emanuelealbertosi/h3-studio"
+          rel="noreferrer"
+          target="_blank"
+          title="Codice sorgente e licenza AGPL-3.0-only"
+        >
+          <span className="rail-icon">&lt;/&gt;</span>
+          Sorgente
+        </a>
       </aside>
 
       <section className="workspace">

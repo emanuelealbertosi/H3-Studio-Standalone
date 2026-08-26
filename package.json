@@ -3,6 +3,14 @@
   "version": "0.2.0",
   "description": "Local-first MiniMax H3 production studio for ComfyUI",
   "license": "AGPL-3.0-only",
+  "homepage": "https://github.com/emanuelealbertosi/h3-studio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emanuelealbertosi/h3-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/emanuelealbertosi/h3-studio/issues"
+  },
   "private": true,
   "engines": {
     "node": ">=22.13.0"
