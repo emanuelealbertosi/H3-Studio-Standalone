@@ -1274,15 +1274,18 @@ a:focus-visible {
   min-height: 62px;
   padding: 11px 12px 11px 15px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  min-width: 0;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 9px;
 }
 
 .candidate-footer > div:first-child {
-  min-width: 104px;
-  display: grid;
-  gap: 3px;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .candidate-footer strong {
@@ -1295,6 +1298,13 @@ a:focus-visible {
   font-size: 9px;
 }
 
+.candidate-footer > div:first-child span {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .candidate-actions {
   display: flex;
   align-items: center;
@@ -1302,27 +1312,42 @@ a:focus-visible {
 }
 
 .candidate-variant-actions {
-  min-width: min(100%, 290px);
-  flex: 1;
+  width: 100%;
+  min-width: 0;
+  flex: none;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
 }
 
 .variant-switch,
-.postprocess-actions {
+.postprocess-actions,
+.candidate-primary-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 4px;
 }
 
 .variant-switch {
   flex: 1 1 100%;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .variant-switch button {
+  flex: 0 0 auto;
   height: 24px;
   padding: 0 7px;
+  white-space: nowrap;
+}
+
+.postprocess-actions,
+.candidate-primary-actions {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .variant-switch button.active {
@@ -1341,15 +1366,19 @@ a:focus-visible {
 }
 
 .candidate-actions button {
+  min-width: 0;
   height: 31px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
   color: #a0a2a6;
-  padding: 0 10px;
+  padding: 0 6px;
   font-size: 9px;
   font-weight: 750;
   transition: 140ms ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .candidate-actions button:hover {
@@ -3288,17 +3317,8 @@ a:focus-visible {
     flex: 1;
   }
 
-  .candidate-footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .candidate-actions {
     width: 100%;
-  }
-
-  .candidate-actions button {
-    flex: 1;
   }
 }
 

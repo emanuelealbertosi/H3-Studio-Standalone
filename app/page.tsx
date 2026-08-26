@@ -4383,43 +4383,45 @@ function StudioApp() {
                             <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "upscale")} title="Rigenera lo stesso seed con latent upscaler fino a circa 1 MP" type="button">Upscale 1 MP</button>
                             <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "face_upscale")} title="Latent render a 1 MP seguito da Face Refiner" type="button">Face + 1 MP</button>
                           </div>
-                          <button
-                            className={isSelected ? "primary-action selected" : "primary-action"}
-                            onClick={() => void selectCandidate(candidate.id)}
-                            type="button"
-                          >
-                            {isSelected ? "Selezionato" : "Scegli"}
-                          </button>
-                          <button
-                            disabled={!displayMediaPath}
-                            onClick={() =>
-                              displayMediaPath &&
-                              prepareVideoOperation(
-                                displayMediaPath,
-                                "candidate_" + candidate.id + ".mp4",
-                                "continue",
-                                { projectId: studioProjectId, sourceJobId: currentJobId },
-                              )
-                            }
-                            type="button"
-                          >
-                            Continua
-                          </button>
-                          <button
-                            disabled={!displayMediaPath}
-                            onClick={() =>
-                              displayMediaPath &&
-                              prepareVideoOperation(
-                                displayMediaPath,
-                                "candidate_" + candidate.id + ".mp4",
-                                "edit",
-                                { projectId: studioProjectId, sourceJobId: currentJobId },
-                              )
-                            }
-                            type="button"
-                          >
-                            Edita
-                          </button>
+                          <div className="candidate-primary-actions">
+                            <button
+                              className={isSelected ? "primary-action selected" : "primary-action"}
+                              onClick={() => void selectCandidate(candidate.id)}
+                              type="button"
+                            >
+                              {isSelected ? "Selezionato" : "Scegli"}
+                            </button>
+                            <button
+                              disabled={!displayMediaPath}
+                              onClick={() =>
+                                displayMediaPath &&
+                                prepareVideoOperation(
+                                  displayMediaPath,
+                                  "candidate_" + candidate.id + ".mp4",
+                                  "continue",
+                                  { projectId: studioProjectId, sourceJobId: currentJobId },
+                                )
+                              }
+                              type="button"
+                            >
+                              Continua
+                            </button>
+                            <button
+                              disabled={!displayMediaPath}
+                              onClick={() =>
+                                displayMediaPath &&
+                                prepareVideoOperation(
+                                  displayMediaPath,
+                                  "candidate_" + candidate.id + ".mp4",
+                                  "edit",
+                                  { projectId: studioProjectId, sourceJobId: currentJobId },
+                                )
+                              }
+                              type="button"
+                            >
+                              Edita
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <span className="waiting-label">{formatStatus(candidate)}</span>

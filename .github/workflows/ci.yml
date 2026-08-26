@@ -23,4 +23,5 @@ jobs:
       - run: npm run test:fast
       - run: npm run test:cancel
       - run: npm run test:restart
+      - run: npm run test:preview-layout
       - run: npm run build
