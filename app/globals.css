@@ -1930,6 +1930,18 @@ a:focus-visible {
   font-weight: 850;
 }
 
+.admin-server-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-subheading .admin-server-actions button.secondary {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
 .admin-install-section {
   margin: 22px;
   border: 1px solid rgba(215, 255, 82, 0.18);

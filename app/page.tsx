@@ -2106,6 +2106,7 @@ function AdminPanel() {
   const [installData, setInstallData] = useState<InstallAdminResponse | null>(null);
   const [message, setMessage] = useState("Caricamento configurazione…");
   const [saving, setSaving] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [loginRequired, setLoginRequired] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
 
@@ -2235,6 +2236,40 @@ function AdminPanel() {
     }
   }
 
+  async function restartServer() {
+    if (restarting) return;
+    setRestarting(true);
+    setMessage("Riavvio del bridge H3…");
+    try {
+      const response = await fetch(`${bridgeUrl}/api/admin/server/restart`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      }
+      setMessage("Bridge in riavvio · attendo la riconnessione…");
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+        try {
+          const health = await fetch(`${bridgeUrl}/api/health`, { cache: "no-store" });
+          if (health.ok) {
+            window.location.reload();
+            return;
+          }
+        } catch {
+          // Il bridge non è ancora tornato online.
+        }
+      }
+      setMessage("Riavvio avviato; ricarica la pagina fra qualche secondo.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Riavvio non riuscito");
+    } finally {
+      setRestarting(false);
+    }
+  }
+
   async function logout() {
     await fetch(`${bridgeUrl}/api/auth/logout`, { method: "POST", credentials: "include" });
     setData(null);
@@ -2285,7 +2320,12 @@ function AdminPanel() {
             <section className="admin-install-section">
               <div className="admin-subheading">
                 <div><span>INSTALLAZIONE</span><h3>ComfyUI e workflow associati</h3></div>
-                <button disabled={saving} onClick={() => void saveInstallSettings()} type="button">Salva e riavvia</button>
+                <div className="admin-server-actions">
+                  <button disabled={saving || restarting} onClick={() => void saveInstallSettings()} type="button">Salva impostazioni</button>
+                  <button className="secondary" disabled={saving || restarting} onClick={() => void restartServer()} type="button">
+                    {restarting ? "Riavvio…" : "↻ Riavvia server"}
+                  </button>
+                </div>
               </div>
               <div className="admin-install-grid">
                 <label>

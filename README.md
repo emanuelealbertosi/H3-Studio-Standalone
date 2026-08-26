@@ -56,6 +56,10 @@ Durante generazione, Face o Upscale, il pulsante **Interrompi** elimina dalla
 coda i prompt del job e ferma il prompt attivo soltanto se non risultano altri
 run ComfyUI estranei in esecuzione.
 
+L'Admin include **Riavvia server**: riavvia soltanto il bridge H3, mantiene
+ComfyUI e i suoi job attivi e ricarica automaticamente l'interfaccia quando il
+collegamento torna disponibile.
+
 Dopo l'installazione o un aggiornamento dei nodi Face/Upscale è necessario
 riavviare ComfyUI. Il bridge esegue un preflight e non accoda un render costoso
 se il processo attivo espone ancora la vecchia definizione dei nodi.

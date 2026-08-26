@@ -168,3 +168,4 @@
 - Persistito il motivo `Interrotto su richiesta` sui candidati e reso evidente l'avanzamento di Face/Upscale sopra il player.
 - Corretto Upscale affinché punti esplicitamente a 0,98 MP; le azioni UI ora distinguono `Upscale 1 MP` e `Face + 1 MP`.
 - Verificati JSON, typecheck, test completi, sanitizzazione e build di produzione.
+- Aggiunto nell'Admin il riavvio controllato del solo bridge H3, con riconnessione e ricarica automatica della pagina; ComfyUI e i job GPU restano attivi.

@@ -26,6 +26,7 @@
     "test:krea-contract": "tsx scripts/test-krea-contract.ts",
     "test:fast": "tsx scripts/test-fast-engine.ts",
     "test:cancel": "tsx scripts/test-comfy-cancel.ts",
+    "test:restart": "node scripts/test-bridge-restart.mjs",
     "test:setup": "tsx scripts/test-setup-auth.ts",
     "sanitize:workflows": "tsx scripts/sanitize-bundled-workflows.ts",
     "typecheck": "tsc --noEmit --pretty false",

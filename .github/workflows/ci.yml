@@ -22,4 +22,5 @@ jobs:
       - run: npm run test:projects
       - run: npm run test:fast
       - run: npm run test:cancel
+      - run: npm run test:restart
       - run: npm run build

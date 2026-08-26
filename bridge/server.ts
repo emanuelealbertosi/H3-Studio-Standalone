@@ -3,6 +3,7 @@ import websocket from "@fastify/websocket";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { createReadStream, statSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { ComfyClient } from "./comfy-client.js";
@@ -42,6 +43,38 @@ const installSettingsStore = new InstallSettingsStore(config.dataDir, {
   ffmpegPath: config.ffmpegPath,
 });
 let installSettings = await installSettingsStore.get();
+
+function scheduleBridgeRestart() {
+  const helperPath = path.resolve("scripts", "restart-bridge-helper.mjs");
+  const launchArguments = JSON.stringify([
+    ...process.execArgv,
+    ...process.argv.slice(1),
+  ]);
+  const helper = spawn(
+    process.execPath,
+    [
+      helperPath,
+      String(process.pid),
+      process.execPath,
+      process.cwd(),
+      launchArguments,
+    ],
+    {
+      cwd: process.cwd(),
+      detached: true,
+      env: process.env,
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  );
+  helper.unref();
+
+  setTimeout(() => {
+    const hardExit = setTimeout(() => process.exit(0), 3_000);
+    hardExit.unref();
+    void app.close().finally(() => process.exit(0));
+  }, 500).unref();
+}
 const comfy = new ComfyClient(installSettings.comfyUrl, config.comfyTimeoutMs);
 const workflowStore = new WorkflowStore(
   workflowPath(config.workflowOutputDir, installSettings.videoWorkflowId),
@@ -1008,12 +1041,20 @@ app.put("/api/admin/install-settings", async (request, reply) => {
       ok: true,
       settings: installSettings,
       restartRequired: true,
-      message: "Configurazione salvata. Riavvia H3 Studio per applicarla a tutti i servizi.",
+      message: "Configurazione salvata. Premi Riavvia server per applicarla al bridge H3.",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Configurazione installazione non valida";
     return reply.status(400).send({ ok: false, error: message });
   }
+});
+
+app.post("/api/admin/server/restart", async () => {
+  scheduleBridgeRestart();
+  return {
+    ok: true,
+    message: "Riavvio del bridge H3 avviato. ComfyUI resta in esecuzione.",
+  };
 });
 
 app.put<{ Body: { currentPassword?: unknown; nextPassword?: unknown } }>(

@@ -363,6 +363,7 @@ Legenda: `[x]` completato e verificato; `[~]` parziale o presente solo a livello
 - [x] Bootstrap amministratore al primo avvio con password derivata via scrypt.
 - [x] Login Admin e sessioni HTTP-only protette server-side.
 - [x] URL ComfyUI, output, FFmpeg e associazione workflow configurabili dall'Admin.
+- [x] Riavvio controllato del bridge direttamente dall'Admin, senza interrompere ComfyUI.
 - [x] Checklist live di custom node e pesi con nomi/cartelle reali.
 - [ ] Stati pending/active/blocked.
 - [ ] Ledger e dotazione 500 crediti.
