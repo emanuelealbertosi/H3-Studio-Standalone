@@ -2,18 +2,28 @@
 setlocal
 cd /d "%~dp0"
 
+set "H3_CODEX_NODE_DIR=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin"
+set "H3_NODE_OK=0"
+
 where node.exe >nul 2>nul
-if errorlevel 1 (
-  echo [ERRORE] Node.js non trovato. Installa Node.js 22 o superiore da https://nodejs.org/
+if not errorlevel 1 (
+  node -e "const major=Number(process.versions.node.split('.')[0]); process.exit(major>=22?0:1)" >nul 2>nul
+  if not errorlevel 1 set "H3_NODE_OK=1"
+)
+
+if "%H3_NODE_OK%"=="0" if exist "%H3_CODEX_NODE_DIR%\node.exe" (
+  set "PATH=%H3_CODEX_NODE_DIR%;%PATH%"
+  set "H3_NODE_OK=1"
+  echo [H3 Studio] Uso il runtime Node incluso in Codex.
+)
+
+if "%H3_NODE_OK%"=="0" (
+  echo [ERRORE] Serve Node.js 22 o superiore. Installalo da https://nodejs.org/
   pause
   exit /b 1
 )
 
-node -e "const major=Number(process.versions.node.split('.')[0]); if(major<22){console.error('[ERRORE] Serve Node.js 22 o superiore. Versione attuale: '+process.versions.node); process.exit(1)}"
-if errorlevel 1 (
-  pause
-  exit /b 1
-)
+node -e "console.log('[H3 Studio] Node '+process.versions.node)"
 
 if not exist "node_modules" (
   echo [H3 Studio] Prima installazione delle dipendenze...
