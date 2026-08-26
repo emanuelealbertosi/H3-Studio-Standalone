@@ -29,6 +29,8 @@ export class FastWorkflowStore {
     const prompt = structuredClone(await this.source.loadApiPrompt());
     const sampler = uniqueNode(prompt, "H3ReferenceMemorySampler");
     const shift = uniqueNode(prompt, "MiniMaxH3SigmaShift");
+    const model = uniqueNode(prompt, "H3ModelLoaderAny");
+    model.inputs.model_name = "minimax_h3_ref2va_int8_convrot.safetensors";
     sampler.inputs.steps = 8;
     sampler.inputs.sampler_name = "euler";
     sampler.inputs.scheduler = "simple";

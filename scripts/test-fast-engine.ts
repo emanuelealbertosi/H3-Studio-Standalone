@@ -36,6 +36,10 @@ const fastSampler = uniqueNode(fast.candidates[0].prompt, "H3ReferenceMemorySamp
 const fastShift = uniqueNode(fast.candidates[0].prompt, "MiniMaxH3SigmaShift");
 assert.equal(fast.engineSettings.profile, "fast");
 assert.equal(fast.engineSettings.steps, 8);
+assert.equal(
+  fast.engineSettings.model,
+  "minimax_h3_ref2va_int8_convrot.safetensors",
+);
 assert.equal(fastSampler.inputs.steps, 8);
 assert.equal(fastSampler.inputs.sampler_name, "euler");
 assert.equal(fastSampler.inputs.scheduler, "simple");
@@ -72,7 +76,19 @@ assert.throws(
     mismatch,
     "00000000-0000-4000-8000-000000000003",
   ),
-  /coppia coerente/i,
+  /coppia FAST non valida/i,
+);
+
+const pruned = structuredClone(DEFAULT_RUNTIME_SETTINGS);
+pruned.fast.model = "minimaxH3INT8INT4_ref2vaINT8Pruned.safetensors";
+assert.throws(
+  () => prepareStudioJob(
+    source,
+    { ...baseRequest, qualityMode: "fast", turboEnabled: true },
+    pruned,
+    "00000000-0000-4000-8000-000000000004",
+  ),
+  /AdaLN pruned\/8-wide/i,
 );
 
 console.log("FAST Alibaba PDD + standard 8 presets: OK (no GPU queue)");

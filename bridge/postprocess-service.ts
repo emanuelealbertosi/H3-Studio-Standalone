@@ -57,6 +57,9 @@ function upscalePrompt(
   const prompt = clone(original);
   const sampler = node(prompt, "H3ReferenceMemorySampler");
   const saver = node(prompt, "H3SaveContinuation");
+  const dimensions = node(prompt, "H3AspectMegapixelSize");
+  dimensions.inputs.size_mode = "megapixels + format";
+  dimensions.inputs.megapixels = 0.98;
   sampler.inputs.studio_upscale = true;
   sampler.inputs.studio_upscale_model =
     "minimax_h3_latent_upscaler_3d_fp16.safetensors";
@@ -350,6 +353,24 @@ export class PostprocessService {
         progress: ready ? 100 : live?.progress ?? null,
       };
     });
+  }
+
+  async cancelForJob(jobId: string) {
+    const active = this.variants.listForJob(jobId).filter(
+      (variant) => variant.status !== "ready" && variant.status !== "failed",
+    );
+    await this.comfy.cancelPrompts(
+      active.flatMap((variant) => variant.promptId ? [variant.promptId] : []),
+    );
+    for (const variant of active) {
+      this.variants.updateStatus(
+        variant.id,
+        "failed",
+        null,
+        "Interrotto su richiesta",
+      );
+    }
+    return this.listForJob(jobId);
   }
 
   async recover() {

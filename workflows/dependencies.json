@@ -127,10 +127,11 @@
     },
     {
       "id": "h3-fast-base-model",
-      "label": "Modello H3 FAST Ref2VA predefinito",
+      "label": "Modello H3 FAST Ref2VA INT8 ConvRot non-pruned",
       "kind": "model",
       "folder": "diffusion_models",
-      "filenames": ["minimaxH3INT8INT4_ref2vaINT8Pruned.safetensors"],
+      "filenames": ["minimax_h3_ref2va_int8_convrot.safetensors"],
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3/blob/main/diffusion_models/minimax_h3_ref2va_int8_convrot.safetensors",
       "requiredFor": ["fast"]
     },
     {

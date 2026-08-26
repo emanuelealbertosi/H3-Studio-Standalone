@@ -25,6 +25,7 @@
     "test:library": "tsx scripts/test-creative-library.ts",
     "test:krea-contract": "tsx scripts/test-krea-contract.ts",
     "test:fast": "tsx scripts/test-fast-engine.ts",
+    "test:cancel": "tsx scripts/test-comfy-cancel.ts",
     "test:setup": "tsx scripts/test-setup-auth.ts",
     "sanitize:workflows": "tsx scripts/sanitize-bundled-workflows.ts",
     "typecheck": "tsc --noEmit --pretty false",

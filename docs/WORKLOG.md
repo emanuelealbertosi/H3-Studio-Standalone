@@ -159,3 +159,12 @@
 - Aggiunto installer ComfyUI recuperabile con backup del nodo H3 esistente, clone dei nodi esterni e requirements Python opzionali.
 - Esteso il manifest ai workflow video, FAST, Krea, Face e Upscale, con verifica live di nodi e pesi e cartelle visibili nell'Admin.
 - Aggiunta CI GitHub Windows per sanitizzazione, typecheck, test principali e build.
+
+## 26 agosto 2026 — Stop sicuro, Upscale 1 MP e fix FAST PDD
+
+- Diagnosticato il primo run FAST: il modello pruned espone AdaLN 8-wide mentre il PDD ufficiale richiede la matrice AdaLN completa; la combinazione viene ora bloccata prima della coda.
+- Impostato come default FAST il Ref2VA INT8 ConvRot ufficiale non-pruned e aggiornati workflow, Admin, manifest dipendenze e test.
+- Aggiunto Stop per generazioni e varianti: i prompt pendenti del job vengono rimossi e il prompt attivo viene interrotto soltanto in assenza di run ComfyUI estranei.
+- Persistito il motivo `Interrotto su richiesta` sui candidati e reso evidente l'avanzamento di Face/Upscale sopra il player.
+- Corretto Upscale affinché punti esplicitamente a 0,98 MP; le azioni UI ora distinguono `Upscale 1 MP` e `Face + 1 MP`.
+- Verificati JSON, typecheck, test completi, sanitizzazione e build di produzione.

@@ -341,4 +341,10 @@ export const JOB_DATABASE_MIGRATIONS = [
        ON admin_sessions(expires_at)`,
     ],
   },
+  {
+    version: 14,
+    statements: [
+      `ALTER TABLE candidates ADD COLUMN error TEXT`,
+    ],
+  },
 ] as const;

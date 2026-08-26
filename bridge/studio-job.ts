@@ -6,6 +6,7 @@ import type {
   RuntimeSettings,
   RuntimeSettingsStore,
 } from "./runtime-settings.js";
+import { assertPddModelCompatibility } from "./pdd-compatibility.js";
 import type { FastWorkflowStore } from "./fast-workflow-store.js";
 import type { ComfyProgressTracker } from "./comfy-progress.js";
 import type { JobRepository } from "./job-repository.js";
@@ -98,6 +99,7 @@ export type StudioJob = {
       | "ready"
       | "failed";
     output: MediaOutput | null;
+    error: string | null;
   }>;
 };
 
@@ -387,23 +389,10 @@ function resolveEngineSettings(
 ): ResolvedEngineSettings {
   const fast = request.qualityMode === "fast" && request.turboEnabled;
   if (fast) {
-    const modelName = runtimeSettings.fast.model.toLowerCase();
-    const pddName = runtimeSettings.fast.pddFile.toLowerCase();
-    const modelFamily = modelName.includes("ref2va") && !modelName.includes("fl2va")
-      ? "ref2va"
-      : modelName.includes("fl2va") && !modelName.includes("ref2va")
-        ? "fl2va"
-        : null;
-    const pddFamily = pddName.includes("ref2va") && !pddName.includes("fl2va")
-      ? "ref2va"
-      : pddName.includes("fl2va") && !pddName.includes("ref2va")
-        ? "fl2va"
-        : null;
-    if (!modelFamily || modelFamily !== pddFamily) {
-      throw new Error(
-        "FAST PDD richiede una coppia coerente: modello Ref2VA + PDD Ref2VA oppure modello FL2VA + PDD FL2VA. I modelli hybrid non sono supportati.",
-      );
-    }
+    assertPddModelCompatibility(
+      runtimeSettings.fast.model,
+      runtimeSettings.fast.pddFile,
+    );
     const loras = runtimeSettings.fast.loras.map((slot) => ({ ...slot }));
     return {
       profile: "fast",
@@ -643,6 +632,14 @@ export class StudioJobService {
         : this.workflowStore.loadApiPrompt(),
       this.runtimeSettings.get(),
     ]);
+    if (wantsFast) {
+      const installedModels = await this.comfy.models("diffusion_models");
+      if (!installedModels.includes(runtimeSettings.fast.model)) {
+        throw new Error(
+          `Modello FAST non installato: ${runtimeSettings.fast.model}. Installalo dalla pagina Dipendenze/Admin e riavvia ComfyUI.`,
+        );
+      }
+    }
     return {
       prepared: prepareStudioJob(sourcePrompt, rawRequest, runtimeSettings),
     };
@@ -727,7 +724,7 @@ export class StudioJobService {
           status === "ready"
             ? "Completato"
             : status === "failed"
-              ? "Esecuzione fallita"
+              ? candidate.error ?? "Esecuzione fallita"
               : liveProgress?.phaseLabel ??
           (status === "queued"
             ? "In coda"
@@ -760,6 +757,27 @@ export class StudioJobService {
       completed,
       candidates,
     };
+  }
+
+  async cancel(jobId: string) {
+    const job = this.jobs.get(jobId);
+    if (!job) throw new Error("Job non trovato");
+    const active = job.candidates.filter(
+      (candidate) => candidate.status !== "ready" && candidate.status !== "failed",
+    );
+    await this.comfy.cancelPrompts(
+      active.flatMap((candidate) => candidate.promptId ? [candidate.promptId] : []),
+    );
+    for (const candidate of active) {
+      this.jobs.failCandidate(jobId, candidate.index, "Interrotto su richiesta");
+    }
+    if (active.length > 0) {
+      this.jobs.updateJobStatus(
+        jobId,
+        job.candidates.some((candidate) => candidate.status === "ready") ? "partial" : "failed",
+      );
+    }
+    return this.get(jobId);
   }
 
   async recover() {

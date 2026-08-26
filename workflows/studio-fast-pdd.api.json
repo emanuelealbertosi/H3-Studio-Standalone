@@ -1,7 +1,7 @@
 {
   "1": {
     "inputs": {
-      "model_name": "minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
+      "model_name": "minimax_h3_ref2va_int8_convrot.safetensors",
       "activation_reserve_gb": 0
     },
     "class_type": "H3ModelLoaderAny",

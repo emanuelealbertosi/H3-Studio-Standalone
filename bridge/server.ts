@@ -20,6 +20,7 @@ import { CandidateVariantRepository } from "./candidate-variant-repository.js";
 import { PostprocessService } from "./postprocess-service.js";
 import { FastWorkflowStore } from "./fast-workflow-store.js";
 import { AdminAuthService } from "./admin-auth.js";
+import { pddModelCompatibility } from "./pdd-compatibility.js";
 import {
   InstallSettingsStore,
   WORKFLOW_CATALOG,
@@ -323,6 +324,21 @@ app.get<{ Params: { jobId: string } }>("/api/jobs/:jobId", async (request, reply
     ok: true,
     job: { ...job, variants: await postprocess.listForJob(job.id) },
   };
+});
+
+app.post<{ Params: { jobId: string } }>("/api/jobs/:jobId/cancel", async (request, reply) => {
+  try {
+    await postprocess.cancelForJob(request.params.jobId);
+    const job = await studioJobs.cancel(request.params.jobId);
+    if (!job) return reply.status(404).send({ ok: false, error: "Job non trovato" });
+    return {
+      ok: true,
+      job: { ...job, variants: await postprocess.listForJob(job.id) },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Interruzione fallita";
+    return reply.status(400).send({ ok: false, error: message });
+  }
 });
 
 app.get<{ Querystring: { limit?: string; projectId?: string } }>("/api/jobs", async (request) => {
@@ -1054,29 +1070,11 @@ async function saveEngineSettings(
     }
     const fastModelName = String((fast as { model?: unknown }).model ?? "");
     const fastPddName = String((fast as { pddFile?: unknown }).pddFile ?? "");
-    const normalizedFastModel = fastModelName.toLowerCase();
-    const normalizedFastPdd = fastPddName.toLowerCase();
-    const fastModelFamily =
-      normalizedFastModel.includes("ref2va") && !normalizedFastModel.includes("fl2va")
-        ? "ref2va"
-        : normalizedFastModel.includes("fl2va") && !normalizedFastModel.includes("ref2va")
-          ? "fl2va"
-          : null;
-    const fastPddFamily = normalizedFastPdd.includes("ref2va")
-      ? "ref2va"
-      : normalizedFastPdd.includes("fl2va")
-        ? "fl2va"
-        : null;
-    if (!fastModelFamily) {
+    const fastCompatibility = pddModelCompatibility(fastModelName, fastPddName);
+    if (!fastCompatibility.compatible) {
       return reply.status(400).send({
         ok: false,
-        error: "FAST PDD richiede un modello H3 Ref2VA oppure FL2VA dedicato; Hybrid/Ref-Delta non sono compatibili",
-      });
-    }
-    if (!fastPddFamily || fastModelFamily !== fastPddFamily) {
-      return reply.status(400).send({
-        ok: false,
-        error: `Coppia FAST non valida: usa PDD ${fastModelFamily.toUpperCase()} con il modello ${fastModelFamily.toUpperCase()}`,
+        error: fastCompatibility.reason,
       });
     }
     if (!models.includes(String((krea as { model?: unknown }).model ?? ""))) {

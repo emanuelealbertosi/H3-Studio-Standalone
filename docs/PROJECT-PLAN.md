@@ -62,7 +62,7 @@ Principio guida: **ComfyUI è il motore, H3 Studio è lo studio di produzione**.
 ### FAST
 
 - Motore separato Alibaba PDD-Acc a 8 NFE.
-- Modello base dedicato Ref2VA o FL2VA, abbinato obbligatoriamente al PDD della stessa famiglia.
+- Modello base dedicato Ref2VA o FL2VA non-pruned, abbinato obbligatoriamente al PDD della stessa famiglia; varianti AdaLN pruned/8-wide sono bloccate prima della coda.
 - Ricetta bloccata: Euler, sigmas PDD, CFG 1, SigmaShift video/audio 12/3, strength trunk/head 1.
 - Nessun Turbo/distill LoRA e nessun cache pack; sono ammessi fino a tre LoRA creativi/personaggio.
 - 5 o 10 secondi.
@@ -384,9 +384,9 @@ Legenda: `[x]` completato e verificato; `[~]` parziale o presente solo a livello
 - [x] `ComfyUI-H3-FaceRefine`, `ComfyUI-H3-NativeAudioLock` e `face_yolov8m.pt` installati; attivazione al prossimo riavvio ComfyUI.
 - [~] Dipendenze FaceRefine verificate; InsightFace usa attualmente ONNX CPU, scelta conservativa per non sostituire il runtime mentre ComfyUI è attiva.
 - [~] Workflow API FaceRefine rettangolare/per-frame costruito e validato staticamente; manca il test GPU dopo il riavvio ComfyUI.
-- [~] Latent Upscaler 3D integrato nel sampler e validato staticamente; manca il test GPU dopo il riavvio ComfyUI.
+- [~] Latent Upscaler 3D integrato nel sampler con target esplicito 0,98 MP e validato staticamente; manca il nuovo test GPU dopo il riavvio ComfyUI.
 - [x] Modello dati immutabile `CandidateVariant`: originale, face, upscale, face+upscale.
-- [~] Servizio derivati persistente con coda, progressi, recupero ed errori indipendenti; retry/cancel ed ETA calibrata restano da aggiungere.
+- [~] Servizio derivati persistente con coda, progressi, recupero, errori indipendenti e cancellazione sicura; retry ed ETA calibrata restano da aggiungere.
 - [x] Pulsanti per clip/candidato e selezione esplicita della variante inviata a Studio o timeline.
 - [x] Render timeline `Originale` o con il derivato scelto per ciascuna clip.
 - [x] Cancellazione candidato dalla scheda o dalla Libreria con rimozione atomica da tutti i montaggi, varianti e file output.
@@ -440,7 +440,7 @@ L'MVP è completo quando un utente autorizzato può creare un progetto, stimare 
 
 1. Riavviare ComfyUI e collaudare su GPU Face, Upscale e Face+Upscale su una clip nota.
 2. Misurare qualità, VRAM e tempi e scegliere l'ordine definitivo della pipeline combinata.
-3. Aggiungere ETA calibrata, retry e cancel granulari alle varianti.
+3. Aggiungere ETA calibrata e retry granulari alle varianti; Stop è già disponibile per run e post-process.
 4. Eseguire test GPU reali di I2V, Reference, Keyframes, Continue ed Edit e completare la gestione degli overlap.
 5. Riavviare ComfyUI e collaudare realmente il profilo FAST PDD-Acc Ref2VA; misurare ETA e qualità contro 8 standard sullo stesso seed.
 6. Iniziare auth, utenti e ledger crediti server-side.

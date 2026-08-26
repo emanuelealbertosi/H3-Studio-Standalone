@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { assertPddModelCompatibility } from "./pdd-compatibility.js";
 
 export type EngineLoraSettings = {
   name: string;
@@ -48,7 +49,7 @@ export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = Object.freeze({
     steps: 8,
   },
   fast: {
-    model: "minimaxH3INT8INT4_ref2vaINT8Pruned.safetensors",
+    model: "minimax_h3_ref2va_int8_convrot.safetensors",
     pddFile: "MiniMax-H3-Ref2VA-Acc-8Step.safetensors",
     loras: [],
     steps: 8,
@@ -155,6 +156,7 @@ function validateSettings(value: unknown): RuntimeSettings {
   if (!kreaModel) throw new Error("Seleziona un modello Krea");
   if (!encoder) throw new Error("Seleziona il text encoder Krea");
   if (!vae) throw new Error("Seleziona la VAE Krea");
+  assertPddModelCompatibility(fastModel, pddFile);
 
   return {
     h3: {

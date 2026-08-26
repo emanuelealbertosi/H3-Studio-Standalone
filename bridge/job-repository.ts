@@ -72,6 +72,7 @@ type CandidateRow = {
   output_subfolder: string | null;
   output_type: MediaOutput["type"] | null;
   output_format: string | null;
+  error: string | null;
 };
 
 function mediaFromRow(row: CandidateRow): MediaOutput | null {
@@ -246,10 +247,17 @@ export class JobRepository {
     this.database
       .prepare(
         `UPDATE candidates
-         SET prompt_id = ?, queue_number = ?, status = 'submitted', updated_at = ?
+         SET prompt_id = ?, queue_number = ?, status = 'submitted', error = NULL, updated_at = ?
          WHERE job_id = ? AND candidate_index = ?`,
       )
       .run(promptId, queueNumber, now, jobId, candidateIndex);
+  }
+
+  failCandidate(jobId: string, candidateIndex: number, error: string) {
+    this.database.prepare(
+      `UPDATE candidates SET status = 'failed', error = ?, updated_at = ?
+       WHERE job_id = ? AND candidate_index = ?`,
+    ).run(error, new Date().toISOString(), jobId, candidateIndex);
   }
 
   updateJobStatus(jobId: string, status: StudioJob["status"]) {
@@ -369,6 +377,7 @@ export class JobRepository {
         queueNumber: candidate.queue_number,
         status: candidate.status,
         output: mediaFromRow(candidate),
+        error: candidate.error,
       })),
     };
   }

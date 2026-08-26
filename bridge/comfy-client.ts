@@ -90,6 +90,22 @@ export class ComfyClient {
     }
   }
 
+  private async requestVoid(path: string, body?: unknown) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: body === undefined ? undefined : { "content-type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`ComfyUI ha risposto HTTP ${response.status}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async health(): Promise<ComfyHealth> {
     const startedAt = performance.now();
 
@@ -159,6 +175,25 @@ export class ComfyClient {
       runningPromptIds: promptIdsFromQueue(queue.queue_running),
       pendingPromptIds: promptIdsFromQueue(queue.queue_pending),
     };
+  }
+
+  async cancelPrompts(promptIds: string[]) {
+    const requested = new Set(promptIds.filter(Boolean));
+    if (requested.size === 0) return { interrupted: false, deleted: [] as string[] };
+    const queue = await this.queueState();
+    const pending = [...requested].filter((id) => queue.pendingPromptIds.has(id));
+    const running = [...requested].filter((id) => queue.runningPromptIds.has(id));
+    if (pending.length > 0) await this.requestVoid("/queue", { delete: pending });
+    if (running.length > 0) {
+      const unrelatedRunning = [...queue.runningPromptIds].filter((id) => !requested.has(id));
+      if (unrelatedRunning.length > 0) {
+        throw new Error(
+          "Stop non eseguito: ComfyUI sta processando anche un prompt estraneo a questo run.",
+        );
+      }
+      await this.requestVoid("/interrupt");
+    }
+    return { interrupted: running.length > 0, deleted: pending };
   }
 
   async mediaResponse(

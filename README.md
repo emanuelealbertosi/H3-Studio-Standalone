@@ -32,7 +32,8 @@ I controlli creativi Camera, Obiettivo ed Effetti aggiungono direttive leggibili
 al prompt senza nascondere o sostituire il testo dell’utente.
 
 Lo Studio espone cinque preset: **FAST / 8 / 12 / 20 / 30**. FAST è un motore
-separato basato su Alibaba PDD-Acc a 8 NFE, con modello Ref2VA o FL2VA dedicato,
+separato basato su Alibaba PDD-Acc a 8 NFE, con modello Ref2VA o FL2VA dedicato
+**non-pruned** (il default è `minimax_h3_ref2va_int8_convrot.safetensors`),
 sigmas PDD, Euler e shift 12/3. I quattro preset numerici usano invece il
 workflow H3 standard senza forzare il motore FAST. Modello, file PDD e fino a
 tre LoRA creativi del FAST si configurano nell'Admin separatamente dallo stack
@@ -44,10 +45,16 @@ Il pulsante **Usa nel video** trasferisce le immagini alla modalità H3 Referenc
 e compila automaticamente i ruoli Picture.
 
 Ogni candidato completato espone inoltre tre derivati non distruttivi: **Face**,
-**Upscale** e **Face + Upscale**. L'originale rimane sempre disponibile; la
+**Upscale 1 MP** e **Face + 1 MP**. L'upscale rigenera lo stesso seed con il
+Latent Upscaler 3D verso 0,98 MP; non è un semplice resize del file MP4.
+L'originale rimane sempre disponibile; la
 versione attiva può essere usata per Continue/Edit oppure assegnata alla singola
 clip della timeline. Lo stato del post-process è persistito nel database e viene
 recuperato dopo il riavvio del bridge.
+
+Durante generazione, Face o Upscale, il pulsante **Interrompi** elimina dalla
+coda i prompt del job e ferma il prompt attivo soltanto se non risultano altri
+run ComfyUI estranei in esecuzione.
 
 Dopo l'installazione o un aggiornamento dei nodi Face/Upscale è necessario
 riavviare ComfyUI. Il bridge esegue un preflight e non accoda un render costoso

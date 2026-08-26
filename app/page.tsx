@@ -32,6 +32,7 @@ type Candidate = {
   mediaPath?: string | null;
   phaseLabel?: string;
   progressExact?: boolean;
+  error?: string | null;
   variants?: CandidateVariant[];
   activeVariantId?: string | null;
 };
@@ -266,7 +267,9 @@ function isPddBaseModel(name: string) {
   const normalized = name.toLowerCase();
   const ref2va = normalized.includes("ref2va");
   const fl2va = normalized.includes("fl2va");
-  return ref2va !== fl2va;
+  return ref2va !== fl2va &&
+    !/(?:pruned|int8int4|ref[-_ ]?delta|fused|hybrid|10eros|b25[-_]?49)/i.test(name) &&
+    !/\.gguf$/i.test(name);
 }
 
 function isFastCreativeLora(name: string) {
@@ -403,6 +406,7 @@ type RemoteJob = {
     phaseLabel?: string;
     progress?: number | null;
     progressExact?: boolean;
+    error?: string | null;
     output: { mediaPath: string; filename: string } | null;
   }>;
   variants?: CandidateVariant[];
@@ -459,8 +463,8 @@ type ProjectClip = {
 
 function variantLabel(kind: VariantKind | "original") {
   if (kind === "face") return "Face";
-  if (kind === "upscale") return "Upscale";
-  if (kind === "face_upscale") return "Face + Upscale";
+  if (kind === "upscale") return "Upscale 1 MP";
+  if (kind === "face_upscale") return "Face + 1 MP";
   return "Originale";
 }
 
@@ -2432,6 +2436,9 @@ function AdminPanel() {
                       },
                     })}
                   >
+                    {!data.capabilities.models.filter(isPddBaseModel).includes(data.settings.fast.model) && (
+                      <option value={data.settings.fast.model}>{data.settings.fast.model} · da installare</option>
+                    )}
                     {data.capabilities.models.filter(isPddBaseModel).map((model) => <option key={model} value={model}>{model}</option>)}
                   </select>
                 </label>
@@ -2456,7 +2463,7 @@ function AdminPanel() {
                 <div className="engine-fixed-recipe fast-recipe">
                   <span>Ricetta bloccata</span>
                   <strong>Euler · CFG 1 · shift 12/3</strong>
-                  <small>Sigmas PDD, strength 1, nessun Turbo/distill/cache</small>
+                  <small>Sigmas PDD, strength 1, modello non-pruned, nessun Turbo/distill/cache</small>
                 </div>
               </div>
               <div className="engine-lora-stack">
@@ -2623,6 +2630,7 @@ function StudioApp() {
   );
   const [selected, setSelected] = useState<number | null>(1);
   const [isRunning, setIsRunning] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [runMessage, setRunMessage] = useState<string | null>(null);
@@ -2871,6 +2879,7 @@ function StudioApp() {
           promptId: remote.promptId ?? undefined,
           mediaPath: remote.output?.mediaPath ?? null,
           phaseLabel: remote.phaseLabel,
+          error: remote.error,
           progressExact: remote.progressExact ?? status === "ready",
           variants: (job.variants ?? []).filter(
             (variant) => variant.sourceCandidateIndex === remote.index,
@@ -3009,6 +3018,7 @@ function StudioApp() {
               progress,
               mediaPath: remote.output?.mediaPath ?? null,
               phaseLabel: remote.phaseLabel,
+              error: remote.error,
               progressExact: remote.progressExact ?? remote.status === "ready",
               variants,
               activeVariantId: candidate.activeVariantId && variants.some(
@@ -3150,6 +3160,26 @@ function StudioApp() {
     } catch (error) {
       setIsRunning(false);
       setRunMessage(error instanceof Error ? error.message : "Invio fallito");
+    }
+  }
+
+  async function cancelActiveRun() {
+    if (!activeJobId || isCancelling) return;
+    setIsCancelling(true);
+    setRunMessage("Interruzione del run in corso…");
+    try {
+      const response = await fetch(`${bridgeUrl}/api/jobs/${activeJobId}/cancel`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      }
+      setRunMessage("Run interrotto");
+    } catch (error) {
+      setRunMessage(error instanceof Error ? error.message : "Interruzione fallita");
+    } finally {
+      setIsCancelling(false);
     }
   }
 
@@ -4180,6 +4210,16 @@ function StudioApp() {
                   <span className={isRunning ? "pulse" : ""} />
                   {isRunning ? "Coda attiva" : "Coda pronta"}
                 </div>
+                {isRunning && activeJobId && (
+                  <button
+                    className="stop-run-button"
+                    disabled={isCancelling}
+                    onClick={() => void cancelActiveRun()}
+                    type="button"
+                  >
+                    {isCancelling ? "Interruzione…" : "■ Interrompi"}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -4195,6 +4235,9 @@ function StudioApp() {
                 const variantBusy = (candidate.variants ?? []).some(
                   (variant) => variant.status !== "ready" && variant.status !== "failed",
                 );
+                const activePostprocess = (candidate.variants ?? []).find(
+                  (variant) => variant.status !== "ready" && variant.status !== "failed",
+                );
                 return (
                   <article
                     className={`candidate-card ${isReady ? "ready" : "processing"} ${isSelected ? "chosen" : ""}`}
@@ -4203,6 +4246,18 @@ function StudioApp() {
                     <div className={`video-surface visual-${candidate.id}`}>
                       <div className="video-noise" />
                       {!isReady && <div className="video-blur" />}
+                      {activePostprocess && (
+                        <div className="variant-run-banner" role="status">
+                          <span className="pulse" />
+                          <strong>{variantLabel(activePostprocess.kind)}</strong>
+                          <small>
+                            {activePostprocess.phaseLabel ?? "Post-process in corso"}
+                            {typeof activePostprocess.progress === "number"
+                              ? ` · ${activePostprocess.progress}%`
+                              : ""}
+                          </small>
+                        </div>
+                      )}
 
                       {isReady ? (
                         <>
@@ -4284,9 +4339,9 @@ function StudioApp() {
                             </span>
                           ))}
                           <div className="postprocess-actions">
-                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "face")} type="button">Face</button>
-                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "upscale")} type="button">Upscale</button>
-                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "face_upscale")} type="button">Face + Upscale</button>
+                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "face")} title="Rifinitura del volto sul video corrente" type="button">Face</button>
+                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "upscale")} title="Rigenera lo stesso seed con latent upscaler fino a circa 1 MP" type="button">Upscale 1 MP</button>
+                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "face_upscale")} title="Latent render a 1 MP seguito da Face Refiner" type="button">Face + 1 MP</button>
                           </div>
                           <button
                             className={isSelected ? "primary-action selected" : "primary-action"}

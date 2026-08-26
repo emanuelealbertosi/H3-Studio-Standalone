@@ -971,6 +971,29 @@ a:focus-visible {
   gap: 8px;
 }
 
+.stop-run-button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 96, 96, 0.48);
+  border-radius: 8px;
+  background: rgba(116, 24, 30, 0.34);
+  color: #ff9c9c;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.stop-run-button:hover:not(:disabled) {
+  border-color: #ff7777;
+  background: rgba(154, 34, 41, 0.48);
+}
+
+.stop-run-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .sync-controls {
   padding-right: 10px;
   border-right: 1px solid var(--line);
@@ -1023,6 +1046,49 @@ a:focus-visible {
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background-color: #22242a;
+}
+
+.variant-run-banner {
+  position: absolute;
+  z-index: 8;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid rgba(215, 255, 82, 0.34);
+  border-radius: 9px;
+  background: rgba(12, 14, 14, 0.9);
+  box-shadow: 0 9px 28px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.variant-run-banner > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.5s infinite;
+}
+
+.variant-run-banner strong {
+  color: var(--accent);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.variant-run-banner small {
+  overflow: hidden;
+  color: #d3d5d8;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .video-surface::before,
