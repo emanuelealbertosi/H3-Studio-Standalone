@@ -93,7 +93,13 @@ try {
       "Trim test",
     );
     assert.equal(alternateWithClip?.clips.length, 1);
-    const trimmed = projects.updateClip(alternateWithClip!.clips[0].id, {
+    const switched = projects.updateClip(alternateWithClip!.clips[0].id, {
+      variantId: "test-variant",
+    });
+    assert.equal(switched?.clips[0].sourceVariantId, "test-variant");
+    assert.equal(switched?.clips[0].variantKind, "upscale");
+    assert.equal(switched?.clips[0].output.filename, "candidate_1_upscale.mp4");
+    const trimmed = projects.updateClip(switched!.clips[0].id, {
       trimStart: 0.5,
       trimEnd: 3.5,
       volume: 0.75,

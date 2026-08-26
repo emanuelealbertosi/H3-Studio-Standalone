@@ -3564,6 +3564,137 @@ input {
   color: #6f7175;
 }
 
+.montage-source-bin {
+  padding: 15px 18px 17px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.montage-source-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.montage-source-heading h3 {
+  margin: 3px 0 0;
+  font-size: 14px;
+}
+
+.montage-source-heading > span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.montage-source-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 260px);
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding-bottom: 3px;
+}
+
+.montage-source-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #101113;
+}
+
+.montage-source-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #08090b;
+}
+
+.montage-source-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.montage-source-preview > span {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(5, 6, 7, 0.78);
+  color: #d8d9dc;
+  font-size: 8px;
+}
+
+.montage-source-body {
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.montage-source-body > strong,
+.montage-source-body > p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.montage-source-body > strong {
+  font-size: 10px;
+}
+
+.montage-source-body > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.montage-source-body label {
+  display: grid;
+  gap: 4px;
+  color: #85878c;
+  font-size: 8px;
+}
+
+.montage-source-body select,
+.montage-source-body > button {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 8px;
+  background: #0c0d0f;
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.montage-source-body > button {
+  border-color: rgba(215, 255, 82, 0.35);
+  background: rgba(215, 255, 82, 0.08);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.montage-source-body > button:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+
+.montage-source-empty {
+  min-height: 90px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .montage-editor-grid {
   padding: 18px;
   display: grid;
@@ -3817,5 +3948,9 @@ input {
 
   .timeline-editor-strip {
     padding: 0 12px 12px;
+  }
+
+  .montage-source-bin {
+    padding: 12px;
   }
 }

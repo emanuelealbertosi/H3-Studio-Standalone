@@ -1045,6 +1045,10 @@ function MontagesPanel({
   const [timelines, setTimelines] = useState<ProjectTimelineSummary[]>([]);
   const [timelineId, setTimelineId] = useState("");
   const [timeline, setTimeline] = useState<TimelineDetail | null>(null);
+  const [projectJobs, setProjectJobs] = useState<RemoteJob[]>([]);
+  const [sourceVersions, setSourceVersions] = useState<Record<string, string>>({});
+  const [addingSource, setAddingSource] = useState<string | null>(null);
+  const [loadingSources, setLoadingSources] = useState(false);
   const [newName, setNewName] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -1075,6 +1079,23 @@ function MontagesPanel({
     const loaded = payload.timelines ?? [];
     setTimelines(loaded);
     setTimelineId(current => current && loaded.some(item => item.id === current) ? current : loaded[0]?.id ?? "");
+  }
+
+  async function loadProjectJobs(id: string) {
+    if (!id) {
+      setProjectJobs([]);
+      return;
+    }
+    setLoadingSources(true);
+    try {
+      const query = new URLSearchParams({ limit: "100", projectId: id });
+      const response = await fetch(`${bridgeUrl}/api/jobs?${query.toString()}`, { cache: "no-store" });
+      const payload = (await response.json()) as { jobs?: RemoteJob[]; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      setProjectJobs(payload.jobs ?? []);
+    } finally {
+      setLoadingSources(false);
+    }
   }
 
   async function loadTimeline(id: string) {
@@ -1118,6 +1139,32 @@ function MontagesPanel({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Creazione montaggio fallita");
     } finally { setBusy(false); }
+  }
+
+  async function addProjectSource(
+    job: RemoteJob,
+    candidate: RemoteJob["candidates"][number],
+    versionId: string,
+  ) {
+    if (!timelineId || !candidate.output) return;
+    const key = `${job.id}-${candidate.index}`;
+    const variant = (job.variants ?? []).find(
+      item => item.id === versionId && item.status === "ready" && item.output,
+    );
+    setAddingSource(key);
+    try {
+      await timelineMutation(`/api/timelines/${timelineId}/clips`, {
+        jobId: job.id,
+        candidateIndex: candidate.index,
+        variantId: variant?.id ?? null,
+        label: `Candidato ${candidate.index} · ${variant ? variantLabel(variant.kind) : "Originale"} · ${job.id.slice(0, 8)}`,
+      });
+      setMessage(`${variant ? variantLabel(variant.kind) : "Originale"} aggiunta a “${timeline?.name ?? "montaggio"}”`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Aggiunta clip fallita");
+    } finally {
+      setAddingSource(null);
+    }
   }
 
   function patchClip(clipId: string, update: Partial<ProjectClip>) {
@@ -1206,6 +1253,7 @@ function MontagesPanel({
   useEffect(() => {
     setPlaying(false);
     void loadTimelines(projectId).catch(error => setMessage(error instanceof Error ? error.message : "Montaggi non disponibili"));
+    void loadProjectJobs(projectId).catch(error => setMessage(error instanceof Error ? error.message : "Clip del progetto non disponibili"));
   }, [projectId]);
   useEffect(() => {
     if (initialTimelineId) setTimelineId(initialTimelineId);
@@ -1220,6 +1268,17 @@ function MontagesPanel({
     else videoRef.current?.pause();
   }, [playing, currentIndex]);
 
+  const projectSources = useMemo(() => projectJobs.flatMap(job =>
+    job.candidates
+      .filter(candidate => candidate.status === "ready" && candidate.output)
+      .map(candidate => ({
+        job,
+        candidate,
+        variants: (job.variants ?? []).filter(
+          variant => variant.sourceCandidateIndex === candidate.index && variant.status === "ready" && variant.output,
+        ),
+      })),
+  ), [projectJobs]);
   const currentClip = timeline?.clips[currentIndex] ?? null;
   return (
     <section className="montages-workspace">
@@ -1246,6 +1305,67 @@ function MontagesPanel({
         <button disabled={busy || !projectId || !newName.trim()} onClick={() => void createTimeline()} type="button">+ Crea</button>
       </div>
 
+      {projectId && (
+        <section className="montage-source-bin" aria-label="Clip del progetto">
+          <div className="montage-source-heading">
+            <div>
+              <span className="section-index">MEDIA DEL PROGETTO</span>
+              <h3>Clip da aggiungere</h3>
+            </div>
+            <span>{loadingSources ? "Caricamento…" : `${projectSources.length} candidate pronte`}</span>
+          </div>
+          {projectSources.length ? (
+            <div className="montage-source-strip">
+              {projectSources.map(({ job, candidate, variants }) => {
+                const key = `${job.id}-${candidate.index}`;
+                const versionId = sourceVersions[key] ?? "original";
+                const selectedVariant = variants.find(variant => variant.id === versionId);
+                const output = selectedVariant?.output ?? candidate.output;
+                const alreadyUsed = Boolean(timeline?.clips.some(
+                  clip => clip.sourceJobId === job.id && clip.sourceCandidateIndex === candidate.index,
+                ));
+                return (
+                  <article className="montage-source-card" key={key}>
+                    <div className="montage-source-preview">
+                      {output && <video muted playsInline preload="metadata" src={`${bridgeUrl}${output.mediaPath}`} />}
+                      <span>Seed {candidate.seed}</span>
+                    </div>
+                    <div className="montage-source-body">
+                      <strong>Candidato {candidate.index} · {job.id.slice(0, 8)}</strong>
+                      <p title={job.request.prompt}>{job.request.prompt}</p>
+                      <label>
+                        <span>Versione</span>
+                        <select
+                          aria-label={`Versione candidato ${candidate.index}`}
+                          value={versionId}
+                          onChange={event => setSourceVersions(current => ({ ...current, [key]: event.target.value }))}
+                        >
+                          <option value="original">Originale</option>
+                          {variants.map(variant => (
+                            <option key={variant.id} value={variant.id}>{variantLabel(variant.kind)}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        disabled={!timelineId || addingSource === key}
+                        onClick={() => void addProjectSource(job, candidate, versionId)}
+                        type="button"
+                      >
+                        {addingSource === key ? "Aggiunta…" : alreadyUsed ? "+ Aggiungi ancora" : "+ Aggiungi al montaggio"}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="montage-source-empty">
+              {loadingSources ? "Cerco le clip generate…" : "Nessuna clip completata associata a questo progetto."}
+            </div>
+          )}
+        </section>
+      )}
+
       {!projects.length ? (
         <div className="montage-empty-large">Crea prima un progetto dalla voce “Progetti”.</div>
       ) : timeline ? (
@@ -1256,7 +1376,7 @@ function MontagesPanel({
                 <video
                   autoPlay={playing}
                   controls
-                  key={currentClip.id}
+                  key={`${currentClip.id}:${currentClip.sourceVariantId ?? "original"}`}
                   onLoadedMetadata={event => { event.currentTarget.currentTime = currentClip.trimStart; }}
                   onTimeUpdate={event => {
                     if (event.currentTarget.currentTime < currentClip.trimEnd - 0.03) return;

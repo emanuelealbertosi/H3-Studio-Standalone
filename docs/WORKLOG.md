@@ -171,3 +171,4 @@
 - Aggiunto nell'Admin il riavvio controllato del solo bridge H3, con riconnessione e ricarica automatica della pagina; ComfyUI e i job GPU restano attivi.
 - Corretto il footer delle preview: Face/Upscale e le azioni principali usano due griglie interne a tre colonne, mentre le versioni scorrono orizzontalmente senza uscire dalla card.
 - Le esecuzioni fallite non mostrano più una barra di avanzamento indeterminata e possono essere eliminate anche quando ComfyUI non ha prodotto alcun file.
+- Montaggi ora include il browser delle candidate appartenenti al progetto, con anteprima e selezione preventiva di Originale, Face, Upscale o Face + Upscale; la versione resta sostituibile anche dopo l’aggiunta in timeline.

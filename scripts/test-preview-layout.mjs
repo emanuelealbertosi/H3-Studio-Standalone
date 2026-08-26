@@ -17,5 +17,9 @@ assert.match(page, /className="candidate-primary-actions"/);
 assert.match(page, /const isFailed = candidate\.status === "failed"/);
 assert.match(page, /\{!isFailed && \(\s*<div className=\{`progress-track/s);
 assert.match(page, /\{\(isReady \|\| isFailed\) && \(\s*<button/s);
+assert.match(page, /aria-label="Clip del progetto"/);
+assert.match(page, /projectId: id/);
+assert.match(page, /variantId: variant\?\.id \?\? null/);
+assert.match(css, /\.montage-source-strip\s*\{[^}]*grid-auto-flow:\s*column[^}]*overflow-x:\s*auto/s);
 
 console.log("Preview card responsive layout: OK");
