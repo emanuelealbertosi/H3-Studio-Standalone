@@ -170,3 +170,4 @@
 - Verificati JSON, typecheck, test completi, sanitizzazione e build di produzione.
 - Aggiunto nell'Admin il riavvio controllato del solo bridge H3, con riconnessione e ricarica automatica della pagina; ComfyUI e i job GPU restano attivi.
 - Corretto il footer delle preview: Face/Upscale e le azioni principali usano due griglie interne a tre colonne, mentre le versioni scorrono orizzontalmente senza uscire dalla card.
+- Le esecuzioni fallite non mostrano più una barra di avanzamento indeterminata e possono essere eliminate anche quando ComfyUI non ha prodotto alcun file.

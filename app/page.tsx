@@ -4266,6 +4266,7 @@ function StudioApp() {
             <div className={`candidate-grid count-${Math.max(1, visibleCandidates.length)}`} ref={candidateGridRef}>
               {visibleCandidates.map((candidate) => {
                 const isReady = candidate.status === "ready";
+                const isFailed = candidate.status === "failed";
                 const isSelected = selected === candidate.id;
                 const activeVariant = (candidate.variants ?? []).find(
                   (variant) =>
@@ -4280,7 +4281,7 @@ function StudioApp() {
                 );
                 return (
                   <article
-                    className={`candidate-card ${isReady ? "ready" : "processing"} ${isSelected ? "chosen" : ""}`}
+                    className={`candidate-card ${isReady ? "ready" : isFailed ? "failed" : "processing"} ${isSelected ? "chosen" : ""}`}
                     key={candidate.id}
                   >
                     <div className={`video-surface visual-${candidate.id}`}>
@@ -4314,26 +4315,32 @@ function StudioApp() {
                           )}
                           <div className="video-time">00:{duration.toString().padStart(2, "0")}</div>
                           {isSelected && <div className="selected-label">Scelto</div>}
-                          <button
-                            aria-label={`Elimina candidato ${candidate.id}`}
-                            className="video-trash-button"
-                            disabled={variantBusy}
-                            onClick={() => void deleteCurrentCandidate(candidate.id)}
-                            title="Elimina video e rimuovilo dai montaggi"
-                            type="button"
-                          >
-                            🗑
-                          </button>
                         </>
                       ) : (
                         <div className="progress-overlay" role="status">
                           <span className="candidate-label">Candidato {candidate.id}</span>
-                          <strong>{candidate.progressExact ? `${candidate.progress}%` : "—"}</strong>
+                          <strong className={isFailed ? "failure-mark" : undefined}>
+                            {isFailed ? "!" : candidate.progressExact ? `${candidate.progress}%` : "—"}
+                          </strong>
                           <span>{formatStatus(candidate)}</span>
-                          <div className={`progress-track ${!candidate.progressExact && candidate.status !== "queued" && candidate.status !== "idle" ? "indeterminate" : ""}`}>
-                            <i style={candidate.progressExact ? { width: `${candidate.progress}%` } : undefined} />
-                          </div>
+                          {!isFailed && (
+                            <div className={`progress-track ${!candidate.progressExact && candidate.status !== "queued" && candidate.status !== "idle" ? "indeterminate" : ""}`}>
+                              <i style={candidate.progressExact ? { width: `${candidate.progress}%` } : undefined} />
+                            </div>
+                          )}
                         </div>
+                      )}
+                      {(isReady || isFailed) && (
+                        <button
+                          aria-label={`Elimina candidato ${candidate.id}`}
+                          className="video-trash-button"
+                          disabled={variantBusy}
+                          onClick={() => void deleteCurrentCandidate(candidate.id)}
+                          title={isFailed ? "Elimina esecuzione fallita" : "Elimina video e rimuovilo dai montaggi"}
+                          type="button"
+                        >
+                          🗑
+                        </button>
                       )}
                     </div>
 

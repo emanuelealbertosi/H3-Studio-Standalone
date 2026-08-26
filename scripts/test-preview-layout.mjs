@@ -14,5 +14,8 @@ assert.match(
 assert.match(css, /\.candidate-variant-actions\s*\{[^}]*min-width:\s*0/s);
 assert.match(css, /\.variant-switch\s*\{[^}]*overflow-x:\s*auto/s);
 assert.match(page, /className="candidate-primary-actions"/);
+assert.match(page, /const isFailed = candidate\.status === "failed"/);
+assert.match(page, /\{!isFailed && \(\s*<div className=\{`progress-track/s);
+assert.match(page, /\{\(isReady \|\| isFailed\) && \(\s*<button/s);
 
 console.log("Preview card responsive layout: OK");

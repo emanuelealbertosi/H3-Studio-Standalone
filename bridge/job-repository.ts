@@ -439,11 +439,14 @@ export class JobRepository {
         output_subfolder: string | null;
         output_type: string | null;
       } | undefined;
-    if (!candidate || !candidate.output_filename) {
-      throw new Error("Video candidato non trovato");
+    if (!candidate) {
+      throw new Error("Candidato non trovato");
     }
     if (!['ready', 'failed'].includes(candidate.status)) {
       throw new Error("Non puoi eliminare un candidato ancora in esecuzione");
+    }
+    if (candidate.status === 'ready' && !candidate.output_filename) {
+      throw new Error("Video candidato non trovato");
     }
     const busyVariant = this.database
       .prepare(
@@ -481,11 +484,13 @@ export class JobRepository {
         project_id: string;
       }>;
     const files = [
-      {
-        filename: candidate.output_filename,
-        subfolder: candidate.output_subfolder ?? "",
-        type: candidate.output_type ?? "output",
-      },
+      candidate.output_filename
+        ? {
+            filename: candidate.output_filename,
+            subfolder: candidate.output_subfolder ?? "",
+            type: candidate.output_type ?? "output",
+          }
+        : null,
       ...variantFiles.flatMap((variant) => [
         variant.output_filename
           ? {

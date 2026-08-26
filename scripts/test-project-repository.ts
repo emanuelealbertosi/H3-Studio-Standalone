@@ -49,6 +49,28 @@ try {
       )`,
     )
     .run(now, now);
+  database
+    .prepare(
+      `INSERT INTO jobs(
+        id, status, created_at, updated_at, prompt, candidate_count,
+        duration_seconds, megapixels, generation_mode, aspect_format,
+        requested_seed, seed_mode, model, lora, lora_strength, steps
+      ) VALUES (?, 'failed', ?, ?, ?, 1, 5, 0.5, 'T2V',
+                '16:9 landscape', '456', 'base', 'test-model', '',
+                0, 8)`,
+    )
+    .run("failed-job", now, now, "Failed candidate cleanup");
+  database
+    .prepare(
+      `INSERT INTO candidates(
+        job_id, candidate_index, seed, filename_prefix, prompt_id,
+        queue_number, status, api_prompt_json, error, created_at, updated_at
+      ) VALUES (
+        'failed-job', 1, '456', 'test/failed_candidate_1', 'failed-prompt',
+        2, 'failed', '{}', 'Test failure', ?, ?
+      )`,
+    )
+    .run(now, now);
   database.close();
 
   const projects = new ProjectRepository(jobs.databasePath);
@@ -112,6 +134,12 @@ try {
     assert.equal(projects.get(first.id)?.clips.length, 0);
     assert.equal(projects.get(second.id)?.clips.length, 0);
     assert.equal(jobs.get("test-job"), null);
+
+    const failedDeleted = jobs.deleteCandidate("failed-job", 1);
+    assert.equal(failedDeleted.jobDeleted, true);
+    assert.equal(failedDeleted.removedClips, 0);
+    assert.deepEqual(failedDeleted.files, []);
+    assert.equal(jobs.get("failed-job"), null);
   } finally {
     projects.close();
   }

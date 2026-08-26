@@ -1185,6 +1185,15 @@ a:focus-visible {
   letter-spacing: -0.07em;
 }
 
+.candidate-card.failed {
+  border-color: rgba(255, 112, 112, 0.32);
+}
+
+.progress-overlay .failure-mark {
+  color: #ff8585;
+  letter-spacing: 0;
+}
+
 .progress-overlay > span:nth-of-type(2) {
   margin-top: 8px;
   color: rgba(255, 255, 255, 0.65);
