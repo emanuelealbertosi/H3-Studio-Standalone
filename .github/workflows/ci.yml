@@ -1,0 +1,23 @@
+name: H3 Studio CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run sanitize:workflows
+      - run: git diff --exit-code -- workflows
+      - run: npm run typecheck
+      - run: npm run test:setup
+      - run: npm run test:projects
+      - run: npm run test:fast
+      - run: npm run build

@@ -1,0 +1,161 @@
+# Worklog
+
+## 25 agosto 2026
+
+- Creato e installato lo scaffold H3 Studio in `F:\H3-Studio`.
+- Scelto Node.js/TypeScript/Fastify come bridge locale.
+- Definiti output da 5 o 10 secondi.
+- Definiti preset 0,5 / 0,7 / 1,0 MP.
+- Confermato supporto a T2V, I2V, Reference, Keyframes, Continue ed Edit.
+- Definita griglia adattiva da 1 a 4 candidati.
+- Realizzata prima UI Candidate Studio con progresso blurred e trasformazione in risultato.
+- Aggiunti costo preventivo e saldo crediti dimostrativi.
+- Definiti utenti pending/active/blocked e console admin.
+- Definito bucket iniziale di 500 crediti, senza rinnovo.
+- Definiti reserve, settle, refund e ledger immutabile.
+- Avviata e verificata la prima preview locale.
+- Invertito il layout in stile chatbot: candidati sopra e composer compatto/sticky in basso.
+- Sostituita la griglia adattiva con una film strip fissa a quattro slot uguali, allineati da sinistra e scorrevoli orizzontalmente sui browser stretti.
+- Build completata; audit runtime segnala advisory nello stack Next/PostCSS/Sharp da risolvere prima di autenticazione o pubblicazione, senza aggiornamenti forzati.
+
+### Prossimo lavoro
+
+- Feedback visivo sulla Product Shell.
+- Bridge Fastify e health check ComfyUI.
+- Primo candidato T2V reale.
+
+## 25 agosto 2026 — Milestone 2
+
+- Creato bridge locale Fastify su loopback.
+- Aggiunto client ComfyUI con timeout, `/system_stats` e `/queue`.
+- Aggiunto `/api/health` e canale WebSocket `/api/events`.
+- Collegato l'indicatore della UI allo stato reale Bridge/ComfyUI.
+- Formalizzato il montaggio non distruttivo con clip autonomi, playback virtuale ed export FFmpeg.
+- Aggiunto il Workflow Store con copia UI separata, firma SHA-256 e cattura validata dell'ultimo prompt API FINAL dall'history di ComfyUI.
+- Aggiunti `GET /api/workflow/status` e `POST /api/workflow/capture`; in assenza di un run riconoscibile il bridge blocca la cattura senza inviare nulla alla GPU.
+- Catturato il FINAL eseguito: copia UI da 30 nodi ed export API validato da 23 nodi, senza modificare il workflow sorgente.
+- Aggiunto builder FAST T2V per 1–4 candidati con prompt, seed, 5/10 secondi, 0,5/0,7/1,0 MP, Turbo 8-step e prefix isolato per candidato.
+- I LoRA non-Turbo presenti nello snapshot vengono disattivati automaticamente nel job Studio; aggiunti dry-run e invio reale separati.
+- Calibrata la prima stima ETA sui run locali: circa 172–180 secondi per 5s / 0,5 MP / Turbo 8-step; l'interfaccia mostra un intervallo prudente scalato per durata, MP e candidati.
+- Aggiunto il selettore formato con tutti gli 11 aspect ratio realmente dichiarati da `H3AspectMegapixelSize`; la scelta viene validata e applicata nel prompt API.
+- Aggiunti monitoraggio di stato per promptId, individuazione dell'MP4 nell'history e proxy streaming `/api/media` con supporto Range per il player web.
+- Aggiunta configurazione FAST persistente per Admin: workflow visibile, modello H3, LoRA/strength e step modificabili; modelli e LoRA sono validati contro gli elenchi reali di ComfyUI.
+- Sostituita la simulazione del pulsante Genera con invio reale al bridge, polling per promptId e player MP4; nessun render viene avviato finché l'utente non preme Genera.
+- Collegati step e LoRA FAST dell'Admin a badge, costo ed ETA dello Studio; le percentuali durante sampling sono esplicitamente stimate finché non arriva il progresso WebSocket.
+- Rimosso il falso avanzamento temporale che poteva mostrare finalizzazione durante il caricamento; aggiunto tracker WebSocket ComfyUI per fase nodo e percentuale sampling reale.
+- Confrontati i primi run: 198,9 s Studio contro 171,7 s cached. Il delta di 27,2 s deriva dal planner/autoprompter non in cache (8 nodi cached contro 17), non da modello, LoRA o bridge; ETA aggiornata con 28 s cold-start una volta per job.
+- Aggiunta persistenza SQLite locale con migrazione versionata per job, candidati, snapshot API, impostazioni FAST, promptId e metadati output; i blob video restano nel filesystem ComfyUI.
+- Aggiunto recupero dei job attivi e degli snapshot di progresso dopo il riavvio del bridge, oltre a `GET /api/jobs` per la cronologia recente.
+- Collegato il ripristino automatico dell'ultimo job alla UI: prompt, durata, MP, formato, candidati e player vengono ricostruiti dal database all'apertura.
+- Aggiunto importatore idempotente della precedente history `video/H3_STUDIO`, utile per migrare nel database i job prodotti prima della persistenza.
+- Aggiunta migrazione SQLite v2 e API per conservare il candidato selezionato, con validazione che il risultato sia completato e abbia un output video.
+- Aggiunta la schermata Progetti/Cronologia: elenca i job SQLite, mostra l'output disponibile e riapre prompt, formato, durata, seed e candidati nello Studio.
+- Collegato il pulsante Scegli alla selezione persistente; verificata la conservazione del candidato dopo due riavvii del bridge.
+- Verificati typecheck, build, migrazioni v1/v2 e risposta HTTP locale senza avviare nuovi render.
+
+## 25 agosto 2026 — Milestone 3/4
+
+- Aggiunte modalità seed Random, Base +1 e Bloccato; verificati su quattro candidati in dry-run.
+- Aggiunti Play, Pausa e Da capo sincronizzati per confrontare i candidati pronti.
+- Aggiunte migrazioni SQLite fino alla v6 per strategia seed, progetti, timeline e parametri multimodali.
+- Implementati progetti locali e clip non distruttive con aggiunta da cronologia, riordino, copia e spostamento fra progetti.
+- Implementato playback virtuale concatenato: ogni video resta un file autonomo e la timeline passa alla clip successiva.
+- Aggiunto test isolato del repository progetti; verificati create, add, copy, move e reorder su database temporaneo.
+- Esteso il builder ai sei modi reali del workflow: T2V, I2V, R2V, KEYFRAMES, VIDEO EXTENSION e VIDEO EDITING.
+- Aggiunto upload proxy verso la route ufficiale del MiniMax H3 Media Loader, con validazione dei tipi.
+- Persistiti media state, ruoli Reference, posizioni Keyframe e politica audio.
+- Imposto sempre `H3SaveContinuation.prepend_source_video = false`: Continue produce soltanto il nuovo segmento.
+- Aggiunti pulsanti Continua/Edita su candidati e clip della timeline.
+- Aggiunti preset creativi Camera, Obiettivo ed Effetti che inseriscono direttive leggibili nel prompt.
+- Implementato export MP4 della timeline tramite FFmpeg locale, con concat stream-copy e fallback H.264/AAC.
+- Aggiunti pulsante Esporta MP4, stato di avanzamento e download diretto nel pannello montaggio.
+- Aggiunto test non-GPU dell’export su un candidato già esistente: MP4 prodotto e temporanei rimossi correttamente.
+- Verificati in dry-run tutti i sei modi con asset ComfyUI esistenti, due seed candidati e coda GPU rimasta vuota.
+- Verificati typecheck, build, migrazioni v1-v6, indice timeline usato dal query planner, repository progetti, API e frontend HTTP 200.
+
+## 26 agosto 2026 — Milestone 6 / Libreria creativa
+
+- Attivato il tab Personaggi e aggiunta una libreria comune per personaggi e oggetti.
+- Aggiunta migrazione SQLite v7 con asset, reference multiple e cronologia generazioni Krea 2.
+- Implementati CRUD, drag-and-drop immagini, ruoli automatici e massimo 12 reference.
+- Costruito un grafo API Krea 2 compatto da 11 nodi per sheet a quattro viste, 1536×1024 e 8 step.
+- Verificata la presenza del workflow sorgente, modello FP8, encoder, VAE, Rebalance e Sharpen nella ComfyUI attiva.
+- Aggiunti dry-run senza GPU, invio esplicito a ComfyUI e recupero automatico dell'output come reference principale.
+- Collegato **Usa nel video** alla modalità H3 Reference con compilazione automatica di `reference_roles`.
+- Test isolato CRUD/migrazione/indice/dry-run superato; test API temporaneo creato e ripulito; coda GPU rimasta vuota.
+
+## 26 agosto 2026 — Collaudo end-to-end autonomo
+
+- Verificati build con Node 24, ESLint, repository progetti, libreria creativa, contratto Krea 2 ed export timeline.
+- Eseguita una generazione Krea 2 reale da 1536×1024 in circa 99 s; la sheet è stata registrata automaticamente come reference primaria.
+- Eseguito un R2V reale da 5 s / 0,5 MP / 8 step con modello hybrid INT8 e Turbo v4 600 EMA in circa 213 s.
+- Verificati output H.264/AAC, coerenza visiva su quattro fotogrammi, persistenza di job/asset/reference dopo restart e coda ComfyUI libera al termine.
+- Corretto lo stato terminale dei candidati: la history `ready/failed` ora prevale su un eventuale progresso WebSocket rimasto obsoleto.
+- Aggiunto `docs/TEST-REPORT-2026-08-26.md` con risultati, artefatti e limite del browser in-app.
+- Allineato il preset MAX alla risoluzione nativa H3: `0,98 MP` al posto di `1,00 MP` nell'app e nei workflow principali.
+- Corretto `H3AspectMegapixelSize` alla convenzione ComfyUI `1024² pixel/MP`: 0,5 → 960×544, 0,7 → 1152×640, 0,98 → 1344×768 in 16:9.
+- Mantenuta compatibilità con i vecchi job a 1,00 MP, normalizzati automaticamente a 0,98 quando vengono riaperti o inviati.
+
+## 26 agosto 2026 — Progetti persistenti e Montaggi v2
+
+- Aggiunte migrazioni SQLite v8/v9 con relazione job → progetto e job → sorgente, montaggi multipli per progetto, trim e mixer audio persistenti.
+- Associati automaticamente i quattro job storici al primo progetto locale; le future continuazioni restano nello stesso progetto come segmenti autonomi.
+- Separata la UI **Progetti** dalla nuova voce **Montaggi**: il nome progetto è visibile nella topbar, nel filtro e sui job.
+- Aggiunta nello Studio una strip dei batch del progetto, così una nuova generazione/continuazione non nasconde più il batch precedente.
+- Aggiunto un montaggio principale automatico e la possibilità di creare più timeline per lo stesso progetto.
+- Implementati trim in/out a 0,05 s, volume per clip, riordino, playback concatenato e salvataggio non distruttivo.
+- Aggiunti upload di audio esterno, gain indipendente per audio H3 e traccia esterna, loop e rimozione traccia.
+- Esteso l’export FFmpeg: applicazione trim, normalizzazione H.264/AAC, concatenazione e mux/mix della traccia esterna.
+- Aggiunti controlli espliciti per mutare audio diegetico e/o non diegetico durante la generazione; sono direttive di prompt perché H3 produce una sola traccia mixata.
+- Creato backup pre-migrazione: data/h3-studio.sqlite.before-timelines-v8-20260826.
+- Verificati typecheck, build, API HTTP, migrazioni, repository su DB temporaneo e export reale trim da 1 secondo (518.651 byte).
+
+## 26 agosto 2026 — Audit piano e preparazione post-produzione
+
+- Installati nella ComfyUI NVMe `ComfyUI-H3-FaceRefine`, `ComfyUI-H3-NativeAudioLock` e il detector `face_yolov8m.pt`.
+- Installate e verificate le dipendenze Python FaceRefine senza sostituire OpenCV mentre ComfyUI era attiva.
+- Confermato che InsightFace usa attualmente ONNX CPU; la migrazione a ONNX GPU resta una decisione separata da collaudare.
+- Confermata la presenza locale del Latent Upscaler H3, ma non ancora la sua integrazione nel bridge H3 Studio.
+- Auditato il piano contro API, UI, database e test reali: coda ordinata, indicizzazione output, libreria media `@`, montaggi ed export risultano implementati.
+- Corrette le voci obsolete su stato progetto, risoluzione massima 0,98 MP, Engine H3/Krea e milestone già completate.
+- Aggiunta una milestone dedicata a Face/Upscale e varianti immutabili, più backlog esplicito per retry/cancel, transizioni, storage, health check e test GPU.
+
+## 26 agosto 2026 — Face Refiner, Latent Upscaler e varianti nell'app
+
+- Aggiunta migrazione SQLite v11 con `candidate_variants` e collegamento opzionale della variante alla clip di timeline.
+- Implementato il servizio persistente per `Face`, `Upscale` e pipeline combinata `Face + Upscale`, senza sovrascrivere il candidato originale.
+- Integrato il Latent Upscaler 3D direttamente nel sampler H3: prima generazione a risoluzione ridotta, upscale latent e breve refine alla risoluzione richiesta con audio bloccato.
+- Costruito il workflow API FaceRefine per crop/tracking per-frame, denoise progressivo, reinserimento sul video e conservazione dell'audio nativo.
+- Aggiunti nell'interfaccia selettore versione, azioni di post-produzione, progressi e scelta del derivato per Continue, Edit e timeline.
+- Il montaggio risolve ora il file della variante selezionata e permette di tornare all'originale in qualunque momento.
+- Aggiunti preflight sui nodi ComfyUI: un processo non riavviato viene fermato prima della coda con un messaggio esplicito.
+- Verificati typecheck bridge, build Vinext, repository progetti, export timeline, libreria creativa e contratto Krea 2.
+- Installato il loader PDD-Acc dedicato e spostati i due pesi ufficiali FL2VA/Ref2VA in `models/pdd_acc`; 13 test del nodo superati. Il profilo resta sperimentale perché richiede un modello base corrispondente e non va sommato al Turbo.
+- Aggiunta l'icona cestino sui candidati completati e sui video della Libreria media.
+- La cancellazione rimuove atomicamente il candidato da ogni timeline, rinumera le clip residue, elimina le varianti Face/Upscale e cancella soltanto i file confinati nella cartella output ComfyUI.
+- Bloccata la cancellazione di candidati o varianti ancora in esecuzione; se era l'ultimo candidato viene rimosso anche il batch rimasto vuoto.
+- Esteso il test repository: verificata la rimozione dello stesso candidato da tre montaggi e del relativo job vuoto.
+
+## 26 agosto 2026 — FAST Alibaba PDD-Acc in produzione applicativa
+
+- Separato il motore FAST dal workflow H3 standard: l'interfaccia espone ora `FAST / 8 / 12 / 20 / 30` senza l'ambiguo interruttore Turbo.
+- FAST usa un workflow API derivato dedicato, PDD-Acc a 8 NFE, Euler, sigmas PDD, CFG 1 e SigmaShift 12/3; i preset numerici mantengono il motore H3 standard.
+- Aggiunto in Admin un pannello FAST indipendente con modello base, file PDD reale da `models/pdd_acc` e fino a tre LoRA creativi.
+- Bloccati Hybrid/Ref-Delta, coppie Ref2VA/FL2VA discordanti e LoRA Turbo/distill/cache nello stack FAST.
+- Esteso il sampler `H3ReferenceMemorySampler` con applicazione PDD interna e preflight sul processo ComfyUI attivo.
+- Aggiunta migrazione SQLite v12: ogni job registra `engine_profile` e `pdd_file` oltre allo snapshot API.
+- Verificati typecheck, build Vinext, migrazioni/repository, sintassi Python e test non-GPU FAST/8 standard.
+
+## 26 agosto 2026 — Packaging GitHub e onboarding locale
+
+- Rimossi dal launcher e dai default applicativi i percorsi personali `C:/Users`, `D:` e `F:`.
+- Aggiunto wizard di primo avvio con creazione password Admin, URL ComfyUI, cartella output, FFmpeg e associazione dei workflow inclusi.
+- Password derivata con `scrypt`, sessioni Admin HTTP-only e protezione server-side di tutte le rotte `/api/admin/*`.
+- Aggiunti catalogo workflow, grafo Krea 2 pronto e manifest interrogabile di custom node/modelli richiesti.
+- L'Admin mostra lo stato reale delle dipendenze e permette di cambiare server e profili; le modifiche infrastrutturali richiedono riavvio esplicito.
+- Aggiornati launcher first-run, `.env.example`, `.gitignore`, metadati package e guida di installazione portabile.
+- Sanitizzati gli snapshot UI/API: rimossi preset, prompt, media e LoRA personali; lo stack viene popolato soltanto dalle impostazioni Admin.
+- Incluso lo snapshot esteso del nodo H3 Studio con licenza MIT upstream, commit base e sole risorse attive.
+- Aggiunto installer ComfyUI recuperabile con backup del nodo H3 esistente, clone dei nodi esterni e requirements Python opzionali.
+- Esteso il manifest ai workflow video, FAST, Krea, Face e Upscale, con verifica live di nodi e pesi e cartelle visibili nell'Admin.
+- Aggiunta CI GitHub Windows per sanitizzazione, typecheck, test principali e build.

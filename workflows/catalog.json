@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "h3-aio-ultra",
+      "role": "video",
+      "name": "MiniMax H3 AIO Autoprompter Ultra",
+      "ui": "studio-backend.ui.json",
+      "api": "studio-backend.api.json"
+    },
+    {
+      "id": "h3-fast-alibaba-pdd",
+      "role": "fast",
+      "name": "MiniMax H3 FAST Alibaba PDD-Acc",
+      "derivedFrom": "h3-aio-ultra",
+      "api": "studio-fast-pdd.api.json"
+    },
+    {
+      "id": "krea2-character-sheet",
+      "role": "image",
+      "name": "Krea 2 Character/Object Sheet",
+      "api": "studio-krea2.api.json"
+    }
+  ]
+}

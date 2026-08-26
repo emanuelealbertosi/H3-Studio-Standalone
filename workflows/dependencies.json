@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "h3-studio-nodes",
+      "label": "H3 Studio node pack (incluso)",
+      "kind": "custom_node",
+      "requiredClasses": [
+        "H3ModelLoaderAny",
+        "H3ReferenceMemorySampler",
+        "H3AIOAutopromptRequest",
+        "H3AIOPlanParser",
+        "H3AIOGenerationRouter",
+        "H3SaveContinuation"
+      ],
+      "url": "https://github.com/jlucasmcrell/ComfyUI-H3-Multishot",
+      "notes": "La versione estesa usata da H3 Studio si trova in comfyui_nodes/ e viene installata dallo script incluso.",
+      "requiredFor": ["video", "fast"]
+    },
+    {
+      "id": "fantastic-h3-media",
+      "label": "Fantastic MiniMax H3 Prompt Builder",
+      "kind": "custom_node",
+      "requiredClasses": ["MiniMaxH3MediaLoader", "MiniMaxH3ReferenceSplitter"],
+      "url": "https://github.com/Adudeguyman/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder",
+      "requiredFor": ["video", "fast"]
+    },
+    {
+      "id": "dasiwa-llm",
+      "label": "DaSiWa LLM/VLM nodes",
+      "kind": "custom_node",
+      "requiredClasses": ["DaSiWa_LLMModelSelector", "DaSiWa_LLMAnalyze"],
+      "url": "https://github.com/darksidewalker/ComfyUI-DaSiWa-Nodes",
+      "requiredFor": ["video", "fast"]
+    },
+    {
+      "id": "rgthree",
+      "label": "rgthree-comfy",
+      "kind": "custom_node",
+      "requiredClasses": ["Power Lora Loader (rgthree)"],
+      "url": "https://github.com/rgthree/rgthree-comfy",
+      "requiredFor": ["video", "fast", "face", "upscale"]
+    },
+    {
+      "id": "kj-nodes",
+      "label": "ComfyUI-KJNodes",
+      "kind": "custom_node",
+      "requiredClasses": ["ImageSharpenKJ", "PathchSageAttentionKJ"],
+      "url": "https://github.com/kijai/ComfyUI-KJNodes",
+      "requiredFor": ["video", "fast", "image", "face", "upscale"]
+    },
+    {
+      "id": "video-helper-suite",
+      "label": "ComfyUI VideoHelperSuite",
+      "kind": "custom_node",
+      "requiredClasses": ["VHS_LoadVideoPath", "VHS_VideoCombine"],
+      "url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+      "requiredFor": ["face", "upscale"]
+    },
+    {
+      "id": "pdd-acc",
+      "label": "MiniMax H3 PDD-Acc",
+      "kind": "custom_node",
+      "requiredClasses": ["MiniMaxH3PDDAccApply"],
+      "url": "https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc",
+      "requiredFor": ["fast"]
+    },
+    {
+      "id": "krea-rebalance",
+      "label": "Rebalance Pack (Krea 2)",
+      "kind": "custom_node",
+      "requiredClasses": ["ConditioningKrea2Rebalance"],
+      "url": "https://github.com/nova452/Rebalance-Pack",
+      "requiredFor": ["image"]
+    },
+    {
+      "id": "h3-face-refine",
+      "label": "ComfyUI-H3-FaceRefine",
+      "kind": "custom_node",
+      "requiredClasses": [
+        "H3FaceTrackCrop",
+        "H3FaceStitch",
+        "H3InjectVideoLatent",
+        "H3PerFrameDenoise"
+      ],
+      "url": "https://github.com/Carasibana/ComfyUI-H3-FaceRefine",
+      "requiredFor": ["face"]
+    },
+    {
+      "id": "h3-native-audio-lock",
+      "label": "MiniMax H3 NativeAudioLock",
+      "kind": "custom_node",
+      "requiredClasses": ["MiniMaxH3NativeAudioLock"],
+      "url": "https://github.com/Shrek3OnVH5/MiniMax-H3-NativeAudio-MusicVideo-Workflow",
+      "notes": "Il nodo si trova nella sottocartella custom_nodes/ComfyUI-H3-NativeAudioLock del repository.",
+      "requiredFor": ["face", "upscale"]
+    },
+    {
+      "id": "h3-latent-upscaler",
+      "label": "MiniMax H3 Latent Upscaler 3D",
+      "kind": "model",
+      "folder": "latent_upscale_models",
+      "requiredClasses": ["MinimaxH3LatentUpscaler3D"],
+      "filenames": ["minimax_h3_latent_upscaler_3d_fp16.safetensors"],
+      "url": "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler",
+      "requiredFor": ["upscale"]
+    },
+    {
+      "id": "pdd-models",
+      "label": "Alibaba MiniMax H3 Acc LoRAs",
+      "kind": "model",
+      "folder": "pdd_acc",
+      "filenames": [
+        "MiniMax-H3-FL2VA-Acc-8Step.safetensors",
+        "MiniMax-H3-Ref2VA-Acc-8Step.safetensors"
+      ],
+      "url": "https://huggingface.co/alibaba-pai/MiniMax-H3-Acc-LoRAs",
+      "requiredFor": ["fast"]
+    },
+    {
+      "id": "h3-base-model",
+      "label": "Modello H3 standard predefinito",
+      "kind": "model",
+      "folder": "diffusion_models",
+      "filenames": ["minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors"],
+      "requiredFor": ["video"]
+    },
+    {
+      "id": "h3-fast-base-model",
+      "label": "Modello H3 FAST Ref2VA predefinito",
+      "kind": "model",
+      "folder": "diffusion_models",
+      "filenames": ["minimaxH3INT8INT4_ref2vaINT8Pruned.safetensors"],
+      "requiredFor": ["fast"]
+    },
+    {
+      "id": "h3-text-encoder",
+      "label": "Text encoder MiniMax H3",
+      "kind": "model",
+      "folder": "text_encoders",
+      "filenames": ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"],
+      "requiredFor": ["video", "fast"]
+    },
+    {
+      "id": "h3-video-vae",
+      "label": "MiniMax H3 Video VAE",
+      "kind": "model",
+      "folder": "vae",
+      "filenames": ["minimax_h3_video_vae_int8_convrot.safetensors"],
+      "requiredFor": ["video", "fast"]
+    },
+    {
+      "id": "h3-audio-vae",
+      "label": "MiniMax H3 Audio VAE",
+      "kind": "model",
+      "folder": "vae",
+      "filenames": ["minimax_h3_audio_vae_fp32.safetensors"],
+      "requiredFor": ["video", "fast"]
+    },
+    {
+      "id": "h3-planner-llm",
+      "label": "LLM locale del planner",
+      "kind": "model",
+      "folder": "llm",
+      "filenames": [
+        "huihui-ai\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-Q4_K.gguf"
+      ],
+      "requiredFor": ["video", "fast"]
+    },
+    {
+      "id": "krea-model",
+      "label": "Krea 2 Turbo FP8",
+      "kind": "model",
+      "folder": "diffusion_models",
+      "filenames": ["krea2TurboFP8_krea2TURBO.safetensors"],
+      "requiredFor": ["image"]
+    },
+    {
+      "id": "krea-text-encoder",
+      "label": "Qwen3-VL 4B Krea encoder",
+      "kind": "model",
+      "folder": "text_encoders",
+      "filenames": ["qwen3vl_4b_fp8_scaled.safetensors"],
+      "requiredFor": ["image"]
+    },
+    {
+      "id": "krea-vae",
+      "label": "Qwen Image VAE",
+      "kind": "model",
+      "folder": "vae",
+      "filenames": ["qwen_image_vae.safetensors"],
+      "requiredFor": ["image"]
+    },
+    {
+      "id": "face-detector",
+      "label": "Face detector YOLOv8m",
+      "kind": "model",
+      "folder": "ultralytics_bbox",
+      "filenames": ["face_yolov8m.pt"],
+      "requiredFor": ["face"]
+    }
+  ]
+}

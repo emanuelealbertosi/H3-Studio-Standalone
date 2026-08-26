@@ -1,0 +1,12 @@
+ALTER TABLE jobs
+ADD COLUMN media_state TEXT NOT NULL DEFAULT '[]';
+
+ALTER TABLE jobs
+ADD COLUMN reference_roles TEXT NOT NULL DEFAULT 'AUTO';
+
+ALTER TABLE jobs
+ADD COLUMN keyframe_positions TEXT NOT NULL DEFAULT 'AUTO';
+
+ALTER TABLE jobs
+ADD COLUMN source_video_audio TEXT NOT NULL DEFAULT 'AUTO'
+CHECK (source_video_audio IN ('AUTO', 'IGNORE', 'REFERENCE', 'REUSE'));

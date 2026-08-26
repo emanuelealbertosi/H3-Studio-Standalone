@@ -1,0 +1,344 @@
+export const JOB_DATABASE_MIGRATIONS = [
+  {
+    version: 1,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS jobs (
+        id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        candidate_count INTEGER NOT NULL CHECK (candidate_count BETWEEN 1 AND 4),
+        duration_seconds INTEGER NOT NULL CHECK (duration_seconds IN (5, 10)),
+        megapixels REAL NOT NULL CHECK (megapixels IN (0.5, 0.7, 1.0)),
+        generation_mode TEXT NOT NULL,
+        aspect_format TEXT NOT NULL,
+        requested_seed TEXT,
+        model TEXT NOT NULL,
+        lora TEXT NOT NULL,
+        lora_strength REAL NOT NULL,
+        steps INTEGER NOT NULL CHECK (steps BETWEEN 4 AND 30)
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS candidates (
+        job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        candidate_index INTEGER NOT NULL CHECK (candidate_index BETWEEN 1 AND 4),
+        seed TEXT NOT NULL,
+        filename_prefix TEXT NOT NULL,
+        prompt_id TEXT,
+        queue_number INTEGER,
+        status TEXT NOT NULL,
+        api_prompt_json TEXT NOT NULL,
+        output_filename TEXT,
+        output_subfolder TEXT,
+        output_type TEXT,
+        output_format TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (job_id, candidate_index)
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_jobs_created_at
+       ON jobs(created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_jobs_active_status
+       ON jobs(status)
+       WHERE status NOT IN ('completed', 'failed')`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_candidates_prompt_id
+       ON candidates(prompt_id)
+       WHERE prompt_id IS NOT NULL`,
+    ],
+  },
+  {
+    version: 2,
+    statements: [
+      `ALTER TABLE jobs
+       ADD COLUMN selected_candidate_index INTEGER
+       CHECK (selected_candidate_index BETWEEN 1 AND 4)`,
+    ],
+  },
+  {
+    version: 3,
+    statements: [
+      `ALTER TABLE jobs
+       ADD COLUMN seed_mode TEXT NOT NULL DEFAULT 'random'
+       CHECK (seed_mode IN ('random', 'base', 'fixed'))`,
+    ],
+  },
+  {
+    version: 4,
+    statements: [
+      `UPDATE jobs
+       SET seed_mode = 'base'
+       WHERE requested_seed IS NOT NULL
+         AND seed_mode = 'random'`,
+    ],
+  },
+  {
+    version: 5,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS project_clips (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        source_job_id TEXT NOT NULL,
+        source_candidate_index INTEGER NOT NULL CHECK (source_candidate_index BETWEEN 1 AND 4),
+        position INTEGER NOT NULL CHECK (position >= 0),
+        label TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (source_job_id, source_candidate_index)
+          REFERENCES candidates(job_id, candidate_index)
+          ON DELETE RESTRICT
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_project_clips_project_position
+       ON project_clips(project_id, position)`,
+    ],
+  },
+  {
+    version: 6,
+    statements: [
+      `ALTER TABLE jobs
+       ADD COLUMN media_state TEXT NOT NULL DEFAULT '[]'`,
+      `ALTER TABLE jobs
+       ADD COLUMN reference_roles TEXT NOT NULL DEFAULT 'AUTO'`,
+      `ALTER TABLE jobs
+       ADD COLUMN keyframe_positions TEXT NOT NULL DEFAULT 'AUTO'`,
+      `ALTER TABLE jobs
+       ADD COLUMN source_video_audio TEXT NOT NULL DEFAULT 'AUTO'
+       CHECK (source_video_audio IN ('AUTO', 'IGNORE', 'REFERENCE', 'REUSE'))`,
+    ],
+  },
+  {
+    version: 7,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS creative_assets (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('character', 'object')),
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        generation_prompt TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draft'
+          CHECK (status IN ('draft', 'ready', 'generating', 'failed')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS creative_generations (
+        id TEXT PRIMARY KEY,
+        asset_id TEXT NOT NULL REFERENCES creative_assets(id) ON DELETE CASCADE,
+        prompt TEXT NOT NULL,
+        seed TEXT NOT NULL,
+        status TEXT NOT NULL
+          CHECK (status IN ('prepared', 'queued', 'running', 'ready', 'failed')),
+        prompt_id TEXT,
+        queue_number INTEGER,
+        api_prompt_json TEXT NOT NULL,
+        filename_prefix TEXT NOT NULL,
+        output_filename TEXT,
+        output_subfolder TEXT,
+        output_type TEXT,
+        output_format TEXT,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS creative_asset_references (
+        id TEXT PRIMARY KEY,
+        asset_id TEXT NOT NULL REFERENCES creative_assets(id) ON DELETE CASCADE,
+        generation_id TEXT REFERENCES creative_generations(id) ON DELETE SET NULL,
+        label TEXT NOT NULL,
+        role TEXT NOT NULL
+          CHECK (role IN ('primary', 'face', 'full_body', 'front', 'side', 'back', 'detail', 'style', 'other')),
+        position INTEGER NOT NULL CHECK (position >= 0),
+        file TEXT NOT NULL,
+        name TEXT NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('upload', 'generated')),
+        width INTEGER,
+        height INTEGER,
+        created_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_creative_assets_kind_updated
+       ON creative_assets(kind, updated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_creative_references_asset_position
+       ON creative_asset_references(asset_id, position)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_creative_references_generation
+       ON creative_asset_references(generation_id)
+       WHERE generation_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_creative_generations_asset_created
+       ON creative_generations(asset_id, created_at DESC)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_creative_generations_prompt_id
+       ON creative_generations(prompt_id)
+       WHERE prompt_id IS NOT NULL`,
+    ],
+  },
+  {
+    version: 8,
+    statements: [
+      `ALTER TABLE jobs
+       ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL`,
+      `ALTER TABLE jobs
+       ADD COLUMN source_job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL`,
+      `ALTER TABLE jobs
+       ADD COLUMN mute_diegetic INTEGER NOT NULL DEFAULT 0
+       CHECK (mute_diegetic IN (0, 1))`,
+      `ALTER TABLE jobs
+       ADD COLUMN mute_non_diegetic INTEGER NOT NULL DEFAULT 0
+       CHECK (mute_non_diegetic IN (0, 1))`,
+      `CREATE TABLE IF NOT EXISTS project_timelines (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        external_audio_file TEXT,
+        external_audio_name TEXT,
+        original_audio_gain REAL NOT NULL DEFAULT 1.0
+          CHECK (original_audio_gain BETWEEN 0.0 AND 2.0),
+        external_audio_gain REAL NOT NULL DEFAULT 1.0
+          CHECK (external_audio_gain BETWEEN 0.0 AND 2.0),
+        external_audio_loop INTEGER NOT NULL DEFAULT 0
+          CHECK (external_audio_loop IN (0, 1)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_project_timelines_project_updated
+       ON project_timelines(project_id, updated_at DESC)`,
+      `INSERT INTO project_timelines(id, project_id, name, created_at, updated_at)
+       SELECT lower(hex(randomblob(16))), id, 'Montaggio principale', created_at, updated_at
+       FROM projects
+       WHERE NOT EXISTS (
+         SELECT 1 FROM project_timelines
+         WHERE project_timelines.project_id = projects.id
+       )`,
+      `ALTER TABLE project_clips
+       ADD COLUMN timeline_id TEXT REFERENCES project_timelines(id) ON DELETE CASCADE`,
+      `ALTER TABLE project_clips
+       ADD COLUMN trim_start REAL NOT NULL DEFAULT 0.0 CHECK (trim_start >= 0.0)`,
+      `ALTER TABLE project_clips
+       ADD COLUMN trim_end REAL CHECK (trim_end IS NULL OR trim_end > 0.0)`,
+      `ALTER TABLE project_clips
+       ADD COLUMN volume REAL NOT NULL DEFAULT 1.0 CHECK (volume BETWEEN 0.0 AND 2.0)`,
+      `UPDATE project_clips
+       SET timeline_id = (
+         SELECT project_timelines.id
+         FROM project_timelines
+         WHERE project_timelines.project_id = project_clips.project_id
+         ORDER BY project_timelines.created_at
+         LIMIT 1
+       )
+       WHERE timeline_id IS NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_project_clips_timeline_position
+       ON project_clips(timeline_id, position)`,
+      `UPDATE jobs
+       SET project_id = (
+         SELECT project_clips.project_id
+         FROM project_clips
+         WHERE project_clips.source_job_id = jobs.id
+         ORDER BY project_clips.created_at
+         LIMIT 1
+       )
+       WHERE project_id IS NULL
+         AND EXISTS (
+           SELECT 1 FROM project_clips
+           WHERE project_clips.source_job_id = jobs.id
+         )`,
+      `CREATE INDEX IF NOT EXISTS idx_jobs_project_created
+       ON jobs(project_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_jobs_source_job
+       ON jobs(source_job_id)`,
+    ],
+  },
+  {
+    version: 9,
+    statements: [
+      `UPDATE jobs
+       SET project_id = (SELECT id FROM projects ORDER BY created_at LIMIT 1),
+           updated_at = updated_at
+       WHERE project_id IS NULL
+         AND (SELECT COUNT(*) FROM projects) = 1`,
+    ],
+  },
+  {
+    version: 10,
+    statements: [
+      `ALTER TABLE jobs
+       ADD COLUMN quality_mode TEXT NOT NULL DEFAULT 'fast'
+       CHECK (quality_mode IN ('fast', 'min', 'med', 'max'))`,
+      `ALTER TABLE jobs
+       ADD COLUMN turbo_enabled INTEGER NOT NULL DEFAULT 1
+       CHECK (turbo_enabled IN (0, 1))`,
+    ],
+  },
+  {
+    version: 11,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS candidate_variants (
+        id TEXT PRIMARY KEY,
+        source_job_id TEXT NOT NULL,
+        source_candidate_index INTEGER NOT NULL CHECK (source_candidate_index BETWEEN 1 AND 4),
+        kind TEXT NOT NULL CHECK (kind IN ('face', 'upscale', 'face_upscale')),
+        stage TEXT NOT NULL CHECK (stage IN ('face', 'upscale')),
+        status TEXT NOT NULL CHECK (status IN ('prepared', 'submitted', 'queued', 'rendering', 'ready', 'failed')),
+        prompt_id TEXT,
+        queue_number INTEGER,
+        api_prompt_json TEXT NOT NULL,
+        filename_prefix TEXT NOT NULL,
+        output_filename TEXT,
+        output_subfolder TEXT,
+        output_type TEXT,
+        output_format TEXT,
+        intermediate_filename TEXT,
+        intermediate_subfolder TEXT,
+        intermediate_type TEXT,
+        intermediate_format TEXT,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (source_job_id, source_candidate_index)
+          REFERENCES candidates(job_id, candidate_index)
+          ON DELETE CASCADE
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_candidate_variants_source
+       ON candidate_variants(source_job_id, source_candidate_index, created_at DESC)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_candidate_variants_prompt_id
+       ON candidate_variants(prompt_id)
+       WHERE prompt_id IS NOT NULL`,
+      `ALTER TABLE project_clips
+       ADD COLUMN source_variant_id TEXT REFERENCES candidate_variants(id) ON DELETE SET NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_project_clips_variant
+       ON project_clips(source_variant_id)
+       WHERE source_variant_id IS NOT NULL`,
+    ],
+  },
+  {
+    version: 12,
+    statements: [
+      `ALTER TABLE jobs
+       ADD COLUMN engine_profile TEXT NOT NULL DEFAULT 'standard'
+       CHECK (engine_profile IN ('standard', 'fast'))`,
+      `ALTER TABLE jobs
+       ADD COLUMN pdd_file TEXT`,
+      `CREATE INDEX IF NOT EXISTS idx_jobs_engine_profile_created
+      ON jobs(engine_profile, created_at DESC)`,
+    ],
+  },
+  {
+    version: 13,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS admin_credentials (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        password_salt TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS admin_sessions (
+        token_hash TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires
+       ON admin_sessions(expires_at)`,
+    ],
+  },
+] as const;

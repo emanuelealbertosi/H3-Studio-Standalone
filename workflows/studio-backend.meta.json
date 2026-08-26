@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-08-25T17:10:37.572Z",
+  "promptId": "5c3ce616-b36e-4b6e-9d98-6d06c1aff455",
+  "queueNumber": 0,
+  "sourceWorkflow": "D:\\ComfyUI_NVMe\\ComfyUI\\user\\default\\workflows\\FINAL-MiniMax H3 AIO AUTOPROMPT ULTRA - OFFICIAL SKILL EXPERIMENT.json",
+  "uiSha256": "e585e14f2452c30b9a6b5d63e77086b9bda8612a48073d2c70ccef55d92c385d",
+  "apiSha256": "e2240233815edb182c4cbd9e287b69ac0bc94d61101fb128d3ca3d892623cc56",
+  "apiNodeCount": 23,
+  "requiredClasses": [
+    "H3ModelLoaderAny",
+    "H3ReferenceMemorySampler",
+    "H3SaveContinuation",
+    "H3AIOAutopromptRequest",
+    "H3AIOPlanParser",
+    "H3AIOGenerationRouter"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "name": "h3-studio",
+  "version": "0.2.0",
+  "description": "Local-first MiniMax H3 production studio for ComfyUI",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vinext dev",
+    "dev:bridge": "tsx watch bridge/server.ts",
+    "start:bridge": "tsx bridge/server.ts",
+    "import:history": "tsx scripts/import-studio-history.ts",
+    "test:projects": "tsx scripts/test-project-repository.ts",
+    "test:export": "tsx scripts/test-timeline-export.ts",
+    "test:library": "tsx scripts/test-creative-library.ts",
+    "test:krea-contract": "tsx scripts/test-krea-contract.ts",
+    "test:fast": "tsx scripts/test-fast-engine.ts",
+    "test:setup": "tsx scripts/test-setup-auth.ts",
+    "sanitize:workflows": "tsx scripts/sanitize-bundled-workflows.ts",
+    "typecheck": "tsc --noEmit --pretty false",
+    "build": "vinext build",
+    "start": "vinext start",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+  },
+  "dependencies": {
+    "@fastify/cors": "11.3.0",
+    "@fastify/websocket": "11.3.0",
+    "fastify": "5.12.1",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/workers-types": "4.20260515.1",
+    "@openai/sites-vite-plugin": "^0.1.0 || ^0.2.0",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "0.5.26",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "react-server-dom-webpack": "19.2.6",
+    "tailwindcss": "4.2.1",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3",
+    "vinext": "1.0.0-beta.3",
+    "vite": "8.0.13",
+    "wrangler": "4.92.0"
+  },
+  "type": "module"
+}

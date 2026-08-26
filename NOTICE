@@ -1,0 +1,9 @@
+H3 Studio
+Copyright (C) 2026 Emanuele
+
+The original H3 Studio code is licensed under the GNU Affero General Public
+License version 3 only (AGPL-3.0-only). See LICENSE.
+
+Bundled third-party and derived components retain their own copyright notices
+and licenses. In particular, comfyui_nodes/ComfyUI-H3-Multishot retains the MIT
+license and attribution of its upstream project; see the files in that folder.

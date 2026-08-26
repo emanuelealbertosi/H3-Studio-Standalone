@@ -1,0 +1,801 @@
+import { randomUUID } from "node:crypto";
+import type { ComfyApiNode, ComfyApiPrompt, ComfyClient } from "./comfy-client.js";
+import type { WorkflowStore } from "./workflow-store.js";
+import type {
+  ResolvedEngineSettings,
+  RuntimeSettings,
+  RuntimeSettingsStore,
+} from "./runtime-settings.js";
+import type { FastWorkflowStore } from "./fast-workflow-store.js";
+import type { ComfyProgressTracker } from "./comfy-progress.js";
+import type { JobRepository } from "./job-repository.js";
+
+const MAX_SEED = 9_007_199_254_740_000;
+const BASE_SECONDS_5S_05MP = 172;
+const PLANNER_COLD_SECONDS = 28;
+const ASPECT_FORMATS = [
+  "16:9 landscape",
+  "9:16 portrait",
+  "1:1 square",
+  "4:3 landscape",
+  "3:4 portrait",
+  "3:2 landscape",
+  "2:3 portrait",
+  "21:9 ultrawide",
+  "9:21 vertical ultrawide",
+  "5:4 landscape",
+  "4:5 portrait",
+] as const;
+const GENERATION_MODES = [
+  "T2V",
+  "I2V",
+  "R2V",
+  "KEYFRAMES",
+  "VIDEO EXTENSION",
+  "VIDEO EDITING",
+] as const;
+
+type AspectFormat = (typeof ASPECT_FORMATS)[number];
+export type GenerationMode = (typeof GENERATION_MODES)[number];
+export type SeedMode = "random" | "base" | "fixed";
+export type QualityMode = "fast" | "min" | "med" | "max";
+
+export type StudioJobRequest = {
+  prompt: string;
+  candidateCount: 1 | 2 | 3 | 4;
+  durationSeconds: 5 | 10;
+  megapixels: 0.5 | 0.7 | 0.98;
+  generationMode: GenerationMode;
+  aspectFormat: AspectFormat;
+  seedMode: SeedMode;
+  qualityMode: QualityMode;
+  turboEnabled: boolean;
+  seed?: number;
+  mediaState: string;
+  referenceRoles: string;
+  keyframePositions: string;
+  sourceVideoAudio: "AUTO" | "IGNORE" | "REFERENCE" | "REUSE";
+  projectId: string | null;
+  sourceJobId: string | null;
+  muteDiegetic: boolean;
+  muteNonDiegetic: boolean;
+};
+
+export type PreparedCandidate = {
+  index: number;
+  seed: number;
+  filenamePrefix: string;
+  prompt: ComfyApiPrompt;
+};
+
+export type StudioJob = {
+  id: string;
+  projectId: string | null;
+  projectName: string | null;
+  sourceJobId: string | null;
+  status:
+    | "prepared"
+    | "submitted"
+    | "partial"
+    | "running"
+    | "completed"
+    | "failed";
+  createdAt: string;
+  selectedCandidateIndex: number | null;
+  engine: ResolvedEngineSettings;
+  request: StudioJobRequest & { promptLength: number };
+  candidates: Array<{
+    index: number;
+    seed: number;
+    filenamePrefix: string;
+    promptId: string | null;
+    queueNumber: number | null;
+    status:
+      | "prepared"
+      | "submitted"
+      | "queued"
+      | "rendering"
+      | "ready"
+      | "failed";
+    output: MediaOutput | null;
+  }>;
+};
+
+export type MediaOutput = {
+  filename: string;
+  subfolder: string;
+  type: "input" | "output" | "temp";
+  format: string;
+  mediaPath: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function clonePrompt(prompt: ComfyApiPrompt): ComfyApiPrompt {
+  return structuredClone(prompt);
+}
+
+function uniqueNode(prompt: ComfyApiPrompt, classType: string): ComfyApiNode {
+  const matches = Object.values(prompt).filter(
+    (node) => node.class_type === classType,
+  );
+  if (matches.length !== 1) {
+    throw new Error(
+      `Firma workflow non valida: atteso un nodo ${classType}, trovati ${matches.length}`,
+    );
+  }
+  return matches[0];
+}
+
+function requireInput(node: ComfyApiNode, input: string) {
+  if (!(input in node.inputs)) {
+    throw new Error(
+      `Firma workflow non valida: ${node.class_type}.${input} non trovato`,
+    );
+  }
+}
+
+function normalizeMediaState(value: unknown) {
+  const raw = typeof value === "string" ? value : "[]";
+  let items: unknown;
+  try {
+    items = JSON.parse(raw || "[]");
+  } catch {
+    throw new Error("mediaState non contiene JSON valido");
+  }
+  if (!Array.isArray(items) || items.length > 18) {
+    throw new Error("mediaState deve contenere al massimo 18 asset");
+  }
+  let pictures = 0;
+  let videos = 0;
+  let audios = 0;
+  for (const item of items) {
+    if (!isRecord(item)) throw new Error("Asset media non valido");
+    if (item.kind === "picture") pictures += 1;
+    else if (item.kind === "video") videos += 1;
+    else if (item.kind === "audio") audios += 1;
+    else throw new Error("Tipo asset non supportato");
+    const file = typeof item.file === "string" ? item.file.trim() : "";
+    const clean = file.replace(/ \[(input|output|temp)\]$/i, "");
+    if (
+      !file ||
+      /^[a-z]:/i.test(clean) ||
+      clean.startsWith("/") ||
+      clean.startsWith("\\") ||
+      clean.split(/[\\/]+/).includes("..")
+    ) {
+      throw new Error("Percorso asset non valido");
+    }
+  }
+  if (pictures > 9 || videos > 3 || audios > 3) {
+    throw new Error("Troppi asset per gli slot MiniMax H3");
+  }
+  return { json: JSON.stringify(items), pictures, videos, audios };
+}
+
+function normalizeRequest(value: unknown): StudioJobRequest {
+  if (!isRecord(value)) throw new Error("Body JSON mancante");
+  const prompt = typeof value.prompt === "string" ? value.prompt.trim() : "";
+  if (prompt.length < 3 || prompt.length > 20_000) {
+    throw new Error("Il prompt deve contenere da 3 a 20.000 caratteri");
+  }
+
+  const candidateCount = Number(value.candidateCount);
+  if (![1, 2, 3, 4].includes(candidateCount)) {
+    throw new Error("candidateCount deve essere 1, 2, 3 o 4");
+  }
+
+  const durationSeconds = Number(value.durationSeconds);
+  if (durationSeconds !== 5 && durationSeconds !== 10) {
+    throw new Error("durationSeconds deve essere 5 oppure 10");
+  }
+
+  const requestedMegapixels = Number(value.megapixels);
+  if (![0.5, 0.7, 0.98, 1].includes(requestedMegapixels)) {
+    throw new Error("megapixels deve essere 0.5, 0.7 oppure 0.98");
+  }
+  const megapixels = requestedMegapixels === 1 ? 0.98 : requestedMegapixels;
+
+  const generationMode =
+    typeof value.generationMode === "string"
+      ? value.generationMode.toUpperCase()
+      : "T2V";
+  if (!GENERATION_MODES.includes(generationMode as GenerationMode)) {
+    throw new Error("Modalità di generazione non supportata");
+  }
+
+  const aspectFormat =
+    typeof value.aspectFormat === "string"
+      ? value.aspectFormat
+      : "16:9 landscape";
+  if (!ASPECT_FORMATS.includes(aspectFormat as AspectFormat)) {
+    throw new Error("aspectFormat non è supportato dal nodo H3");
+  }
+
+  const requestedSeed = value.seed === undefined ? undefined : Number(value.seed);
+  const seedMode: SeedMode =
+    value.seedMode === "base" || value.seedMode === "fixed"
+      ? value.seedMode
+      : "random";
+  const qualityMode: QualityMode =
+    value.qualityMode === "min" ||
+    value.qualityMode === "med" ||
+    value.qualityMode === "max"
+      ? value.qualityMode
+      : "fast";
+  if (
+    requestedSeed !== undefined &&
+    (!Number.isSafeInteger(requestedSeed) || requestedSeed < 0)
+  ) {
+    throw new Error("seed deve essere un intero sicuro maggiore o uguale a zero");
+  }
+  if (seedMode !== "random" && requestedSeed === undefined) {
+    throw new Error("Inserisci un seed per la modalità base o bloccata");
+  }
+
+  const media = normalizeMediaState(value.mediaState);
+  if (generationMode === "I2V" && media.pictures < 1) {
+    throw new Error("I2V richiede almeno una Picture");
+  }
+  if (generationMode === "KEYFRAMES" && media.pictures < 1) {
+    throw new Error("Keyframes richiede almeno una Picture");
+  }
+  if (
+    (generationMode === "VIDEO EXTENSION" ||
+      generationMode === "VIDEO EDITING") &&
+    media.videos < 1
+  ) {
+    throw new Error("Continue/Edit richiede almeno un Video");
+  }
+  if (
+    (generationMode === "VIDEO EXTENSION" ||
+      generationMode === "VIDEO EDITING") &&
+    (JSON.parse(media.json) as Array<Record<string, unknown>>).some(
+      (item) =>
+        item.kind === "video" &&
+        typeof item.duration === "number" &&
+        item.duration > 10.5,
+    )
+  ) {
+    throw new Error("Continue/Edit nello Studio accetta video fino a 10 secondi");
+  }
+  if (
+    generationMode === "R2V" &&
+    media.pictures + media.videos + media.audios < 1
+  ) {
+    throw new Error("Reference richiede almeno un asset");
+  }
+
+  const referenceRoles =
+    typeof value.referenceRoles === "string"
+      ? value.referenceRoles.trim().slice(0, 4_000) || "AUTO"
+      : "AUTO";
+  const keyframePositions =
+    typeof value.keyframePositions === "string"
+      ? value.keyframePositions.trim().slice(0, 500) || "AUTO"
+      : "AUTO";
+  const sourceVideoAudio =
+    value.sourceVideoAudio === "IGNORE" ||
+    value.sourceVideoAudio === "REFERENCE" ||
+    value.sourceVideoAudio === "REUSE"
+      ? value.sourceVideoAudio
+      : "AUTO";
+  const normalizeOptionalId = (input: unknown) => {
+    if (input === undefined || input === null || input === "") return null;
+    if (typeof input !== "string" || input.trim().length > 80) {
+      throw new Error("Identificatore progetto o sorgente non valido");
+    }
+    return input.trim();
+  };
+
+  return {
+    prompt,
+    candidateCount: candidateCount as 1 | 2 | 3 | 4,
+    durationSeconds: durationSeconds as 5 | 10,
+    megapixels: megapixels as 0.5 | 0.7 | 0.98,
+    generationMode: generationMode as GenerationMode,
+    aspectFormat: aspectFormat as AspectFormat,
+    seedMode,
+    qualityMode,
+    turboEnabled: value.turboEnabled !== false,
+    seed: requestedSeed,
+    mediaState: media.json,
+    referenceRoles,
+    keyframePositions,
+    sourceVideoAudio,
+    projectId: normalizeOptionalId(value.projectId),
+    sourceJobId: normalizeOptionalId(value.sourceJobId),
+    muteDiegetic: value.muteDiegetic === true,
+    muteNonDiegetic: value.muteNonDiegetic === true,
+  };
+}
+
+function audioPolicyPrompt(request: StudioJobRequest) {
+  if (!request.muteDiegetic && !request.muteNonDiegetic) return request.prompt;
+  const directive = request.muteDiegetic && request.muteNonDiegetic
+    ? "AUDIO POLICY: produce complete silence. No dialogue, voices, sound effects, ambience, music, score or narration."
+    : request.muteDiegetic
+      ? "AUDIO POLICY: mute all diegetic scene audio, including dialogue, voices, ambience and sound effects. Generate only explicitly requested non-diegetic music, score or narration."
+      : "AUDIO POLICY: mute all non-diegetic audio, including music, score and narration. Generate only natural diegetic dialogue, ambience and sound effects occurring inside the scene.";
+  return `${request.prompt}\n\n${directive}`;
+}
+
+function randomSeed() {
+  return Math.floor(Math.random() * MAX_SEED);
+}
+
+export function findVideoOutput(outputs: unknown): MediaOutput | null {
+  if (!isRecord(outputs)) return null;
+  for (const nodeOutput of Object.values(outputs)) {
+    if (!isRecord(nodeOutput)) continue;
+    for (const value of Object.values(nodeOutput)) {
+      if (!Array.isArray(value)) continue;
+      for (const item of value) {
+        if (!isRecord(item) || typeof item.filename !== "string") continue;
+        const format = typeof item.format === "string" ? item.format : "";
+        if (!format.startsWith("video/") && !/\.(mp4|webm|mov)$/i.test(item.filename)) {
+          continue;
+        }
+        const type =
+          item.type === "input" || item.type === "temp" ? item.type : "output";
+        const subfolder = typeof item.subfolder === "string" ? item.subfolder : "";
+        const query = new URLSearchParams({
+          filename: item.filename,
+          subfolder,
+          type,
+        });
+        return {
+          filename: item.filename,
+          subfolder,
+          type,
+          format: format || "video/mp4",
+          mediaPath: `/api/media?${query.toString()}`,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function configureEngineLoras(node: ComfyApiNode, settings: ResolvedEngineSettings) {
+  const slots = Object.entries(node.inputs)
+    .filter(([name, value]) => /^lora_\d+$/.test(name) && isRecord(value))
+    .sort(([left], [right]) => Number(left.slice(5)) - Number(right.slice(5)));
+  if (slots.length < settings.loras.length) {
+    throw new Error(
+      `Il workflow offre ${slots.length} slot LoRA, ma l'Engine ne richiede ${settings.loras.length}`,
+    );
+  }
+  slots.forEach(([, raw], index) => {
+    const value = raw as Record<string, unknown>;
+    const configured = settings.loras[index];
+    if (!configured) {
+      value.on = false;
+      return;
+    }
+    value.lora = configured.name;
+    value.on = configured.strength !== 0;
+    value.strength = configured.strength;
+  });
+}
+
+function resolveEngineSettings(
+  request: StudioJobRequest,
+  runtimeSettings: RuntimeSettings,
+): ResolvedEngineSettings {
+  const fast = request.qualityMode === "fast" && request.turboEnabled;
+  if (fast) {
+    const modelName = runtimeSettings.fast.model.toLowerCase();
+    const pddName = runtimeSettings.fast.pddFile.toLowerCase();
+    const modelFamily = modelName.includes("ref2va") && !modelName.includes("fl2va")
+      ? "ref2va"
+      : modelName.includes("fl2va") && !modelName.includes("ref2va")
+        ? "fl2va"
+        : null;
+    const pddFamily = pddName.includes("ref2va") && !pddName.includes("fl2va")
+      ? "ref2va"
+      : pddName.includes("fl2va") && !pddName.includes("ref2va")
+        ? "fl2va"
+        : null;
+    if (!modelFamily || modelFamily !== pddFamily) {
+      throw new Error(
+        "FAST PDD richiede una coppia coerente: modello Ref2VA + PDD Ref2VA oppure modello FL2VA + PDD FL2VA. I modelli hybrid non sono supportati.",
+      );
+    }
+    const loras = runtimeSettings.fast.loras.map((slot) => ({ ...slot }));
+    return {
+      profile: "fast",
+      model: runtimeSettings.fast.model,
+      pddFile: runtimeSettings.fast.pddFile,
+      loras,
+      lora: loras[0]?.name ?? "",
+      loraStrength: loras[0]?.strength ?? 0,
+      steps: 8,
+    };
+  }
+  const steps =
+    request.qualityMode === "fast"
+      ? 8
+      : request.qualityMode === "min"
+      ? 12
+      : request.qualityMode === "med"
+        ? 20
+        : 30;
+  const loras = runtimeSettings.h3.loras.map((slot) => ({ ...slot }));
+  const firstLora = loras[0];
+  return {
+    profile: "standard",
+    model: runtimeSettings.h3.model,
+    pddFile: null,
+    loras,
+    lora: firstLora?.name ?? "",
+    loraStrength: firstLora?.strength ?? 0,
+    steps,
+  };
+}
+
+export function prepareStudioJob(
+  sourcePrompt: ComfyApiPrompt,
+  rawRequest: unknown,
+  runtimeSettings: RuntimeSettings,
+  jobId = randomUUID(),
+) {
+  const request = normalizeRequest(rawRequest);
+  const resolvedEngine = resolveEngineSettings(request, runtimeSettings);
+  const baseSeed = request.seed ?? randomSeed();
+  const randomSeeds = new Set<number>();
+  const candidates: PreparedCandidate[] = [];
+
+  for (let index = 1; index <= request.candidateCount; index += 1) {
+    const prompt = clonePrompt(sourcePrompt);
+    const requestNode = uniqueNode(prompt, "H3AIOAutopromptRequest");
+    const sampler = uniqueNode(prompt, "H3ReferenceMemorySampler");
+    const size = uniqueNode(prompt, "H3AspectMegapixelSize");
+    const saver = uniqueNode(prompt, "H3SaveContinuation");
+    const media = uniqueNode(prompt, "MiniMaxH3MediaLoader");
+    const loras = uniqueNode(prompt, "Power Lora Loader (rgthree)");
+    const model = uniqueNode(prompt, "H3ModelLoaderAny");
+    const shift = uniqueNode(prompt, "MiniMaxH3SigmaShift");
+
+    for (const input of [
+      "generation_mode",
+      "natural_prompt",
+      "reference_roles",
+      "shot_count",
+      "max_auto_shots",
+      "shot_seconds",
+      "keyframe_positions",
+      "source_video_audio",
+    ]) {
+      requireInput(requestNode, input);
+    }
+    for (const input of ["seed", "steps"]) requireInput(sampler, input);
+    for (const input of ["megapixels", "aspect_format", "size_mode"]) {
+      requireInput(size, input);
+    }
+    requireInput(saver, "filename_prefix");
+    requireInput(saver, "prepend_source_video");
+    requireInput(media, "media_state");
+
+    let candidateSeed: number;
+    if (request.seedMode === "fixed") {
+      candidateSeed = baseSeed;
+    } else if (request.seedMode === "base") {
+      candidateSeed = (baseSeed + index - 1) % MAX_SEED;
+    } else {
+      do {
+        candidateSeed = randomSeed();
+      } while (randomSeeds.has(candidateSeed));
+      randomSeeds.add(candidateSeed);
+    }
+    const filenamePrefix = `video/H3_STUDIO/${jobId}/candidate_${index}`;
+
+    requestNode.inputs.generation_mode = request.generationMode;
+    requestNode.inputs.natural_prompt = audioPolicyPrompt(request);
+    requestNode.inputs.reference_roles = request.referenceRoles;
+    requestNode.inputs.shot_count =
+      request.generationMode === "VIDEO EDITING" ? 0 : 1;
+    requestNode.inputs.max_auto_shots =
+      request.generationMode === "VIDEO EDITING" ? 2 : 1;
+    requestNode.inputs.shot_seconds = request.durationSeconds;
+    requestNode.inputs.keyframe_positions = request.keyframePositions;
+    requestNode.inputs.source_video_audio = request.sourceVideoAudio;
+    sampler.inputs.seed = candidateSeed;
+    requireInput(model, "model_name");
+    sampler.inputs.steps = resolvedEngine.steps;
+    size.inputs.size_mode = "megapixels + format";
+    size.inputs.megapixels = request.megapixels;
+    size.inputs.aspect_format = request.aspectFormat;
+    saver.inputs.filename_prefix = filenamePrefix;
+    saver.inputs.prepend_source_video = false;
+    media.inputs.media_state =
+      request.generationMode === "T2V" ? "[]" : request.mediaState;
+    model.inputs.model_name = resolvedEngine.model;
+    configureEngineLoras(loras, resolvedEngine);
+    if (resolvedEngine.profile === "fast") {
+      sampler.inputs.steps = 8;
+      sampler.inputs.sampler_name = "euler";
+      sampler.inputs.scheduler = "simple";
+      sampler.inputs.pdd_acc_file = resolvedEngine.pddFile;
+      shift.inputs.shift_video = 12;
+      shift.inputs.shift_audio = 3;
+    }
+
+    candidates.push({
+      index,
+      seed: candidateSeed,
+      filenamePrefix,
+      prompt,
+    });
+  }
+
+  return { jobId, request, candidates, engineSettings: resolvedEngine };
+}
+
+export function estimateExecutionTime(
+  request: StudioJobRequest,
+  engineSettings: ResolvedEngineSettings,
+) {
+  const centralSeconds = Math.round(
+    PLANNER_COLD_SECONDS +
+      BASE_SECONDS_5S_05MP *
+        (request.durationSeconds / 5) *
+        (request.megapixels / 0.5) *
+        (engineSettings.steps / 8) *
+        request.candidateCount,
+  );
+  return {
+    centralSeconds,
+    minimumSeconds: Math.max(60, Math.round(centralSeconds * 0.85)),
+    maximumSeconds: Math.round(centralSeconds * 1.3),
+    basis: "history-local-plus-cold-planner" as const,
+  };
+}
+
+export function publicDryRun(
+  prepared: ReturnType<typeof prepareStudioJob>,
+) {
+  const settings = prepared.engineSettings;
+  const estimatedExecution = estimateExecutionTime(prepared.request, settings);
+  const mediaAssetCount = (
+    JSON.parse(prepared.request.mediaState || "[]") as unknown[]
+  ).length;
+  return {
+    ok: true,
+    dryRun: true,
+    jobId: prepared.jobId,
+    preset: prepared.request.qualityMode.toUpperCase(),
+    generationMode: prepared.request.generationMode,
+    durationSeconds: prepared.request.durationSeconds,
+    megapixels: prepared.request.megapixels,
+    steps: settings.steps,
+    profile: settings.profile,
+    fastPdd: settings.profile === "fast",
+    pddFile: settings.pddFile,
+    turbo: false,
+    model: settings.model,
+    lora: settings.lora,
+    loraStrength: settings.loraStrength,
+    loras: settings.loras,
+    aspectFormat: prepared.request.aspectFormat,
+    seedMode: prepared.request.seedMode,
+    mediaAssetCount,
+    keyframePositions: prepared.request.keyframePositions,
+    projectId: prepared.request.projectId,
+    sourceJobId: prepared.request.sourceJobId,
+    muteDiegetic: prepared.request.muteDiegetic,
+    muteNonDiegetic: prepared.request.muteNonDiegetic,
+    continuationOnly: prepared.candidates.every(
+      (candidate) =>
+        uniqueNode(candidate.prompt, "H3SaveContinuation").inputs
+          .prepend_source_video === false,
+    ),
+    promptLength: prepared.request.prompt.length,
+    estimatedExecution,
+    candidates: prepared.candidates.map((candidate) => ({
+      index: candidate.index,
+      seed: candidate.seed,
+      filenamePrefix: candidate.filenamePrefix,
+      apiNodeCount: Object.keys(candidate.prompt).length,
+    })),
+  };
+}
+
+export class StudioJobService {
+  constructor(
+    private readonly comfy: ComfyClient,
+    private readonly workflowStore: WorkflowStore,
+    private readonly fastWorkflowStore: FastWorkflowStore,
+    private readonly runtimeSettings: RuntimeSettingsStore,
+    private readonly progressTracker: ComfyProgressTracker,
+    private readonly jobs: JobRepository,
+  ) {}
+
+  async prepare(rawRequest: unknown) {
+    const wantsFast = isRecord(rawRequest) &&
+      rawRequest.qualityMode !== "min" &&
+      rawRequest.qualityMode !== "med" &&
+      rawRequest.qualityMode !== "max" &&
+      rawRequest.turboEnabled !== false;
+    if (wantsFast) {
+      const [pddInfo, samplerInfo] = await Promise.all([
+        this.comfy.objectInfo("MiniMaxH3PDDAccApply").catch(() => null),
+        this.comfy.objectInfo("H3ReferenceMemorySampler").catch(() => null),
+      ]);
+      const pddNodeReady = isRecord(pddInfo) &&
+        isRecord(pddInfo.MiniMaxH3PDDAccApply);
+      const sampler = samplerInfo?.H3ReferenceMemorySampler;
+      const input = isRecord(sampler) && isRecord(sampler.input)
+        ? sampler.input
+        : null;
+      const optional = input && isRecord(input.optional) ? input.optional : null;
+      if (!pddNodeReady || !optional || !("pdd_acc_file" in optional)) {
+        throw new Error(
+          "FAST Alibaba è installato ma non ancora caricato: riavvia ComfyUI.",
+        );
+      }
+    }
+    const [sourcePrompt, runtimeSettings] = await Promise.all([
+      wantsFast
+        ? this.fastWorkflowStore.loadApiPrompt()
+        : this.workflowStore.loadApiPrompt(),
+      this.runtimeSettings.get(),
+    ]);
+    return {
+      prepared: prepareStudioJob(sourcePrompt, rawRequest, runtimeSettings),
+    };
+  }
+
+  async submit(rawRequest: unknown) {
+    const { prepared } = await this.prepare(rawRequest);
+    this.jobs.createPrepared(prepared, prepared.engineSettings);
+    let submittedCount = 0;
+
+    try {
+      for (const candidate of prepared.candidates) {
+        const queued = await this.comfy.queuePrompt(
+          candidate.prompt,
+          `h3-studio-${prepared.jobId}`,
+        );
+        this.progressTracker.register(queued.promptId, candidate.prompt);
+        this.jobs.markQueued(
+          prepared.jobId,
+          candidate.index,
+          queued.promptId,
+          queued.queueNumber,
+        );
+        submittedCount += 1;
+      }
+    } catch (error) {
+      this.jobs.updateJobStatus(
+        prepared.jobId,
+        submittedCount > 0 ? "partial" : "failed",
+      );
+      throw error;
+    }
+
+    this.jobs.updateJobStatus(prepared.jobId, "submitted");
+    return this.jobs.get(prepared.jobId);
+  }
+
+  async get(jobId: string) {
+    const job = this.jobs.get(jobId);
+    if (!job) return null;
+
+    const [history, queue] = await Promise.all([
+      this.comfy.history(200),
+      this.comfy.queueState(),
+    ]);
+    const candidates = job.candidates.map((candidate) => {
+      if (!candidate.promptId) {
+        return {
+          ...candidate,
+          phase: "prepared",
+          phaseLabel: "Non ancora inviato",
+          progress: null,
+          progressExact: false,
+        };
+      }
+      const entry = history[candidate.promptId];
+      const statusString =
+        entry && isRecord(entry.status) && typeof entry.status.status_str === "string"
+          ? entry.status.status_str
+          : null;
+      const output = entry ? findVideoOutput(entry.outputs) : candidate.output;
+      const liveProgress = this.progressTracker.get(candidate.promptId);
+      let status = candidate.status;
+      if (statusString === "success" && output) status = "ready";
+      else if (statusString === "error") status = "failed";
+      else if (queue.runningPromptIds.has(candidate.promptId)) status = "rendering";
+      else if (queue.pendingPromptIds.has(candidate.promptId)) status = "queued";
+
+      this.jobs.updateCandidate(job.id, candidate.index, status, output);
+      const terminal = status === "ready" || status === "failed";
+      return {
+        ...candidate,
+        status,
+        output,
+        phase:
+          status === "ready"
+            ? "completed"
+            : status === "failed"
+              ? "failed"
+              : liveProgress?.phase ?? status,
+        phaseLabel:
+          status === "ready"
+            ? "Completato"
+            : status === "failed"
+              ? "Esecuzione fallita"
+              : liveProgress?.phaseLabel ??
+          (status === "queued"
+            ? "In coda"
+            : status === "rendering"
+              ? "ComfyUI in esecuzione"
+              : "Inviato a ComfyUI"),
+        progress:
+          status === "ready"
+            ? 100
+            : status === "failed"
+              ? null
+              : liveProgress?.progress ?? null,
+        progressExact: terminal ? status === "ready" : liveProgress?.exact ?? false,
+      };
+    });
+
+    const completed = candidates.filter(
+      (candidate) => candidate.status === "ready" || candidate.status === "failed",
+    ).length;
+    const status: StudioJob["status"] =
+      completed === candidates.length
+        ? candidates.some((candidate) => candidate.status === "failed")
+          ? "partial"
+          : "completed"
+        : "running";
+    this.jobs.updateJobStatus(job.id, status);
+    return {
+      ...job,
+      status,
+      completed,
+      candidates,
+    };
+  }
+
+  async recover() {
+    let recovered = 0;
+    for (const candidate of this.jobs.recoverableCandidates()) {
+      try {
+        const prompt = JSON.parse(candidate.api_prompt_json) as ComfyApiPrompt;
+        this.progressTracker.register(candidate.prompt_id, prompt);
+        recovered += 1;
+      } catch {
+        // A malformed historical snapshot must not prevent bridge startup.
+      }
+    }
+    return recovered;
+  }
+
+  async list(limit = 20, projectId?: string | null) {
+    const jobs = await Promise.all(
+      this.jobs.listIds(limit, projectId).map((jobId) => this.get(jobId)),
+    );
+    return jobs.filter((job): job is NonNullable<typeof job> => job !== null);
+  }
+
+  async selectCandidate(jobId: string, candidateIndex: number) {
+    if (!Number.isInteger(candidateIndex) || candidateIndex < 1 || candidateIndex > 4) {
+      throw new Error("Indice candidato non valido");
+    }
+    const job = await this.get(jobId);
+    if (!job) throw new Error("Job non trovato");
+    const candidate = job.candidates.find(
+      (item) => item.index === candidateIndex,
+    );
+    if (!candidate || candidate.status !== "ready" || !candidate.output) {
+      throw new Error("Puoi selezionare soltanto un candidato completato");
+    }
+    this.jobs.selectCandidate(jobId, candidateIndex);
+    return this.jobs.get(jobId);
+  }
+}

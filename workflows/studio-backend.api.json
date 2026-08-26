@@ -1,0 +1,755 @@
+{
+  "1": {
+    "inputs": {
+      "model_name": "minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
+      "activation_reserve_gb": 0
+    },
+    "class_type": "H3ModelLoaderAny",
+    "_meta": {
+      "title": "H3 Model (safetensors or GGUF)"
+    }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Video VAE"
+    }
+  },
+  "4": {
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Audio VAE"
+    }
+  },
+  "5": {
+    "inputs": {
+      "script": [
+        "66",
+        0
+      ],
+      "shot_count": [
+        "65",
+        1
+      ],
+      "width": [
+        "47",
+        0
+      ],
+      "height": [
+        "47",
+        1
+      ],
+      "frames_per_shot": [
+        "65",
+        2
+      ],
+      "seed": 1028546842544089,
+      "steps": 4,
+      "seed_per_shot": true,
+      "memory_frames": 1,
+      "anchor_frames": 0,
+      "sampler_name": "res_multistep",
+      "scheduler": "simple",
+      "ref_image_size": "match",
+      "stream_to_disk": false,
+      "model": [
+        "21",
+        0
+      ],
+      "clip": [
+        "11",
+        0
+      ],
+      "video_vae": [
+        "3",
+        0
+      ],
+      "audio_vae": [
+        "4",
+        0
+      ],
+      "start_image": [
+        "66",
+        1
+      ],
+      "voice_ref": [
+        "66",
+        2
+      ],
+      "ref_image_0": [
+        "66",
+        3
+      ],
+      "ref_image_1": [
+        "66",
+        4
+      ],
+      "ref_image_2": [
+        "66",
+        5
+      ],
+      "ref_image_3": [
+        "66",
+        6
+      ],
+      "ref_audio_0": [
+        "66",
+        9
+      ],
+      "ref_audio_1": [
+        "66",
+        10
+      ],
+      "ref_video_0": [
+        "66",
+        7
+      ],
+      "ref_video_audio_0": [
+        "66",
+        8
+      ],
+      "ref_image_4": [
+        "66",
+        11
+      ],
+      "ref_image_5": [
+        "66",
+        12
+      ],
+      "ref_image_6": [
+        "66",
+        13
+      ],
+      "ref_image_7": [
+        "66",
+        14
+      ],
+      "ref_image_8": [
+        "66",
+        15
+      ],
+      "keyframe_plan": [
+        "66",
+        16
+      ]
+    },
+    "class_type": "H3ReferenceMemorySampler",
+    "_meta": {
+      "title": "H3 AIO REFERENCE MEMORY"
+    }
+  },
+  "6": {
+    "inputs": {
+      "fps": 24,
+      "bit_depth": 8,
+      "images": [
+        "5",
+        0
+      ],
+      "audio": [
+        "69",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Mux video + audio"
+    }
+  },
+  "7": {
+    "inputs": {
+      "prepend_source_video": false,
+      "filename_prefix": "video/H3MULTI_REFERENCE/MASTER",
+      "fallback_crf": 16,
+      "continuation": [
+        "6",
+        0
+      ],
+      "source_video": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "H3SaveContinuation",
+    "_meta": {
+      "title": "SAVE — continuation OR source + continuation"
+    }
+  },
+  "11": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax"
+    },
+    "class_type": "H3ClipLoaderAny",
+    "_meta": {
+      "title": "Text encoder  (type = minimax)"
+    }
+  },
+  "19": {
+    "inputs": {
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_2": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_3": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_4": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_5": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_6": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_7": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_8": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_9": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_10": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_11": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_12": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "lora_13": {
+        "on": false,
+        "lora": "",
+        "strength": 1
+      },
+      "➕ Add Lora": "",
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree)"
+    }
+  },
+  "20": {
+    "inputs": {
+      "sage_attention": "auto",
+      "allow_compile": true,
+      "model": [
+        "19",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
+  },
+  "21": {
+    "inputs": {
+      "shift_video": 12,
+      "shift_audio": 3,
+      "model": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "MiniMax H3 Sigma Shift"
+    }
+  },
+  "39": {
+    "inputs": {
+      "file": "(select full source only when PREPEND is ON)"
+    },
+    "class_type": "H3OptionalSourceVideo",
+    "_meta": {
+      "title": "FULL ORIGINAL — for PREPEND output"
+    }
+  },
+  "46": {
+    "inputs": {
+      "presets_json": "{\"version\":2,\"selected\":\"\",\"presets\":{}}"
+    },
+    "class_type": "H3WorkflowPresetManager",
+    "_meta": {
+      "title": "H3 Presets + Workflow Instances"
+    }
+  },
+  "47": {
+    "inputs": {
+      "size_mode": "megapixels + format",
+      "manual_width": 1152,
+      "manual_height": 640,
+      "megapixels": 0.5,
+      "aspect_format": "16:9 landscape",
+      "source_image": [
+        "66",
+        1
+      ],
+      "fallback_image": [
+        "66",
+        3
+      ],
+      "picture_1": [
+        "61",
+        0
+      ]
+    },
+    "class_type": "H3AspectMegapixelSize",
+    "_meta": {
+      "title": "OUTPUT SIZE — MANUAL / MP+FORMAT / MP+PICTURE 1"
+    }
+  },
+  "60": {
+    "inputs": {
+      "media_state": "[]",
+      "Open loader…": null,
+      "+ Native-output splitter": null
+    },
+    "class_type": "MiniMaxH3MediaLoader",
+    "_meta": {
+      "title": "1 - LOAD ALL MEDIA HERE (drag and drop)"
+    }
+  },
+  "61": {
+    "inputs": {
+      "references": [
+        "60",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceSplitter",
+    "_meta": {
+      "title": "AUTOMATIC MEDIA SPLITTER"
+    }
+  },
+  "62": {
+    "inputs": {
+      "generation_mode": "T2V",
+      "natural_prompt": "Create a coherent cinematic video with natural motion, clear continuity, readable composition and a stable ending.",
+      "reference_roles": "AUTO: infer conservative roles from the prompt and supplied references. Do not invent identity details that are not visible.",
+      "shot_count": 1,
+      "max_auto_shots": 1,
+      "shot_seconds": 5,
+      "llm_media_context": "OFF - text only",
+      "r2v_picture1_as_start": false,
+      "audio_1_role": "ignore",
+      "video_context_frames": 1,
+      "context_resolution": 512,
+      "keyframe_positions": "AUTO",
+      "source_video_audio": "AUTO",
+      "picture_1": [
+        "61",
+        0
+      ],
+      "picture_2": [
+        "61",
+        1
+      ],
+      "picture_3": [
+        "61",
+        2
+      ],
+      "picture_4": [
+        "61",
+        3
+      ],
+      "picture_5": [
+        "61",
+        4
+      ],
+      "picture_6": [
+        "61",
+        5
+      ],
+      "picture_7": [
+        "61",
+        6
+      ],
+      "picture_8": [
+        "61",
+        7
+      ],
+      "picture_9": [
+        "61",
+        8
+      ],
+      "video_1": [
+        "61",
+        9
+      ],
+      "video_2": [
+        "61",
+        10
+      ],
+      "video_3": [
+        "61",
+        11
+      ],
+      "video_audio_1": [
+        "61",
+        12
+      ],
+      "video_audio_2": [
+        "61",
+        13
+      ],
+      "video_audio_3": [
+        "61",
+        14
+      ],
+      "audio_1": [
+        "61",
+        15
+      ],
+      "audio_2": [
+        "61",
+        16
+      ],
+      "audio_3": [
+        "61",
+        17
+      ]
+    },
+    "class_type": "H3AIOAutopromptRequest",
+    "_meta": {
+      "title": "START HERE - 6 MODES + NATURAL PROMPT + AUTO SHOTS"
+    }
+  },
+  "63": {
+    "inputs": {
+      "model": "huihui-ai\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-Q4_K.gguf",
+      "custom_path": "",
+      "hf_repo_id": "",
+      "hf_revision": "main",
+      "download_if_missing": false,
+      "backend": "llama_cpp",
+      "task": "auto",
+      "device": "auto",
+      "dtype": "auto",
+      "quantization": "none",
+      "cache_mode": "unload_after_run",
+      "trust_remote_code": false,
+      "attention_implementation": "auto",
+      "kv_cache_implementation": "default",
+      "kv_cache_quant_backend": "quanto",
+      "kv_cache_nbits": "4",
+      "kv_cache_residual_length": 128,
+      "llama_n_ctx": 15872,
+      "llama_n_gpu_layers": -1,
+      "llama_n_threads": 0,
+      "llama_chat_format": "",
+      "ollama_model": "",
+      "ollama_url": "http://127.0.0.1:11434",
+      "ollama_timeout": 300
+    },
+    "class_type": "DaSiWa_LLMModelSelector",
+    "_meta": {
+      "title": "GEMMA PLANNER - unload after run"
+    }
+  },
+  "64": {
+    "inputs": {
+      "system_prompt_preset": "custom",
+      "system_prompt": "You are a strict MiniMax H3 production planner. Follow text_input exactly and return valid JSON only.",
+      "prompt": "Create the complete validated plan requested in text_input.",
+      "max_new_tokens": 4096,
+      "max_input_tokens": 0,
+      "temperature": 0.1,
+      "top_p": 0.9,
+      "repetition_penalty": 1.05,
+      "use_kv_cache": true,
+      "seed": 474377331528115,
+      "max_frames": 16,
+      "frame_stride": 1,
+      "frame_strategy": "evenly_spaced",
+      "resize_max_px": 512,
+      "resize_algorithm": "lanczos",
+      "memory_cleanup": "off",
+      "llm_config": [
+        "63",
+        0
+      ],
+      "images": [
+        "62",
+        1
+      ],
+      "text_input": [
+        "71",
+        0
+      ]
+    },
+    "class_type": "DaSiWa_LLMAnalyze",
+    "_meta": {
+      "title": "GEMMA - NATURAL LANGUAGE TO COMPLETE H3 PLAN"
+    }
+  },
+  "65": {
+    "inputs": {
+      "save_debug_plan": true,
+      "debug_filename_prefix": "H3_AIO_AUTOPROMPT_DEBUG/plan",
+      "llm_response": [
+        "70",
+        0
+      ],
+      "generation_mode": [
+        "62",
+        2
+      ],
+      "shot_seconds": [
+        "62",
+        3
+      ],
+      "max_shots": [
+        "62",
+        4
+      ],
+      "available_pictures": [
+        "62",
+        5
+      ],
+      "picture1_as_start": [
+        "62",
+        6
+      ],
+      "exact_shots": [
+        "62",
+        9
+      ],
+      "source_video_audio": [
+        "62",
+        11
+      ]
+    },
+    "class_type": "H3AIOPlanParser",
+    "_meta": {
+      "title": "VALIDATE + FORMAT EXACT H3 SCRIPT"
+    }
+  },
+  "66": {
+    "inputs": {
+      "script": [
+        "65",
+        0
+      ],
+      "generation_mode": [
+        "62",
+        2
+      ],
+      "picture1_as_start": [
+        "62",
+        6
+      ],
+      "audio_1_role": [
+        "62",
+        7
+      ],
+      "keyframe_positions": [
+        "62",
+        10
+      ],
+      "source_video_audio": [
+        "62",
+        11
+      ],
+      "picture_1": [
+        "61",
+        0
+      ],
+      "picture_2": [
+        "61",
+        1
+      ],
+      "picture_3": [
+        "61",
+        2
+      ],
+      "picture_4": [
+        "61",
+        3
+      ],
+      "picture_5": [
+        "61",
+        4
+      ],
+      "picture_6": [
+        "61",
+        5
+      ],
+      "picture_7": [
+        "61",
+        6
+      ],
+      "picture_8": [
+        "61",
+        7
+      ],
+      "picture_9": [
+        "61",
+        8
+      ],
+      "video_1": [
+        "61",
+        9
+      ],
+      "video_2": [
+        "61",
+        10
+      ],
+      "video_3": [
+        "61",
+        11
+      ],
+      "video_audio_1": [
+        "61",
+        12
+      ],
+      "video_audio_2": [
+        "61",
+        13
+      ],
+      "video_audio_3": [
+        "61",
+        14
+      ],
+      "audio_1": [
+        "61",
+        15
+      ],
+      "audio_2": [
+        "61",
+        16
+      ],
+      "audio_3": [
+        "61",
+        17
+      ]
+    },
+    "class_type": "H3AIOGenerationRouter",
+    "_meta": {
+      "title": "ONE ROUTER - T2V / I2V / R2V / KEYFRAMES / VIDEO"
+    }
+  },
+  "69": {
+    "inputs": {
+      "h3_sfx_gain": 0.3,
+      "h3_generated_audio": [
+        "5",
+        1
+      ],
+      "exact_soundtrack": [
+        "66",
+        17
+      ],
+      "audio_mode": [
+        "62",
+        7
+      ]
+    },
+    "class_type": "H3AIOFinalAudioRouter",
+    "_meta": {
+      "title": "FINAL AUDIO - H3 / EXACT / EXACT + SFX"
+    }
+  },
+  "70": {
+    "inputs": {
+      "repair_mode": "SAFE AUTO-FIX",
+      "cut_policy": "AUTO FROM REQUEST",
+      "reference_policy": "CONTINUITY UNION",
+      "llm_response": [
+        "64",
+        0
+      ],
+      "planner_request": [
+        "62",
+        0
+      ],
+      "generation_mode": [
+        "62",
+        2
+      ],
+      "shot_seconds": [
+        "62",
+        3
+      ],
+      "max_shots": [
+        "62",
+        4
+      ],
+      "available_pictures": [
+        "62",
+        5
+      ],
+      "exact_shots": [
+        "62",
+        9
+      ]
+    },
+    "class_type": "H3AIOComposerPreValidator",
+    "_meta": {
+      "title": "COMPOSER PREFLIGHT - AUTO-FIX + REPORT"
+    }
+  },
+  "71": {
+    "inputs": {
+      "enabled": true,
+      "guide_profile": "AUTO",
+      "context_detail": "FULL OFFICIAL (requires >=16k context)",
+      "planner_request": [
+        "62",
+        0
+      ],
+      "generation_mode": [
+        "62",
+        2
+      ]
+    },
+    "class_type": "H3OfficialPromptSkill",
+    "_meta": {
+      "title": "OFFICIAL H3 SKILL - BEFORE LOCAL PLANNER"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "krea2TurboFP8_krea2TURBO.safetensors", "weight_dtype": "default" },
+    "_meta": { "title": "Krea 2 model — overridden by H3 Studio" }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "qwen3vl_4b_fp8_scaled.safetensors", "type": "krea2", "device": "default" },
+    "_meta": { "title": "Krea 2 text encoder — overridden by H3 Studio" }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "qwen_image_vae.safetensors" },
+    "_meta": { "title": "Krea 2 VAE — overridden by H3 Studio" }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "Professional cinematic character reference sheet", "clip": ["2", 0] },
+    "_meta": { "title": "Sheet prompt — overridden by H3 Studio" }
+  },
+  "5": {
+    "class_type": "ConditioningKrea2Rebalance",
+    "inputs": {
+      "conditioning": ["4", 0],
+      "multiplier": 3,
+      "per_layer_weights": "1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0"
+    }
+  },
+  "6": { "class_type": "ConditioningZeroOut", "inputs": { "conditioning": ["4", 0] } },
+  "7": { "class_type": "EmptyLatentImage", "inputs": { "width": 1536, "height": 1024, "batch_size": 1 } },
+  "8": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["1", 0], "seed": 1, "steps": 8, "cfg": 1,
+      "sampler_name": "er_sde", "scheduler": "simple",
+      "positive": ["5", 0], "negative": ["6", 0], "latent_image": ["7", 0], "denoise": 1
+    }
+  },
+  "9": { "class_type": "VAEDecode", "inputs": { "samples": ["8", 0], "vae": ["3", 0] } },
+  "10": { "class_type": "ImageSharpenKJ", "inputs": { "image": ["9", 0], "method": "rcas", "method.strength": 0.55 } },
+  "11": { "class_type": "SaveImage", "inputs": { "images": ["10", 0], "filename_prefix": "images/H3_STUDIO/krea_sheet" } }
+}
