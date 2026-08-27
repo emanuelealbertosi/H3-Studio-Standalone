@@ -325,7 +325,7 @@ function normalizeRequest(value: unknown): StudioJobRequest {
 function audioPolicyPrompt(request: StudioJobRequest) {
   let prompt = request.prompt;
   if (request.generationMode === "VIDEO EXTENSION") {
-    prompt += "\n\nCONTINUATION LOCK: Continue seamlessly from the exact final state of Video 1. Preserve the existing camera position, lens, trajectory and speed; character identity, position, pose and ongoing motion; environment geometry, lighting, color and composition. Begin with continuous motion from the source ending, with no cut, scene reset, reframing, teleport, pose reset or sudden camera change. If the requested action or camera direction differs, transition into it gradually and physically rather than switching instantly.";
+    prompt += "\n\nSEAMLESS START: Begin from the exact final state of Video 1 and preserve visual and motion continuity through the first second. No cut, scene reset, teleport or pose reset. Then transition naturally into the requested action and camera direction.";
   }
   if (!request.muteDiegetic && !request.muteNonDiegetic) return prompt;
   const directive = request.muteDiegetic && request.muteNonDiegetic
@@ -472,9 +472,7 @@ export function prepareStudioJob(
     ]) {
       requireInput(requestNode, input);
     }
-    for (const input of ["seed", "steps", "memory_frames", "anchor_frames"]) {
-      requireInput(sampler, input);
-    }
+    for (const input of ["seed", "steps"]) requireInput(sampler, input);
     for (const input of ["megapixels", "aspect_format", "size_mode"]) {
       requireInput(size, input);
     }
@@ -506,10 +504,6 @@ export function prepareStudioJob(
     requestNode.inputs.keyframe_positions = request.keyframePositions;
     requestNode.inputs.source_video_audio = request.sourceVideoAudio;
     sampler.inputs.seed = candidateSeed;
-    if (request.generationMode === "VIDEO EXTENSION") {
-      sampler.inputs.memory_frames = 2;
-      sampler.inputs.anchor_frames = 1;
-    }
     requireInput(model, "model_name");
     sampler.inputs.steps = resolvedEngine.steps;
     const keepSourceAspect = request.aspectFormat === "keep source aspect";

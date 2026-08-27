@@ -83,6 +83,12 @@ assert.match(page, /disabled=\{duration === 15 && item\.value > 0\.7\}/);
 assert.match(page, /if \(nextDuration === 15 && megapixels > 0\.7\)/);
 assert.match(page, /15 s supporta al massimo 0\.7 MP/);
 assert.match(css, /\.segmented-control button:disabled\s*\{[^}]*cursor:\s*not-allowed/s);
+const prepareVideoOperationPattern =
+  /function prepareVideoOperation\([\s\S]*?\n  }\n\n  function prepareClipOperation/;
+const prepareVideoOperationBlock = page.match(prepareVideoOperationPattern);
+assert.ok(prepareVideoOperationBlock, "prepareVideoOperation should be present");
+assert.match(prepareVideoOperationBlock[0], /setPrompt\(""\)/);
+assert.match(prepareVideoOperationBlock[0], /il vecchio prompt non viene riutilizzato/);
 assert.match(page, /const isFailed = candidate\.status === "failed"/);
 assert.match(page, /\{!isFailed && \(\s*<div className=\{`progress-track/s);
 assert.match(page, /\{\(isReady \|\| isFailed\) && \(\s*<button/s);

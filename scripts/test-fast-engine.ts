@@ -218,9 +218,9 @@ const continuationRequest = uniqueNode(
   continuation.candidates[0].prompt,
   "H3AIOAutopromptRequest",
 );
-assert.equal(continuationSampler.inputs.memory_frames, 2);
-assert.equal(continuationSampler.inputs.anchor_frames, 1);
-assert.match(String(continuationRequest.inputs.natural_prompt), /CONTINUATION LOCK/);
+assert.equal(continuationSampler.inputs.memory_frames, 1);
+assert.equal(continuationSampler.inputs.anchor_frames, 0);
+assert.match(String(continuationRequest.inputs.natural_prompt), /SEAMLESS START/);
 assert.match(String(continuationRequest.inputs.natural_prompt), /no cut/i);
 
 const mismatch = structuredClone(DEFAULT_RUNTIME_SETTINGS);

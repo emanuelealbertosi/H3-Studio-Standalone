@@ -4568,6 +4568,7 @@ function StudioApp() {
     context?: { projectId?: string | null; sourceJobId?: string | null },
   ) {
     setStudioMediaMode("video");
+    setPrompt("");
     const url = new URL(mediaPath, bridgeUrl);
     const outputFilename = url.searchParams.get("filename") ?? filename;
     const subfolder = url.searchParams.get("subfolder") ?? "";
@@ -4592,7 +4593,7 @@ function StudioApp() {
     setActiveView("studio");
     setRunMessage(
       operation === "continue"
-        ? "Clip sorgente pronta: verrà salvata solo la nuova continuazione"
+        ? "Clip sorgente pronta: descrivi soltanto la nuova continuazione; il vecchio prompt non viene riutilizzato"
         : operation === "edit"
           ? "Clip sorgente pronta per un edit non distruttivo"
           : "Clip aggiunta come riferimento video",
