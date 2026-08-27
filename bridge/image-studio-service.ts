@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import {
+  composeImagePrompt,
+  isImageCompositionPreset,
+} from "../lib/image-composition.js";
 import type {
   ComfyApiPrompt,
   ComfyClient,
@@ -106,7 +110,7 @@ function normalizeReference(
   return { file, name, role, width, height };
 }
 
-function normalizeRequest(value: unknown) {
+export function normalizeImageRequest(value: unknown) {
   if (!isRecord(value)) throw new Error("Body immagine mancante");
   const projectId = typeof value.projectId === "string" ? value.projectId.trim() : "";
   if (!projectId) throw new Error("Seleziona un progetto");
@@ -114,6 +118,23 @@ function normalizeRequest(value: unknown) {
   const prompt = typeof value.prompt === "string" ? value.prompt.trim() : "";
   if (prompt.length < 3 || prompt.length > 20_000) {
     throw new Error("Il prompt immagine deve contenere da 3 a 20.000 caratteri");
+  }
+  const compositionPreset = value.compositionPreset === undefined
+    ? "free"
+    : isImageCompositionPreset(value.compositionPreset)
+      ? value.compositionPreset
+      : null;
+  if (!compositionPreset) throw new Error("Preset di composizione immagine non valido");
+  const effectivePrompt = composeImagePrompt(prompt, compositionPreset);
+  if (effectivePrompt.length > 20_000) {
+    throw new Error("Il prompt effettivo non può superare 20.000 caratteri");
+  }
+  if (
+    value.effectivePrompt !== undefined &&
+    (typeof value.effectivePrompt !== "string" ||
+      value.effectivePrompt.trim() !== effectivePrompt)
+  ) {
+    throw new Error("Il prompt effettivo non corrisponde al preset selezionato");
   }
   const candidateCount = Number(value.candidateCount);
   if (![1, 2, 3, 4].includes(candidateCount)) {
@@ -165,6 +186,8 @@ function normalizeRequest(value: unknown) {
     projectId,
     mode,
     prompt,
+    effectivePrompt,
+    compositionPreset,
     candidateCount: candidateCount as 1 | 2 | 3 | 4,
     width,
     height,
@@ -249,7 +272,7 @@ export class ImageStudioService {
   ) {}
 
   async prepare(value: unknown): Promise<PreparedImageJob> {
-    const request = normalizeRequest(value);
+    const request = normalizeImageRequest(value);
     const [settings, workflowTemplate] = await Promise.all([
       this.runtimeSettings.get(),
       readWorkflowTemplate(
@@ -271,6 +294,8 @@ export class ImageStudioService {
           scheduler: "flux2",
           kvCacheEnabled: settings.imageEdit.kvCacheEnabled,
           attentionBackend: settings.imageEdit.attentionBackend,
+          compositionPreset: request.compositionPreset,
+          effectivePrompt: request.effectivePrompt,
         }
       : {
           kind: "krea" as const,
@@ -281,6 +306,8 @@ export class ImageStudioService {
           cfg: 1,
           sampler: "er_sde",
           scheduler: "simple",
+          compositionPreset: request.compositionPreset,
+          effectivePrompt: request.effectivePrompt,
           loras: settings.krea.loras,
         };
     const candidates = Array.from({ length: request.candidateCount }, (_, offset) => {
@@ -297,7 +324,7 @@ export class ImageStudioService {
         `images/H3_STUDIO/projects/${request.projectId}/${request.mode}_${id.slice(0, 8)}_c${index}`;
       const apiPrompt = request.mode === "edit"
         ? buildFlux2KleinEditPrompt({
-            prompt: request.prompt,
+            prompt: request.effectivePrompt,
             seed,
             width: request.width,
             height: request.height,
@@ -307,7 +334,7 @@ export class ImageStudioService {
             template: workflowTemplate,
           })
         : buildKreaGeneratePrompt({
-            prompt: request.prompt,
+            prompt: request.effectivePrompt,
             seed,
             width: request.width,
             height: request.height,
@@ -322,6 +349,8 @@ export class ImageStudioService {
       originProjectId: request.projectId,
       mode: request.mode,
       prompt: request.prompt,
+      effectivePrompt: request.effectivePrompt,
+      compositionPreset: request.compositionPreset,
       candidateCount: request.candidateCount,
       aspectFormat: request.aspectFormat,
       width: request.width,

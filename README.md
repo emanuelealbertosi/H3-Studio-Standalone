@@ -46,9 +46,14 @@ e compila automaticamente i ruoli Picture.
 
 Lo **Studio Immagini** condivide progetti e layout con lo Studio Video. Genera
 da uno a quattro candidati con Krea 2 oppure esegue edit Flux.2 Klein con un
-massimo di quattro reference ordinate. Ogni candidato può essere taggato come
-Personaggio, Oggetto o Paesaggio, riusato come reference e condiviso
-singolarmente con altri progetti. Il profilo Flux predefinito è il 4B
+massimo di quattro reference ordinate. I preset di composizione Libero,
+Character sheet/turnaround, Primo piano, Mezzo busto, Figura intera, Oggetto
+sheet e Paesaggio arricchiscono il prompt senza sostituire il testo dell'utente;
+il prompt effettivo resta ispezionabile prima del lancio. Ogni candidato può
+essere taggato come Personaggio, Oggetto o Paesaggio e condiviso singolarmente
+con altri progetti. Dal selettore media dello Studio Video le immagini generate
+del progetto, e in seconda battuta quelle riutilizzabili degli altri progetti,
+possono essere collegate come reference senza un nuovo upload. Il profilo Flux predefinito è il 4B
 Distilled FP8 a quattro step e CFG 1; workflow, modello, encoder, VAE, cache e
 attention backend sono gestiti dall’Admin.
 

@@ -3387,6 +3387,80 @@ a:focus-visible {
   gap: 12px;
 }
 
+.image-composition-presets {
+  margin: 0 18px 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, .45fr);
+  align-items: center;
+  gap: 10px;
+  background: #101113;
+}
+.image-composition-presets legend {
+  padding: 0 5px;
+  color: #85878c;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.image-composition-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.image-composition-options button {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+}
+.image-composition-options button:hover { border-color: rgba(255, 255, 255, .22); color: var(--ink); }
+.image-composition-options button.selected {
+  border-color: rgba(215, 255, 82, .42);
+  background: rgba(215, 255, 82, .1);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(215, 255, 82, .08);
+}
+.image-composition-presets > p {
+  margin: 0;
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+.image-composition-presets > p strong { color: var(--accent); font-size: 9px; }
+
+.image-effective-prompt {
+  margin: 0 18px 2px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .018);
+}
+.image-effective-prompt summary {
+  padding: 8px 10px;
+  cursor: pointer;
+  color: #9b9da2;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.image-effective-prompt p {
+  margin: 0;
+  padding: 0 10px 10px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .image-initial-tags {
   margin: 0 18px 14px;
   padding: 9px;
@@ -3510,6 +3584,10 @@ a:focus-visible {
   .studio-media-toggle { width: 100%; }
   .studio-media-toggle button { flex: 1; }
   .image-control-grid { grid-template-columns: 1fr 1fr; padding-left: 12px; padding-right: 12px; }
+  .image-composition-presets { margin-left: 12px; margin-right: 12px; grid-template-columns: 1fr; }
+  .image-composition-options { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .image-composition-options button { flex: 0 0 auto; }
+  .image-effective-prompt { margin-left: 12px; margin-right: 12px; }
   .image-initial-tags { margin-left: 12px; margin-right: 12px; grid-template-columns: 1fr; }
   .image-initial-tags > div { overflow-x: auto; }
   .image-reference-list { grid-template-columns: repeat(4, 180px); }

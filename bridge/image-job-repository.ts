@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import {
+  composeImagePrompt,
+  type ImageCompositionPreset,
+  isImageCompositionPreset,
+} from "../lib/image-composition.js";
 import type { ComfyApiPrompt } from "./comfy-client.js";
 
 export type ImageJobMode = "generate" | "edit";
@@ -43,6 +48,8 @@ export type ImageEngineSnapshot = {
     | "auto"
     | "pytorch attention"
     | "comfy kitchen attention";
+  compositionPreset?: ImageCompositionPreset;
+  effectivePrompt?: string;
   loras?: Array<{ name: string; strength: number }>;
 };
 
@@ -59,6 +66,8 @@ export type PreparedImageJob = {
   originProjectId: string;
   mode: ImageJobMode;
   prompt: string;
+  effectivePrompt: string;
+  compositionPreset: ImageCompositionPreset;
   candidateCount: 1 | 2 | 3 | 4;
   aspectFormat: string;
   width: number;
@@ -395,12 +404,21 @@ export class ImageJobRepository {
         scheduler: row.mode === "edit" ? "flux2" : "simple",
       };
     }
+    const compositionPreset = isImageCompositionPreset(engine.compositionPreset)
+      ? engine.compositionPreset
+      : "free";
+    const effectivePrompt = typeof engine.effectivePrompt === "string" &&
+      engine.effectivePrompt.trim()
+      ? engine.effectivePrompt
+      : composeImagePrompt(row.prompt, compositionPreset);
     return {
       id: row.id,
       originProjectId: row.origin_project_id,
       originProjectName: row.origin_project_name,
       mode: row.mode,
       prompt: row.prompt,
+      effectivePrompt,
+      compositionPreset,
       candidateCount: row.candidate_count as 1 | 2 | 3 | 4,
       aspectFormat: row.aspect_format,
       width: row.width,

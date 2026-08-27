@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  composeImagePrompt,
+  IMAGE_COMPOSITION_PRESETS,
+  imageCompositionPreset,
+  type ImageCompositionPreset,
+} from "../lib/image-composition";
 
 type SeedMode = "random" | "base" | "fixed";
 type ImageMode = "generate" | "edit";
@@ -53,6 +59,8 @@ type ImageJob = {
   originProjectName: string | null;
   mode: ImageMode;
   prompt: string;
+  effectivePrompt?: string;
+  compositionPreset?: ImageCompositionPreset;
   candidateCount: number;
   aspectFormat: string;
   width: number;
@@ -174,6 +182,8 @@ function referenceMediaPath(file: string) {
 export default function ImageStudioPanel({ bridgeUrl, projects, projectId, projectName }: Props) {
   const [mode, setMode] = useState<ImageMode>("generate");
   const [prompt, setPrompt] = useState("");
+  const [compositionPreset, setCompositionPreset] =
+    useState<ImageCompositionPreset>("free");
   const [candidateCount, setCandidateCount] = useState(4);
   const [format, setFormat] = useState<(typeof formats)[number]["value"]>("1:1");
   const [seedMode, setSeedMode] = useState<SeedMode>("random");
@@ -193,6 +203,11 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
   const composerRef = useRef<HTMLElement>(null);
   const loadGenerationRef = useRef(0);
   const selectedFormat = formats.find((item) => item.value === format) ?? formats[0];
+  const selectedComposition = imageCompositionPreset(compositionPreset);
+  const effectivePrompt = useMemo(
+    () => composeImagePrompt(prompt, compositionPreset),
+    [compositionPreset, prompt],
+  );
   const orderedProjects = useMemo(() => [...projects].sort((a, b) => a.name.localeCompare(b.name)), [projects]);
   const visibleCandidates = job
     ? job.candidates.filter((candidate) => {
@@ -326,7 +341,7 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
     try {
       const response = await fetch(`${bridgeUrl}/api/image-jobs`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId, mode, prompt: prompt.trim(), candidateCount, aspectFormat: selectedFormat.value, width: selectedFormat.width, height: selectedFormat.height, seedMode, seed: seedMode === "random" ? undefined : numericSeed, references: references.map((reference) => ({ file: reference.file, name: reference.name, width: reference.width, height: reference.height, role: reference.role })), tag }),
+        body: JSON.stringify({ projectId, mode, prompt: prompt.trim(), effectivePrompt, compositionPreset, candidateCount, aspectFormat: selectedFormat.value, width: selectedFormat.width, height: selectedFormat.height, seedMode, seed: seedMode === "random" ? undefined : numericSeed, references: references.map((reference) => ({ file: reference.file, name: reference.name, width: reference.width, height: reference.height, role: reference.role })), tag }),
       });
       const payload = (await response.json()) as { job?: ImageJob; error?: string };
       if (!response.ok || !payload.job) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
@@ -450,7 +465,7 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
                   className={item.id === job?.id ? "active" : ""}
                   key={item.id}
                   onClick={() => {
-                    setJob(item); setActiveJobId(active(item) ? item.id : null); setMode(item.mode); setPrompt(item.prompt); setCandidateCount(item.candidateCount);
+                    setJob(item); setActiveJobId(active(item) ? item.id : null); setMode(item.mode); setPrompt(item.prompt); setCompositionPreset(item.compositionPreset ?? "free"); setCandidateCount(item.candidateCount);
                     setFormat((formats.some((candidate) => candidate.value === item.aspectFormat) ? item.aspectFormat : "1:1") as typeof format);
                     setSeedMode(item.seedMode);
                     setSeedValue(item.requestedSeed === null || item.requestedSeed === undefined ? "1024" : String(item.requestedSeed));
@@ -559,6 +574,29 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
             <span className="prompt-hint">{mode === "edit" ? "Le reference vengono inviate a Flux Klein nell'ordine mostrato." : "Genera fino a quattro variazioni nello stesso batch."}</span>
           </label>
 
+          <fieldset className="image-composition-presets">
+            <legend>Composizione</legend>
+            <div className="image-composition-options">
+              {IMAGE_COMPOSITION_PRESETS.map((preset) => (
+                <button
+                  aria-pressed={compositionPreset === preset.value}
+                  className={compositionPreset === preset.value ? "selected" : ""}
+                  key={preset.value}
+                  onClick={() => setCompositionPreset(preset.value)}
+                  type="button"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <p><strong>{selectedComposition.label}</strong><span>{selectedComposition.description}</span></p>
+          </fieldset>
+
+          <details className="image-effective-prompt">
+            <summary>Prompt effettivo inviato al motore</summary>
+            <p>{effectivePrompt || "Scrivi il prompt per vedere il testo effettivo."}</p>
+          </details>
+
           <div className="image-control-grid">
             <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => setMode("edit")} type="button">Edit</button></div></fieldset>
             <label className="select-control"><span>Formato</span><select onChange={(event) => setFormat(event.target.value as typeof format)} value={format}>{formats.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
@@ -590,7 +628,7 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
           <div className={selectedEngineReady ? "image-engine-state ready" : "image-engine-state blocked"}>
             {selectedEngineReady ? "Motore immagini pronto" : engineStatusError ?? "Dipendenze motore mancanti"}
           </div>
-          <div className="preset-note"><span className="fast-badge">{mode === "edit" ? "FLUX KLEIN EDIT" : "IMAGE"}</span>{selectedFormat.width} × {selectedFormat.height} · {(selectedFormat.width * selectedFormat.height / 1_000_000).toFixed(1)} MP</div>
+          <div className="preset-note"><span className="fast-badge">{mode === "edit" ? "FLUX KLEIN EDIT" : "IMAGE"}</span>{selectedFormat.width} × {selectedFormat.height} · {(selectedFormat.width * selectedFormat.height / 1_000_000).toFixed(1)} MP · {selectedComposition.shortLabel}</div>
           <div className="generation-cta"><div><span>Output</span><strong>{candidateCount} immagin{candidateCount === 1 ? "e" : "i"} · {tag === "untagged" ? "senza tag" : tags.find((item) => item.value === tag)?.label}</strong></div><button disabled={busy === "run" || active(job) || !projectId || !selectedEngineReady} onClick={() => void run()} type="button">{busy === "run" || active(job) ? "Generazione in corso" : !selectedEngineReady ? "Motore non pronto" : mode === "edit" ? "Crea " + candidateCount + " edit" : "Genera " + candidateCount + " immagini"}</button></div>
         </div>
         {message && <div className="run-message">{message}</div>}

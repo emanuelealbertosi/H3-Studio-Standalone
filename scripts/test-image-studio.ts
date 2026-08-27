@@ -3,6 +3,10 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import {
+  composeImagePrompt,
+  IMAGE_COMPOSITION_PRESETS,
+} from "../lib/image-composition.js";
 import { JobRepository } from "../bridge/job-repository.js";
 import {
   ImageJobRepository,
@@ -13,6 +17,10 @@ import {
   buildFlux2KleinEditPrompt,
   buildKreaGeneratePrompt,
 } from "../bridge/image-workflow-builder.js";
+import {
+  ImageStudioService,
+  normalizeImageRequest,
+} from "../bridge/image-studio-service.js";
 import { ProjectRepository } from "../bridge/project-repository.js";
 import {
   DEFAULT_RUNTIME_SETTINGS,
@@ -32,9 +40,10 @@ function reference(index: number): ImageJobReferenceInput {
 }
 
 try {
-  const [imageStudioSource, pageSource] = await Promise.all([
+  const [imageStudioSource, pageSource, serverSource] = await Promise.all([
     readFile(path.join(process.cwd(), "app", "image-studio-panel.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "app", "page.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "bridge", "server.ts"), "utf8"),
   ]);
   assert.match(
     imageStudioSource,
@@ -44,7 +53,82 @@ try {
     imageStudioSource,
     /const roles:[\s\S]*?value: "background", label: "Sfondo"[\s\S]*?\];/,
   );
+  assert.match(imageStudioSource, /IMAGE_COMPOSITION_PRESETS\.map/);
+  assert.match(
+    imageStudioSource,
+    /JSON\.stringify\(\{[\s\S]*?effectivePrompt,[\s\S]*?compositionPreset,/,
+  );
   assert.match(pageSource, /<span className="rail-icon">◉<\/span>\s*Assets/);
+  assert.match(
+    serverSource,
+    /"\/api\/image-jobs"[\s\S]{0,500}request\.query\.projectId/,
+    "the image jobs API should forward the project filter",
+  );
+  assert.match(pageSource, /projectImageQuery\.set\("projectId", studioProjectId\)/);
+  assert.match(
+    pageSource,
+    /fetch\(`\$\{bridgeUrl\}\/api\/image-jobs\?\$\{projectImageQuery\.toString\(\)\}`/,
+  );
+  assert.match(
+    pageSource,
+    /fetch\(`\$\{bridgeUrl\}\/api\/image-jobs\?\$\{reusableImageQuery\.toString\(\)\}`/,
+    "the media picker should keep a global fallback for historical and cross-project images",
+  );
+  assert.match(pageSource, />Immagini del progetto<\/strong>/);
+  assert.match(pageSource, />Altre immagini generate<\/strong>/);
+  assert.match(pageSource, /function addGeneratedImage\([\s\S]*?kind: "picture" as const/);
+  assert.match(pageSource, /file: imageReferenceFile\(candidate\.output\)/);
+
+  assert.deepEqual(
+    IMAGE_COMPOSITION_PRESETS.map((preset) => preset.value),
+    [
+      "free",
+      "character-turnaround",
+      "close-up",
+      "half-body",
+      "full-body",
+      "object-sheet",
+      "landscape",
+    ],
+  );
+  const userPrompt = "A silver-haired explorer in a weathered red coat";
+  assert.equal(composeImagePrompt(userPrompt, "free"), userPrompt);
+  const turnaroundPrompt = composeImagePrompt(userPrompt, "character-turnaround");
+  assert.ok(turnaroundPrompt.startsWith(userPrompt + "\n\n"));
+  assert.match(turnaroundPrompt, /front, three-quarter, side and back views/);
+  const normalizedComposition = normalizeImageRequest({
+    projectId: "project-test",
+    mode: "generate",
+    prompt: userPrompt,
+    effectivePrompt: turnaroundPrompt,
+    compositionPreset: "character-turnaround",
+    candidateCount: 1,
+    aspectFormat: "1:1",
+    width: 1024,
+    height: 1024,
+    seedMode: "random",
+    references: [],
+    tag: "character",
+  });
+  assert.equal(normalizedComposition.prompt, userPrompt);
+  assert.equal(normalizedComposition.effectivePrompt, turnaroundPrompt);
+  assert.equal(normalizedComposition.compositionPreset, "character-turnaround");
+  assert.throws(
+    () => normalizeImageRequest({
+      ...normalizedComposition,
+      candidateCount: 1,
+      effectivePrompt: userPrompt,
+    }),
+    /prompt effettivo non corrisponde/i,
+  );
+  assert.throws(
+    () => normalizeImageRequest({
+      ...normalizedComposition,
+      candidateCount: 1,
+      compositionPreset: "unknown",
+    }),
+    /preset di composizione immagine non valido/i,
+  );
 
   const jobs = new JobRepository(temporaryDir);
   const projects = new ProjectRepository(jobs.databasePath);
@@ -52,6 +136,40 @@ try {
   const firstProject = projects.create("Immagini A");
   const secondProject = projects.create("Immagini B");
   assert(firstProject && secondProject);
+
+  const prepareRuntime = new RuntimeSettingsStore(temporaryDir);
+  const imageService = new ImageStudioService(
+    {} as never,
+    images,
+    prepareRuntime,
+    path.join(process.cwd(), "workflows", "studio-krea2.api.json"),
+    path.join(process.cwd(), "workflows", "studio-flux2-klein-edit.api.json"),
+  );
+  const closeUpEffectivePrompt = composeImagePrompt(userPrompt, "close-up");
+  const preparedComposition = await imageService.prepare({
+    projectId: firstProject.id,
+    mode: "generate",
+    prompt: userPrompt,
+    effectivePrompt: closeUpEffectivePrompt,
+    compositionPreset: "close-up",
+    candidateCount: 1,
+    aspectFormat: "1:1",
+    width: 1024,
+    height: 1024,
+    seedMode: "fixed",
+    seed: 99,
+    references: [],
+    tag: "character",
+  });
+  assert.equal(preparedComposition.prompt, userPrompt);
+  assert.equal(preparedComposition.effectivePrompt, closeUpEffectivePrompt);
+  assert.equal(preparedComposition.compositionPreset, "close-up");
+  assert.equal(preparedComposition.engine.compositionPreset, "close-up");
+  assert.equal(preparedComposition.engine.effectivePrompt, closeUpEffectivePrompt);
+  assert.equal(
+    preparedComposition.candidates[0].apiPrompt["4"].inputs.text,
+    closeUpEffectivePrompt,
+  );
 
   const schema = new DatabaseSync(jobs.databasePath);
   const migration = schema
@@ -186,6 +304,8 @@ try {
     originProjectId: firstProject.id,
     mode: "edit",
     prompt: "Combine the references",
+    effectivePrompt: composeImagePrompt("Combine the references", "half-body"),
+    compositionPreset: "half-body",
     candidateCount: 2,
     aspectFormat: "16:9",
     width: 1344,
@@ -204,6 +324,8 @@ try {
       scheduler: "flux2",
       kvCacheEnabled: false,
       attentionBackend: "auto",
+      compositionPreset: "half-body",
+      effectivePrompt: composeImagePrompt("Combine the references", "half-body"),
     },
     references: fourReferences,
     candidates: [
@@ -222,6 +344,9 @@ try {
     ],
   };
   let stored = images.createPrepared(prepared);
+  assert.equal(stored.prompt, "Combine the references");
+  assert.equal(stored.compositionPreset, "half-body");
+  assert.equal(stored.effectivePrompt, prepared.effectivePrompt);
   assert.equal(stored.references.length, 4);
   assert.equal(stored.candidates[0].projectLinks[0].projectId, firstProject.id);
   assert.equal(stored.candidates[0].projectLinks[0].tag, "background");
@@ -237,6 +362,38 @@ try {
     type: "output",
     format: "image/png",
   });
+  const firstProjectJobs = images.list(20, firstProject.id);
+  assert.equal(firstProjectJobs.length, 1);
+  assert.deepEqual(firstProjectJobs[0].candidates.map((candidate) => candidate.index), [1, 2]);
+  assert.equal(
+    firstProjectJobs[0].candidates[0].output?.file,
+    "images/H3_STUDIO/result.png [output]",
+  );
+  assert.equal(
+    firstProjectJobs[0].candidates[0].output?.mediaPath,
+    "/api/media?filename=result.png&subfolder=images%2FH3_STUDIO&type=output",
+  );
+
+  // Simulate a historical candidate whose output predates (or lost) its project link.
+  // It must remain discoverable through the unfiltered picker fallback without re-uploading.
+  const legacyDatabase = new DatabaseSync(jobs.databasePath);
+  legacyDatabase
+    .prepare(
+      `DELETE FROM project_image_links
+       WHERE project_id = ? AND image_job_id = ? AND image_candidate_index = ?`,
+    )
+    .run(firstProject.id, "image-job-test", 2);
+  legacyDatabase.close();
+  assert.deepEqual(
+    images.list(20, firstProject.id)[0].candidates.map((candidate) => candidate.index),
+    [1],
+  );
+  const reusableJobs = images.list(20);
+  assert.equal(reusableJobs[0].candidates[1].index, 2);
+  assert.equal(
+    reusableJobs[0].candidates[1].output?.file,
+    "images/H3_STUDIO/result-2.png [output]",
+  );
   stored = images.linkProject(
     "image-job-test",
     1,

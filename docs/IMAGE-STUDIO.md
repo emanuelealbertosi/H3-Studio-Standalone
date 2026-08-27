@@ -16,6 +16,19 @@ separata.
 I tag Personaggio, Oggetto e Paesaggio sono metadati del progetto: servono a
 classificare e riusare l’immagine, ma non cambiano da soli il render.
 
+## Preset di composizione
+
+Il composer offre **Libero**, **Character sheet / turnaround**, **Primo piano**,
+**Mezzo busto**, **Figura intera**, **Oggetto sheet** e **Paesaggio**. Libero
+invia il testo invariato; gli altri preset aggiungono in coda una direttiva di
+inquadratura adatta al caso scelto. Il testo scritto dall'utente non viene
+sostituito e rimane modificabile separatamente.
+
+La selezione attiva e la relativa descrizione sono sempre visibili. La voce
+**Prompt effettivo inviato al motore** permette inoltre di controllare il testo
+completo prima di avviare il batch. Il bridge ricompone e valida lo stesso prompt
+prima di costruire il grafo ComfyUI, così un payload incoerente non entra in coda.
+
 ## Reference Flux.2 Klein
 
 Le reference sono ordinate e limitate a quattro, come nel contratto ufficiale
@@ -33,6 +46,19 @@ Un candidato completato può essere:
 
 La condivisione è per singolo candidato: condividere una immagine di un batch
 non espone le altre.
+
+## Riutilizzo nello Studio Video
+
+Nel composer video, **Scegli dalla libreria** mostra prima le immagini generate
+e collegate al progetto corrente, quindi le altre immagini riutilizzabili. La
+scelta crea una reference Picture che punta direttamente al file di output
+ComfyUI (`[output]`): non duplica il file e non esegue un nuovo upload.
+
+Le stesse immagini compaiono nel menu `@` del prompt. Il nome, la didascalia,
+le dimensioni e il tag del candidato vengono riportati nella reference; se il
+video era in modalità T2V, H3 Studio passa automaticamente a Reference. Un
+fallback globale mantiene visibili anche risultati storici privi del vecchio
+legame candidato-progetto.
 
 ## Profilo raccomandato
 
@@ -54,8 +80,9 @@ reference vengono poi ricostruiti e validati prima dell’invio.
 
 ## Persistenza e sicurezza
 
-Job, candidati, seed, reference, prompt API e legami con i progetti sono
-persistiti in SQLite. I file restano nell’output ComfyUI. Dopo un riavvio il
+Job, candidati, seed, reference, preset di composizione, prompt utente, prompt
+effettivo, prompt API e legami con i progetti sono persistiti in SQLite o nello
+snapshot del job. I file restano nell’output ComfyUI. Dopo un riavvio il
 bridge recupera i prompt ancora attivi e il frontend riprende il polling.
 
 Prima di abilitare Genera, l’interfaccia verifica workflow, modelli, VAE,

@@ -141,6 +141,49 @@ type MediaAsset = {
   uid: string;
 };
 
+type ImageProjectTag = "untagged" | "character" | "object" | "background";
+
+type ImagePickerOutput = {
+  mediaPath: string;
+  filename?: string;
+  file?: string;
+  subfolder?: string;
+  type?: "input" | "output" | "temp";
+  width?: number | null;
+  height?: number | null;
+};
+
+type ImagePickerCandidate = {
+  index: number;
+  status: string;
+  output: ImagePickerOutput | null;
+  projectLinks?: Array<
+    | string
+    | {
+        projectId: string;
+        projectName?: string | null;
+        candidateIndex?: number | null;
+        tag?: ImageProjectTag | null;
+      }
+  >;
+};
+
+type ImagePickerJob = {
+  id: string;
+  originProjectId: string | null;
+  originProjectName: string | null;
+  prompt: string;
+  width: number;
+  height: number;
+  candidates: ImagePickerCandidate[];
+};
+
+type GeneratedImagePickerItem = {
+  job: ImagePickerJob;
+  candidate: ImagePickerCandidate & { output: ImagePickerOutput };
+  sameProject: boolean;
+};
+
 type MentionState = { start: number; end: number; query: string };
 
 function mentionBase(name: string) {
@@ -180,6 +223,36 @@ function mediaPreviewPath(asset: MediaAsset) {
   const type = (match?.[2] ?? "input").toLowerCase();
   const query = new URLSearchParams({ filename, subfolder, type });
   return `/api/media?${query.toString()}`;
+}
+
+function imageReferenceFile(output: ImagePickerOutput) {
+  if (output.file?.trim()) return output.file;
+  const relative = [output.subfolder, output.filename].filter(Boolean).join("/");
+  if (relative) return `${relative} [${output.type ?? "output"}]`;
+  try {
+    const url = new URL(output.mediaPath, "http://h3-studio.local");
+    const filename = url.searchParams.get("filename");
+    if (filename) {
+      const subfolder = url.searchParams.get("subfolder") ?? "";
+      const type = url.searchParams.get("type") ?? "output";
+      return `${subfolder ? `${subfolder}/` : ""}${filename} [${type}]`;
+    }
+  } catch {
+    // Historical entries can contain a plain media path instead of a URL.
+  }
+  return output.mediaPath;
+}
+
+function imageCandidateTag(candidate: ImagePickerCandidate, projectId: string) {
+  const links = (candidate.projectLinks ?? []).flatMap((link) =>
+    typeof link === "string"
+      ? [{ projectId: link, tag: null }]
+      : [{ projectId: link.projectId, tag: link.tag ?? null }],
+  );
+  const tag =
+    links.find((link) => link.projectId === projectId)?.tag ??
+    links.find((link) => link.tag && link.tag !== "untagged")?.tag;
+  return tag && tag !== "untagged" ? tag : undefined;
 }
 
 function buildReferenceRoles(assets: MediaAsset[], fallback: string) {
@@ -3010,7 +3083,13 @@ function StudioApp() {
   const [mediaPickerBusy, setMediaPickerBusy] = useState(false);
   const [mediaLibraryAssets, setMediaLibraryAssets] = useState<CreativeAsset[]>([]);
   const [mediaRecentJobs, setMediaRecentJobs] = useState<RemoteJob[]>([]);
+  const [mediaProjectImageJobs, setMediaProjectImageJobs] = useState<ImagePickerJob[]>([]);
+  const [mediaReusableImageJobs, setMediaReusableImageJobs] = useState<ImagePickerJob[]>([]);
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  const mediaPickerLoadedProjectRef = useRef<string | null>(null);
+  const mediaPickerLoadGenerationRef = useRef(0);
+  const studioProjectIdRef = useRef(studioProjectId);
+  studioProjectIdRef.current = studioProjectId;
   const [prompt, setPrompt] = useState(
     "A brilliant fantasy wizard faces a colossal golden dragon above a sunlit mountain citadel. Fast cinematic action, sweeping camera moves, magical shields and spectacular elemental attacks.",
   );
@@ -3067,6 +3146,33 @@ function StudioApp() {
   const playableCandidates = visibleCandidates.filter(
     (candidate) => candidate.status === "ready" && candidate.mediaPath,
   ).length;
+  const mediaGeneratedImages = useMemo(() => {
+    const seen = new Set<string>();
+    const collected: GeneratedImagePickerItem[] = [];
+    const append = (jobs: ImagePickerJob[]) => {
+      for (const job of jobs) {
+        for (const candidate of job.candidates) {
+          if (candidate.status !== "ready" || !candidate.output) continue;
+          const key = `${job.id}-${candidate.index}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const linkedToProject = (candidate.projectLinks ?? []).some((link) =>
+            typeof link === "string" ? link === studioProjectId : link.projectId === studioProjectId,
+          );
+          collected.push({
+            job,
+            candidate: { ...candidate, output: candidate.output },
+            sameProject: linkedToProject || job.originProjectId === studioProjectId,
+          });
+        }
+      }
+    };
+    append(mediaProjectImageJobs);
+    append(mediaReusableImageJobs);
+    return collected;
+  }, [mediaProjectImageJobs, mediaReusableImageJobs, studioProjectId]);
+  const mediaProjectGeneratedImages = mediaGeneratedImages.filter((item) => item.sameProject);
+  const mediaOtherGeneratedImages = mediaGeneratedImages.filter((item) => !item.sameProject);
   const promptMentionOptions = useMemo(() => {
     const query = mentionState?.query ?? "";
     const seen = new Set<string>();
@@ -3081,6 +3187,12 @@ function StudioApp() {
       detail: `${asset.kind === "character" ? "Personaggio" : "Oggetto"} · ${asset.referenceCount} reference`,
       asset,
     }));
+    const images = mediaGeneratedImages.map((item) => ({
+      kind: "image" as const,
+      label: mentionBase(`immagine_${item.job.id.slice(0, 8)}_${item.candidate.index}`),
+      detail: `${item.job.originProjectName ?? "Immagine generata"} · candidato ${item.candidate.index}`,
+      ...item,
+    }));
     const videos = mediaRecentJobs.flatMap((job) =>
       job.candidates
         .filter((candidate) => candidate.output)
@@ -3092,10 +3204,10 @@ function StudioApp() {
           candidate,
         })),
     );
-    return [...loaded, ...library, ...videos]
+    return [...loaded, ...images, ...library, ...videos]
       .filter((item) => !query || `${item.label} ${item.detail}`.toLowerCase().includes(query))
       .slice(0, 12);
-  }, [mediaAssets, mediaLibraryAssets, mediaRecentJobs, mentionState?.query]);
+  }, [mediaAssets, mediaGeneratedImages, mediaLibraryAssets, mediaRecentJobs, mentionState?.query]);
   const modeConfig = modes.find((item) => item.value === mode) ?? modes[0];
   const effectiveSteps =
     qualityMode === "fast"
@@ -3621,21 +3733,43 @@ function StudioApp() {
   }
 
   async function loadMediaPicker() {
-    if (mediaPickerBusy) return;
+    const loadGeneration = ++mediaPickerLoadGenerationRef.current;
+    const requestedProjectId = studioProjectId;
     setMediaPickerBusy(true);
+    mediaPickerLoadedProjectRef.current = requestedProjectId;
+    setMediaProjectImageJobs([]);
     try {
-      const [libraryResponse, jobsResponse] = await Promise.all([
+      const projectImageQuery = new URLSearchParams({ limit: "40" });
+      if (studioProjectId) projectImageQuery.set("projectId", studioProjectId);
+      const reusableImageQuery = new URLSearchParams({ limit: "100" });
+      const [libraryResponse, jobsResponse, projectImagesResponse, reusableImagesResponse] = await Promise.all([
         fetch(`${bridgeUrl}/api/library`, { cache: "no-store" }),
         fetch(`${bridgeUrl}/api/jobs?limit=30`, { cache: "no-store" }),
+        studioProjectId
+          ? fetch(`${bridgeUrl}/api/image-jobs?${projectImageQuery.toString()}`, { cache: "no-store" })
+          : Promise.resolve(null),
+        fetch(`${bridgeUrl}/api/image-jobs?${reusableImageQuery.toString()}`, { cache: "no-store" }),
       ]);
       const libraryPayload = (await libraryResponse.json()) as { assets?: CreativeAsset[] };
       const jobsPayload = (await jobsResponse.json()) as { jobs?: RemoteJob[] };
+      const projectImagesPayload = projectImagesResponse
+        ? ((await projectImagesResponse.json()) as { jobs?: ImagePickerJob[] })
+        : { jobs: [] as ImagePickerJob[] };
+      const reusableImagesPayload = (await reusableImagesResponse.json()) as { jobs?: ImagePickerJob[] };
+      if (
+        loadGeneration !== mediaPickerLoadGenerationRef.current ||
+        requestedProjectId !== studioProjectIdRef.current
+      ) return;
       if (libraryResponse.ok) setMediaLibraryAssets(libraryPayload.assets ?? []);
       if (jobsResponse.ok) setMediaRecentJobs(jobsPayload.jobs ?? []);
+      if (projectImagesResponse?.ok) setMediaProjectImageJobs(projectImagesPayload.jobs ?? []);
+      if (reusableImagesResponse.ok) setMediaReusableImageJobs(reusableImagesPayload.jobs ?? []);
     } catch (error) {
-      setRunMessage(error instanceof Error ? error.message : "Libreria media non disponibile");
+      if (loadGeneration === mediaPickerLoadGenerationRef.current) {
+        setRunMessage(error instanceof Error ? error.message : "Libreria media non disponibile");
+      }
     } finally {
-      setMediaPickerBusy(false);
+      if (loadGeneration === mediaPickerLoadGenerationRef.current) setMediaPickerBusy(false);
     }
   }
 
@@ -3668,7 +3802,9 @@ function StudioApp() {
       return;
     }
     setMentionState({ start: caret - match[0].length, end: caret, query: match[1].toLowerCase() });
-    if (!mediaLibraryAssets.length && !mediaPickerBusy) void loadMediaPicker();
+    if (mediaPickerLoadedProjectRef.current !== studioProjectId) {
+      void loadMediaPicker();
+    }
   }
 
   async function addLibraryAsset(summary: CreativeAsset) {
@@ -3705,6 +3841,40 @@ function StudioApp() {
     } finally {
       setMediaPickerBusy(false);
     }
+  }
+
+  function addGeneratedImage(item: GeneratedImagePickerItem) {
+    if (mediaAssets.length >= 18) {
+      setRunMessage("Puoi collegare al massimo 18 media");
+      return;
+    }
+    const { job, candidate } = item;
+    const name = `Immagine ${job.id.slice(0, 8)} · candidato ${candidate.index}`;
+    const mention = uniqueMention(name, mediaAssets);
+    setMediaAssets((current) => [
+      ...current,
+      {
+        kind: "picture" as const,
+        file: imageReferenceFile(candidate.output),
+        name,
+        caption: job.prompt.slice(0, 180),
+        mention,
+        mediaPath: candidate.output.mediaPath,
+        referenceRole: imageCandidateTag(candidate, studioProjectId),
+        width: candidate.output.width ?? job.width,
+        height: candidate.output.height ?? job.height,
+        audio_mode: "off" as const,
+        uid: crypto.randomUUID(),
+      },
+    ].slice(0, 18));
+    if (mode === "t2v") setMode("reference");
+    insertPromptMention(mention);
+    setMediaPickerOpen(false);
+    setRunMessage(
+      item.sameProject
+        ? "Immagine del progetto collegata senza nuovo upload"
+        : `Immagine di “${job.originProjectName ?? "un altro progetto"}” riutilizzata senza nuovo upload`,
+    );
   }
 
   function addRecentVideo(job: RemoteJob, candidate: RemoteJob["candidates"][number]) {
@@ -4304,7 +4474,7 @@ function StudioApp() {
                 <div className="mention-menu" role="listbox" aria-label="Media disponibili">
                   <div className="mention-menu-head">
                     <strong>Inserisci un riferimento</strong>
-                    <span>Caricati · Libreria · Video recenti</span>
+                    <span>Caricati · Immagini · Libreria · Video recenti</span>
                   </div>
                   {mediaPickerBusy && !promptMentionOptions.length ? (
                     <span className="mention-empty">Caricamento media…</span>
@@ -4315,15 +4485,16 @@ function StudioApp() {
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => {
                           if (item.kind === "loaded") insertPromptMention(item.label);
+                          else if (item.kind === "image") addGeneratedImage(item);
                           else if (item.kind === "library") void addLibraryAsset(item.asset);
                           else addRecentVideo(item.job, item.candidate);
                         }}
                         role="option"
                         type="button"
                       >
-                        <span>{item.kind === "loaded" ? "●" : item.kind === "library" ? "▧" : "▶"}</span>
+                        <span>{item.kind === "loaded" ? "●" : item.kind === "image" ? "▨" : item.kind === "library" ? "▧" : "▶"}</span>
                         <div><strong>@{item.label}</strong><small>{item.detail}</small></div>
-                        <i>{item.kind === "loaded" ? "Caricato" : item.kind === "library" ? "Libreria" : "Video"}</i>
+                        <i>{item.kind === "loaded" ? "Caricato" : item.kind === "image" ? "Immagine" : item.kind === "library" ? "Libreria" : "Video"}</i>
                       </button>
                     ))
                   ) : (
@@ -4545,8 +4716,9 @@ function StudioApp() {
                   <div className="asset-source-actions">
                     <button
                       onClick={() => {
-                        setMediaPickerOpen((current) => !current);
-                        if (!mediaLibraryAssets.length) void loadMediaPicker();
+                        const opening = !mediaPickerOpen;
+                        setMediaPickerOpen(opening);
+                        if (opening) void loadMediaPicker();
                       }}
                       type="button"
                     >
@@ -4619,10 +4791,46 @@ function StudioApp() {
                       <div><strong>Libreria media</strong><span>Aggiungi senza ricaricare file già disponibili</span></div>
                       <button onClick={() => setMediaPickerOpen(false)} type="button">×</button>
                     </div>
-                    {mediaPickerBusy && !mediaLibraryAssets.length ? (
+                    {mediaPickerBusy && !mediaLibraryAssets.length && !mediaGeneratedImages.length && !mediaRecentJobs.length ? (
                       <span className="media-picker-empty">Caricamento…</span>
                     ) : (
                       <>
+                        <div className="media-picker-section">
+                          <strong>Immagini del progetto</strong>
+                          <div className="media-picker-grid generated-images">
+                            {mediaProjectGeneratedImages.slice(0, 12).map((item) => (
+                              <button
+                                key={`${item.job.id}-${item.candidate.index}`}
+                                onClick={() => addGeneratedImage(item)}
+                                title={item.job.prompt}
+                                type="button"
+                              >
+                                <div><img alt="" src={`${bridgeUrl}${item.candidate.output.mediaPath}`} /></div>
+                                <strong>{item.job.originProjectName ?? "Immagine generata"}</strong>
+                                <small>{item.job.id.slice(0, 8)} · candidato {item.candidate.index}</small>
+                              </button>
+                            ))}
+                            {!mediaProjectGeneratedImages.length && <span className="media-picker-empty">Nessuna immagine generata in questo progetto</span>}
+                          </div>
+                        </div>
+                        <div className="media-picker-section">
+                          <strong>Altre immagini generate</strong>
+                          <div className="media-picker-grid generated-images reusable-images">
+                            {mediaOtherGeneratedImages.slice(0, 12).map((item) => (
+                              <button
+                                key={`${item.job.id}-${item.candidate.index}`}
+                                onClick={() => addGeneratedImage(item)}
+                                title={item.job.prompt}
+                                type="button"
+                              >
+                                <div><img alt="" src={`${bridgeUrl}${item.candidate.output.mediaPath}`} /></div>
+                                <strong>{item.job.originProjectName ?? "Altro progetto"}</strong>
+                                <small>{item.job.id.slice(0, 8)} · candidato {item.candidate.index}</small>
+                              </button>
+                            ))}
+                            {!mediaOtherGeneratedImages.length && <span className="media-picker-empty">Nessun’altra immagine riutilizzabile</span>}
+                          </div>
+                        </div>
                         <div className="media-picker-section">
                           <strong>Personaggi e oggetti</strong>
                           <div className="media-picker-grid">
