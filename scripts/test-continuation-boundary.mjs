@@ -54,5 +54,20 @@ assert.match(
   /"context_frames": self\.external_frames/,
   "Motion Context must receive consecutive decoded source frames",
 );
+assert.match(
+  motionSource,
+  /context_latent=self\.external_latent/,
+  "a saved native AV latent must be preferred for Studio Continue",
+);
+assert.match(
+  source,
+  /MiniMaxH3MotionContextLoadLatent/,
+  "Studio Continue must load the source candidate native AV latent",
+);
+assert.match(
+  source,
+  /MiniMaxH3MotionContextSaveLatent/,
+  "every Studio candidate must persist its native AV latent",
+);
 
 console.log("Video continuation boundary regression passed.");

@@ -173,6 +173,7 @@ try {
         "candidate_1.mp4",
         "candidate_1_face_upscale.mp4",
         "candidate_1_upscale.mp4",
+        "latent_00001.safetensors",
       ],
     );
     assert.equal(projects.get(first.id)?.clips.length, 0);
@@ -182,7 +183,13 @@ try {
     const failedDeleted = jobs.deleteCandidate("failed-job", 1);
     assert.equal(failedDeleted.jobDeleted, true);
     assert.equal(failedDeleted.removedClips, 0);
-    assert.deepEqual(failedDeleted.files, []);
+    assert.deepEqual(failedDeleted.files, [
+      {
+        filename: "latent_00001.safetensors",
+        subfolder: "video/H3_STUDIO_CONTEXT/failed-job",
+        type: "output",
+      },
+    ]);
     assert.equal(jobs.get("failed-job"), null);
   } finally {
     projects.close();

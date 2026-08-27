@@ -595,6 +595,11 @@ export class JobRepository {
         project_id: string;
       }>;
     const files = [
+      {
+        filename: `latent_${String(candidateIndex).padStart(5, "0")}.safetensors`,
+        subfolder: `video/H3_STUDIO_CONTEXT/${jobId}`,
+        type: "output",
+      },
       candidate.output_filename
         ? {
             filename: candidate.output_filename,

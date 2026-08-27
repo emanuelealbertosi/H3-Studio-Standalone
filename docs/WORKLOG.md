@@ -224,3 +224,12 @@
 - Il dialog Upscale ora si apre anche con un backend precedente, mostra l'errore di contratto e disabilita la conferma, così il problema non appare più come un click ignorato e non raggiunge la coda ComfyUI.
 - Aggiunto `repair:processing-times`: dry-run predefinito, apply consentito solo con `--bridge-stopped`, backup SQLite verificato, controllo dei percorsi reali nell'output ComfyUI e aggiornamenti condizionali dei soli candidati idonei.
 - Sei tempi legacy risultano ricostruibili dal file MP4; un job importato ha un output precedente alla creazione del candidato e viene escluso dalla riparazione anziché ricevere una durata inventata.
+
+## 27 agosto 2026 — Continuità nativa fra job Continue
+
+- Ogni candidato H3 Studio salva ora il proprio latent H3 AV nativo in uno slot deterministico separato dal video consegnato.
+- Continue riconosce job e candidato dal media selezionato, carica il latent video+audio e lo passa a Motion Context senza decodifica e ricodifica.
+- La catena Continue 1→2→3 conserva quindi lo stesso contesto transitivo usato internamente dal multishot, pur mantenendo segmenti e job separati.
+- I video legacy, importati o generati a una risoluzione incompatibile continuano a funzionare con il fallback degli ultimi 22 frame decodificati.
+- La cancellazione di un candidato rimuove anche il relativo cache latent; i path sorgente accettano soltanto UUID di job e indici candidato 1–4.
+- Verificati sintassi Python, regressione Continue, mapping FAST/standard, cancellazione repository e typecheck con Node 24.

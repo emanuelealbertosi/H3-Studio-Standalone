@@ -340,6 +340,35 @@ function randomSeed() {
   return Math.floor(Math.random() * MAX_SEED);
 }
 
+function sourceContextFromRequest(request: StudioJobRequest) {
+  if (request.generationMode !== "VIDEO EXTENSION") return null;
+  const items = JSON.parse(request.mediaState || "[]") as Array<Record<string, unknown>>;
+  const sourceVideo = items.find(
+    (item) => item.kind === "video" && typeof item.file === "string",
+  );
+  const file = typeof sourceVideo?.file === "string" ? sourceVideo.file : "";
+  const pathMatch = file.match(
+    /(?:^|[\\/])H3_STUDIO[\\/]([^\\/]+)[\\/]candidate_(\d+)_/i,
+  );
+  const sourceJobId = pathMatch?.[1] ?? request.sourceJobId;
+  const candidateIndex = pathMatch ? Number(pathMatch[2]) : 1;
+  if (
+    !sourceJobId ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      sourceJobId,
+    ) ||
+    !Number.isInteger(candidateIndex) ||
+    candidateIndex < 1 ||
+    candidateIndex > 4
+  ) {
+    return null;
+  }
+  return {
+    prefix: `video/H3_STUDIO_CONTEXT/${sourceJobId}/latent`,
+    candidateIndex,
+  };
+}
+
 export function findVideoOutput(outputs: unknown): MediaOutput | null {
   if (!isRecord(outputs)) return null;
   for (const nodeOutput of Object.values(outputs)) {
@@ -448,6 +477,7 @@ export function prepareStudioJob(
   const baseSeed = request.seed ?? randomSeed();
   const randomSeeds = new Set<number>();
   const candidates: PreparedCandidate[] = [];
+  const sourceContext = sourceContextFromRequest(request);
 
   for (let index = 1; index <= request.candidateCount; index += 1) {
     const prompt = clonePrompt(sourcePrompt);
@@ -506,6 +536,12 @@ export function prepareStudioJob(
     sampler.inputs.seed = candidateSeed;
     requireInput(model, "model_name");
     sampler.inputs.steps = resolvedEngine.steps;
+    sampler.inputs.studio_context_prefix =
+      `video/H3_STUDIO_CONTEXT/${jobId}/latent`;
+    sampler.inputs.studio_context_clip_index = index;
+    sampler.inputs.studio_source_context_prefix = sourceContext?.prefix ?? "";
+    sampler.inputs.studio_source_context_clip_index =
+      sourceContext?.candidateIndex ?? 0;
     const keepSourceAspect = request.aspectFormat === "keep source aspect";
     size.inputs.size_mode = keepSourceAspect
       ? "source aspect + megapixels"

@@ -17,6 +17,7 @@ class _InRunMotionContext:
         self.audio_context_length = int(audio_context_length)
         self.crossfade_frames = max(0, int(crossfade_frames))
         self.previous_latent = None
+        self.external_latent = None
         self.external_frames = None
         self.external_audio = None
         self.external_audio_vae = None
@@ -35,6 +36,10 @@ class _InRunMotionContext:
         self.external_audio = audio
         self.external_audio_vae = audio_vae
 
+    def set_external_latent(self, latent):
+        """Seed clip 1 from a previously saved native H3 AV latent."""
+        self.external_latent = latent
+
     @staticmethod
     def _node(node_name):
         # Look up the installed pack at execution time. ComfyUI has completed
@@ -51,10 +56,36 @@ class _InRunMotionContext:
 
     def apply(self, conditioning, video_vae, latent, shot_index):
         if shot_index == 0:
-            if self.external_frames is None:
+            if self.external_latent is None and self.external_frames is None:
                 return conditioning, 0
             if self._motion_node is None:
                 self._motion_node = self._node("MiniMaxH3MotionContext")
+            if self.external_latent is not None:
+                try:
+                    conditioned, trim_frames = self._motion_node.apply(
+                        conditioning=conditioning,
+                        vae=video_vae,
+                        latent=latent,
+                        context_length=self.context_length,
+                        audio_context_length=self.audio_context_length,
+                        context_latent=self.external_latent,
+                    )
+                    print(
+                        "[H3ReferenceMotionMemory] clip 1: native saved AV "
+                        "latent context video=%s frames, audio=%d frames, "
+                        "trim=%d."
+                        % (self.context_length, self.audio_context_length,
+                           int(trim_frames)),
+                        flush=True)
+                    return conditioned, int(trim_frames)
+                except Exception as exc:
+                    if self.external_frames is None:
+                        raise
+                    print(
+                        "[H3ReferenceMotionMemory] saved AV latent is not "
+                        "compatible with this output shape (%s); falling "
+                        "back to decoded source frames." % exc,
+                        flush=True)
             kwargs = {
                 "conditioning": conditioning,
                 "vae": video_vae,

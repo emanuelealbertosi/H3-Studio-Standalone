@@ -92,6 +92,11 @@ assert.equal(
 );
 assert.equal(fastShift.inputs.shift_video, 12);
 assert.equal(fastShift.inputs.shift_audio, 3);
+assert.equal(
+  fastSampler.inputs.studio_context_prefix,
+  "video/H3_STUDIO_CONTEXT/00000000-0000-4000-8000-000000000001/latent",
+);
+assert.equal(fastSampler.inputs.studio_context_clip_index, 1);
 assert.equal(publicDryRun(fast).fastPdd, true);
 
 const fl2vaSettings = structuredClone(DEFAULT_RUNTIME_SETTINGS);
@@ -201,9 +206,14 @@ const continuation = prepareStudioJob(
     megapixels: 0.7,
     generationMode: "VIDEO EXTENSION",
     mediaState: JSON.stringify([
-      { kind: "video", file: "source.mp4 [input]", duration: 15.1 },
+      {
+        kind: "video",
+        file: "video/H3_STUDIO/11111111-1111-4111-8111-111111111111/candidate_2_00001_.mp4 [output]",
+        duration: 15.1,
+      },
       { kind: "picture", file: "reference.png [input]" },
     ]),
+    sourceJobId: "11111111-1111-4111-8111-111111111111",
     qualityMode: "fast",
     turboEnabled: false,
   },
@@ -220,6 +230,11 @@ const continuationRequest = uniqueNode(
 );
 assert.equal(continuationSampler.inputs.memory_frames, 1);
 assert.equal(continuationSampler.inputs.anchor_frames, 0);
+assert.equal(
+  continuationSampler.inputs.studio_source_context_prefix,
+  "video/H3_STUDIO_CONTEXT/11111111-1111-4111-8111-111111111111/latent",
+);
+assert.equal(continuationSampler.inputs.studio_source_context_clip_index, 2);
 assert.match(String(continuationRequest.inputs.natural_prompt), /SEAMLESS START/);
 assert.match(String(continuationRequest.inputs.natural_prompt), /no cut/i);
 

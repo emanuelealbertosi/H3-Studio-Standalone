@@ -145,6 +145,18 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
                            "tail frames from the external source so clip 1 "
                            "continues real motion instead of a single still. "
                            "22 is the near-seamless default."})
+        optional["studio_context_prefix"] = ("STRING", {
+            "default": "",
+            "tooltip": "H3 Studio internal cache path for this candidate's "
+                       "native video/audio latent."})
+        optional["studio_context_clip_index"] = ("INT", {
+            "default": 0, "min": 0, "max": 9999, "step": 1})
+        optional["studio_source_context_prefix"] = ("STRING", {
+            "default": "",
+            "tooltip": "H3 Studio internal cache path of the candidate "
+                       "being continued."})
+        optional["studio_source_context_clip_index"] = ("INT", {
+            "default": 0, "min": 0, "max": 9999, "step": 1})
         return {
             "required": required,
             "optional": optional,
@@ -186,7 +198,10 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
             studio_upscale_source_ratio=0.60,
             studio_upscale_refine_steps=3,
             studio_upscale_precision="fp16",
-            pdd_acc_file="", external_motion_context_length="22"):
+            pdd_acc_file="", external_motion_context_length="22",
+            studio_context_prefix="", studio_context_clip_index=0,
+            studio_source_context_prefix="",
+            studio_source_context_clip_index=0):
         import torch
         import node_helpers
         from comfy_extras import nodes_custom_sampler as ncs
@@ -389,6 +404,32 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
                 int(external_motion_context_length), 17)
             motion_controller.set_external(
                 ref_video_0, ref_video_audio_0, audio_vae)
+            source_prefix = str(studio_source_context_prefix or "").strip()
+            source_index = int(studio_source_context_clip_index or 0)
+            if source_prefix and source_index > 0:
+                load_cls = comfy_nodes.NODE_CLASS_MAPPINGS.get(
+                    "MiniMaxH3MotionContextLoadLatent")
+                if load_cls is None:
+                    print(
+                        "[H3ReferenceMemory] native Studio context loader is "
+                        "not registered; using decoded source fallback.",
+                        flush=True)
+                else:
+                    try:
+                        source_latent = load_cls().load(
+                            source_prefix, source_index)[0]
+                        motion_controller.set_external_latent(source_latent)
+                        print(
+                            "[H3ReferenceMemory] loaded native Studio AV "
+                            "context %s slot %d."
+                            % (source_prefix, source_index),
+                            flush=True)
+                    except Exception as exc:
+                        print(
+                            "[H3ReferenceMemory] native Studio AV context "
+                            "unavailable (%s); using decoded source fallback."
+                            % exc,
+                            flush=True)
         anchor = start_image[:1] if start_image is not None else None
         if anchor is not None:
             suffix = (
@@ -630,6 +671,31 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
 
             if motion_controller is not None:
                 motion_controller.capture(output, shot_index)
+
+            context_prefix = str(studio_context_prefix or "").strip()
+            context_index = int(studio_context_clip_index or 0)
+            if context_prefix and context_index > 0 and shot_index == n - 1:
+                save_cls = comfy_nodes.NODE_CLASS_MAPPINGS.get(
+                    "MiniMaxH3MotionContextSaveLatent")
+                if save_cls is None:
+                    print(
+                        "[H3ReferenceMemory] native Studio context saver is "
+                        "not registered; candidate video will still finish.",
+                        flush=True)
+                else:
+                    try:
+                        latent_path = save_cls().save(
+                            output, context_prefix, context_index)[0]
+                        print(
+                            "[H3ReferenceMemory] saved native Studio AV "
+                            "context: %s" % latent_path,
+                            flush=True)
+                    except Exception as exc:
+                        print(
+                            "[H3ReferenceMemory] native Studio context save "
+                            "failed; candidate video will still finish: %s"
+                            % exc,
+                            flush=True)
 
             samples = output["samples"]
             if getattr(samples, "is_nested", False):
