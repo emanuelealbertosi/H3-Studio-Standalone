@@ -3640,6 +3640,7 @@ function StudioApp() {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const mediaPickerLoadedProjectRef = useRef<string | null>(null);
   const mediaPickerLoadGenerationRef = useRef(0);
+  const latestJobRestoreRef = useRef(false);
   const studioProjectIdRef = useRef(studioProjectId);
   studioProjectIdRef.current = studioProjectId;
   useEffect(() => {
@@ -3995,7 +3996,11 @@ function StudioApp() {
       }),
     );
 
-    const active = ["prepared", "submitted", "running"].includes(job.status);
+    const variantActive = (job.variants ?? []).some(
+      (variant) => variant.status !== "ready" && variant.status !== "failed",
+    );
+    const active =
+      ["prepared", "submitted", "running"].includes(job.status) || variantActive;
     setIsRunning(active);
     setActiveJobId(active ? job.id : null);
     setRunMessage(
@@ -4077,18 +4082,28 @@ function StudioApp() {
   }, []);
 
   useEffect(() => {
+    if (
+      connection.state !== "connected" ||
+      latestJobRestoreRef.current ||
+      currentJobId
+    ) return;
     let disposed = false;
+    latestJobRestoreRef.current = true;
     const restoreLatestJob = async () => {
       try {
         const response = await fetch(`${bridgeUrl}/api/jobs?limit=1`, {
           cache: "no-store",
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          latestJobRestoreRef.current = false;
+          return;
+        }
         const payload = (await response.json()) as { jobs?: RemoteJob[] };
         const job = payload.jobs?.[0];
         if (!job || disposed) return;
         openJob(job, true);
       } catch {
+        latestJobRestoreRef.current = false;
         // La pagina resta utilizzabile anche se non esiste ancora una cronologia.
       }
     };
@@ -4096,7 +4111,7 @@ function StudioApp() {
     return () => {
       disposed = true;
     };
-  }, []);
+  }, [connection.state, currentJobId]);
 
   useEffect(() => {
     if (!activeJobId) return;
@@ -4824,6 +4839,7 @@ function StudioApp() {
           ? {
               ...candidate,
               variants: [payload.variant!, ...(candidate.variants ?? [])],
+              activeVariantId: payload.variant!.id,
             }
           : candidate,
       ));

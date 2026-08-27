@@ -57,6 +57,13 @@ assert.ok(
   guardIndex < postIndex,
   "the bridge guard must run before the post-process POST",
 );
+assert.match(runVariantBlock[0], /activeVariantId:\s*payload\.variant!\.id/);
+assert.match(
+  page,
+  /const variantActive = \(job\.variants \?\? \[\]\)\.some\([\s\S]*?const active =[\s\S]*?\|\| variantActive/,
+);
+assert.match(page, /latestJobRestoreRef\.current/);
+assert.match(page, /connection\.state !== "connected"/);
 assert.match(page, /aria-modal="true"/);
 assert.match(page, /role="dialog"/);
 assert.match(page, /postprocessContract >= 2/);
