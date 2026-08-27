@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import ImageStudioPanel from "./image-studio-panel";
 import {
   compatiblePddFilesForModel,
   fastPddPairForModel,
@@ -273,6 +274,18 @@ function isFastCreativeLora(name: string) {
   return !/(?:turbo|distill|pdd|acc[-_ ]?8)/i.test(name);
 }
 
+function compatibleEngineOptions(
+  values: string[],
+  current: string,
+  pattern: RegExp,
+) {
+  const compatible = values.filter((value) => pattern.test(value));
+  if (current && values.includes(current) && !compatible.includes(current)) {
+    compatible.unshift(current);
+  }
+  return compatible.length > 0 ? compatible : values;
+}
+
 type EngineAdminResponse = {
   workflow: {
     source: string;
@@ -287,6 +300,7 @@ type EngineAdminResponse = {
     error?: string;
   };
   kreaWorkflow: { source: string };
+  imageEditWorkflow: { source: string };
   settings: {
     h3: {
       model: string;
@@ -306,6 +320,15 @@ type EngineAdminResponse = {
       loras: EngineLoraSlot[];
       steps: number;
     };
+    imageEdit: {
+      model: string;
+      encoder: string;
+      vae: string;
+      steps: number;
+      cfg: number;
+      kvCacheEnabled: boolean;
+      attentionBackend: "auto" | "pytorch attention" | "comfy kitchen attention";
+    };
   };
   capabilities: {
     models: string[];
@@ -313,12 +336,13 @@ type EngineAdminResponse = {
     pddFiles: string[];
     textEncoders: string[];
     vaes: string[];
+    imageAttentionBackends: string[];
   };
 };
 
 type WorkflowCatalogItem = {
   id: string;
-  role: "video" | "fast" | "image";
+  role: "video" | "fast" | "image" | "image_edit";
   name: string;
   description: string;
   file: string;
@@ -330,6 +354,7 @@ type InstallSettings = {
   videoWorkflowId: string;
   fastWorkflowId: string;
   imageWorkflowId: string;
+  imageEditWorkflowId: string;
   ffmpegPath: string;
 };
 
@@ -2161,7 +2186,7 @@ function SetupWizard({ status }: { status: SetupStatus }) {
 
   const workflowSelect = (role: WorkflowCatalogItem["role"], key: keyof InstallSettings) => (
     <label>
-      <span>Workflow {role === "video" ? "Video" : role === "fast" ? "FAST" : "Krea"}</span>
+      <span>Workflow {role === "video" ? "Video" : role === "fast" ? "FAST" : role === "image_edit" ? "Flux Klein Edit" : "Krea"}</span>
       <select
         value={String(settings[key])}
         onChange={(event) => setSettings({ ...settings, [key]: event.target.value })}
@@ -2202,6 +2227,7 @@ function SetupWizard({ status }: { status: SetupStatus }) {
           {workflowSelect("video", "videoWorkflowId")}
           {workflowSelect("fast", "fastWorkflowId")}
           {workflowSelect("image", "imageWorkflowId")}
+          {workflowSelect("image_edit", "imageEditWorkflowId")}
           <label>
             <span>FFmpeg</span>
             <input onChange={(event) => setSettings({ ...settings, ffmpegPath: event.target.value })} placeholder="ffmpeg oppure percorso completo" value={settings.ffmpegPath} />
@@ -2491,6 +2517,7 @@ function AdminPanel() {
                   ["video", "videoWorkflowId", "Workflow Video"],
                   ["fast", "fastWorkflowId", "Workflow FAST"],
                   ["image", "imageWorkflowId", "Workflow Krea"],
+                  ["image_edit", "imageEditWorkflowId", "Workflow Flux Klein Edit"],
                 ] as const).map(([role, key, label]) => (
                   <label key={key}>
                     <span>{label}</span>
@@ -2546,6 +2573,12 @@ function AdminPanel() {
               <code>{data.kreaWorkflow.source}</code>
               <small>Usato per character e object sheet</small>
             </div>
+            <div className="workflow-card">
+              <span>Workflow Flux Klein Edit</span>
+              <strong>{data.imageEditWorkflow.source.split("\\").at(-1)}</strong>
+              <code>{data.imageEditWorkflow.source}</code>
+              <small>Image edit multi-reference, fino a quattro input</small>
+            </div>
           </div>
 
           <div className="engine-config-grid">
@@ -2570,7 +2603,7 @@ function AdminPanel() {
                       },
                     })}
                   >
-                    {data.capabilities.models.map((model) => <option key={model} value={model}>{model}</option>)}
+                    {compatibleEngineOptions(data.capabilities.models, data.settings.imageEdit.model, /flux.*2.*klein|klein.*(?:4b|9b)/i).map((model) => <option key={model} value={model}>{model}</option>)}
                   </select>
                 </label>
                 <div className="engine-fixed-recipe">
@@ -2708,7 +2741,7 @@ function AdminPanel() {
                     ...data,
                     settings: { ...data.settings, krea: { ...data.settings.krea, encoder: event.target.value } },
                   })}>
-                    {data.capabilities.textEncoders.map((encoder) => <option key={encoder} value={encoder}>{encoder}</option>)}
+                    {compatibleEngineOptions(data.capabilities.textEncoders, data.settings.imageEdit.encoder, /qwen[_-]?3.*4b/i).map((encoder) => <option key={encoder} value={encoder}>{encoder}</option>)}
                   </select>
                 </label>
                 <label>
@@ -2717,7 +2750,7 @@ function AdminPanel() {
                     ...data,
                     settings: { ...data.settings, krea: { ...data.settings.krea, vae: event.target.value } },
                   })}>
-                    {data.capabilities.vaes.map((vae) => <option key={vae} value={vae}>{vae}</option>)}
+                    {compatibleEngineOptions(data.capabilities.vaes, data.settings.imageEdit.vae, /flux2[-_]?vae/i).map((vae) => <option key={vae} value={vae}>{vae}</option>)}
                   </select>
                 </label>
                 <label>
@@ -2761,6 +2794,78 @@ function AdminPanel() {
                 ))}
               </div>
             </article>
+
+            <article className="engine-config-card image-edit-engine-card">
+              <div className="engine-config-heading">
+                <div>
+                  <span>IMAGE EDIT ENGINE</span>
+                  <h3>Flux.2 Klein</h3>
+                </div>
+                <b>{data.settings.imageEdit.steps} STEP</b>
+              </div>
+              <div className="admin-form image-edit-engine-form">
+                <label>
+                  <span>Modello Flux.2 Klein</span>
+                  <select value={data.settings.imageEdit.model} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, model: event.target.value } },
+                  })}>
+                    {data.capabilities.models.map((model) => <option key={model} value={model}>{model}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Text encoder</span>
+                  <select value={data.settings.imageEdit.encoder} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, encoder: event.target.value } },
+                  })}>
+                    {data.capabilities.textEncoders.map((encoder) => <option key={encoder} value={encoder}>{encoder}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>VAE</span>
+                  <select value={data.settings.imageEdit.vae} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, vae: event.target.value } },
+                  })}>
+                    {data.capabilities.vaes.map((vae) => <option key={vae} value={vae}>{vae}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Step Flux Klein</span>
+                  <input min="4" max="40" step="1" type="number" value={data.settings.imageEdit.steps} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, steps: Number(event.target.value) } },
+                  })} />
+                </label>
+                <label>
+                  <span>CFG</span>
+                  <input min="0" max="20" step="0.1" type="number" value={data.settings.imageEdit.cfg} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, cfg: Number(event.target.value) } },
+                  })} />
+                </label>
+                <label>
+                  <span>Attention backend</span>
+                  <select value={data.settings.imageEdit.attentionBackend} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, attentionBackend: event.target.value as EngineAdminResponse["settings"]["imageEdit"]["attentionBackend"] } },
+                  })}>
+                    <option value="auto">Auto</option>
+                    {data.capabilities.imageAttentionBackends.includes("pytorch attention") && <option value="pytorch attention">PyTorch</option>}
+                    {data.capabilities.imageAttentionBackends.includes("comfy kitchen attention") && <option value="comfy kitchen attention">Comfy Kitchen</option>}
+                  </select>
+                </label>
+                <label className="engine-checkbox image-edit-cache-toggle">
+                  <input checked={data.settings.imageEdit.kvCacheEnabled} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, kvCacheEnabled: event.target.checked } },
+                  })} type="checkbox" />
+                  <span><strong>Flux KV Cache (sperimentale)</strong><small>Accelera edit multi-reference; disattivabile in caso di incompatibilità</small></span>
+                </label>
+                <p className="image-edit-profile-note">Profilo consigliato: Klein 4B Distilled FP8 · Qwen 3 4B · Flux2 VAE · 4 step / CFG 1. Modelli Base, 9B o community possono richiedere un workflow e parametri diversi.</p>
+              </div>
+            </article>
           </div>
 
           <div className="admin-footer">
@@ -2789,6 +2894,8 @@ function AdminPanel() {
 
 function StudioApp() {
   const [activeView, setActiveView] = useState<"studio" | "projects" | "montages" | "characters" | "library" | "admin">("studio");
+  const [studioMediaMode, setStudioMediaMode] = useState<"video" | "image">("video");
+  const [imageResetToken, setImageResetToken] = useState(0);
   const [libraryInitialKind, setLibraryInitialKind] = useState<"all" | "character" | "object">("all");
   const [montageTarget, setMontageTarget] = useState<{ projectId: string; timelineId: string } | null>(null);
   const [studioProjects, setStudioProjects] = useState<ProjectSummary[]>([]);
@@ -2983,6 +3090,7 @@ function StudioApp() {
       void createStudioProject();
       return;
     }
+    setStudioMediaMode("video");
     setStudioProjectId(projectId);
     setSourceJobId(null);
     setCurrentJobId(null);
@@ -3010,6 +3118,7 @@ function StudioApp() {
   }
 
   function openJob(job: RemoteJob, restored = false) {
+    setStudioMediaMode("video");
     setCurrentJobId(job.id);
     setPrompt(job.request.prompt);
     setCandidateCount(job.request.candidateCount);
@@ -3548,6 +3657,7 @@ function StudioApp() {
     operation: "continue" | "edit" | "reference",
     context?: { projectId?: string | null; sourceJobId?: string | null },
   ) {
+    setStudioMediaMode("video");
     const url = new URL(mediaPath, bridgeUrl);
     const outputFilename = url.searchParams.get("filename") ?? filename;
     const subfolder = url.searchParams.get("subfolder") ?? "";
@@ -3595,6 +3705,7 @@ function StudioApp() {
     asset: CreativeAsset,
     references: CreativeReference[],
   ) {
+    setStudioMediaMode("video");
     const selectedReferences = references.slice(0, 12);
     const mention = uniqueMention(asset.name, mediaAssets);
     setMediaAssets(
@@ -3861,12 +3972,16 @@ function StudioApp() {
                     ? "Libreria"
                   : activeView === "characters"
                     ? "Personaggi e oggetti"
-                  : "Shot 01"}
+                  : studioMediaMode === "image" ? "Immagine 01" : "Shot 01"}
             </h1>
           </div>
           <div className="topbar-actions">
             {activeView === "studio" && (
               <div className="topbar-project-switcher">
+                <div className="studio-media-toggle" aria-label="Tipo di generazione">
+                  <button className={studioMediaMode === "video" ? "active" : ""} onClick={() => setStudioMediaMode("video")} type="button">▶ Video</button>
+                  <button className={studioMediaMode === "image" ? "active" : ""} onClick={() => setStudioMediaMode("image")} type="button">▧ Immagini</button>
+                </div>
                 <label>
                   <span>Progetto</span>
                   <select value={studioProjectId} onChange={(event) => {
@@ -3878,7 +3993,10 @@ function StudioApp() {
                     ))}
                   </select>
                 </label>
-                <button onClick={() => beginNewGeneration(studioProjectId)} type="button">Nuovo shot</button>
+                <button onClick={() => {
+                  if (studioMediaMode === "video") beginNewGeneration(studioProjectId);
+                  else setImageResetToken((current) => current + 1);
+                }} type="button">{studioMediaMode === "video" ? "Nuovo shot" : "Nuova immagine"}</button>
                 <button onClick={() => void createStudioProject()} title="Crea un nuovo progetto" type="button">＋</button>
               </div>
             )}
@@ -3930,6 +4048,17 @@ function StudioApp() {
               }}
             />
           ) : (
+          <>
+          <div hidden={studioMediaMode !== "image"}>
+            <ImageStudioPanel
+              bridgeUrl={bridgeUrl}
+              key={imageResetToken}
+              projectId={studioProjectId}
+              projectName={studioProject?.name}
+              projects={studioProjects}
+            />
+          </div>
+          {studioMediaMode === "video" && (
           <>
           <section
             className={`composer ${composerExpanded ? "expanded" : "collapsed"}`}
@@ -4590,6 +4719,8 @@ function StudioApp() {
               })}
             </div>
           </section>
+          </>
+          )}
           </>
           )}
         </div>

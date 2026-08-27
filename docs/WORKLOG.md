@@ -180,3 +180,14 @@
 - Esteso il manifest dipendenze con entrambi i modelli base INT8 ConvRot ufficiali; ne basta uno con la patch corrispondente, mentre entrambi permettono il cambio famiglia dall’Admin.
 - Esteso il test FAST con il percorso positivo FL2VA, la selezione automatica della patch, il filtro anti-mismatch, il manifest e il rifiuto dei modelli non ufficiali.
 - Verificati `npm run test:fast`, `npm run typecheck -- --incremental false` e build Vinext con Node 24, senza coda GPU né avvio dei server.
+
+## 27 agosto 2026 — Studio Immagini e Flux.2 Klein
+
+- Unificati Studio Video e Studio Immagini nello stesso progetto con selettore dedicato, batch da uno-quattro candidati e composer coerente.
+- Aggiunti Generate Krea 2 ed Edit Flux.2 Klein 4B Distilled con massimo quattro reference, ruoli espliciti, formati sotto 2 MP e seed Random/Base/Bloccato.
+- Persistiti job, candidati, prompt API, output, reference ordinate e collegamenti per-candidato molti-a-molti fra progetti nella migrazione SQLite v15.
+- Aggiunti tag Personaggio/Oggetto/Sfondo per progetto, riuso immediato dell’output come base edit, download, scelta, cancellazione, stop e recupero dopo riavvio.
+- Collegati realmente i blueprint workflow selezionati nell’Admin; modello, encoder, VAE, step, CFG, attention e Flux KV Cache sono configurabili con preflight live.
+- Scelto come default il profilo core 4B Distilled FP8 a quattro step/CFG 1; il vecchio Multi Input Compact 9B/5-reference resta solo un riferimento perché più pesante e meno portabile.
+- Corrette condivisione isolata per candidato, annotation input/output, polling fra progetti, ripristino dei draft edit, thumbnail upload e routing automatico alle azioni Video.
+- Aggiunti guida Image Studio, manifest modelli, workflow API sanitizzato, test di regressione e job CI dedicato.

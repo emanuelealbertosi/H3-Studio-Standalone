@@ -1,0 +1,104 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux-2-klein-4b-fp8.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": { "title": "Flux.2 Klein 4B Distilled FP8 — overridden by H3 Studio" }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "_meta": { "title": "Flux.2 Klein encoder — overridden by H3 Studio" }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "flux2-vae.safetensors" },
+    "_meta": { "title": "Flux.2 VAE — overridden by H3 Studio" }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "Edit the reference image.", "clip": ["2", 0] }
+  },
+  "5": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": { "conditioning": ["4", 0] }
+  },
+  "6": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": { "width": 1024, "height": 1024, "batch_size": 1 }
+  },
+  "7": {
+    "class_type": "RandomNoise",
+    "inputs": { "noise_seed": 1 }
+  },
+  "8": {
+    "class_type": "KSamplerSelect",
+    "inputs": { "sampler_name": "euler" }
+  },
+  "9": {
+    "class_type": "Flux2Scheduler",
+    "inputs": { "steps": 4, "width": 1024, "height": 1024 }
+  },
+  "20": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "reference.png" },
+    "_meta": { "title": "Reference 1 — injected by H3 Studio" }
+  },
+  "21": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["20", 0],
+      "upscale_method": "nearest-exact",
+      "megapixels": 1,
+      "resolution_steps": 1
+    }
+  },
+  "22": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["21", 0], "vae": ["3", 0] }
+  },
+  "23": {
+    "class_type": "ReferenceLatent",
+    "inputs": { "conditioning": ["4", 0], "latent": ["22", 0] }
+  },
+  "24": {
+    "class_type": "ReferenceLatent",
+    "inputs": { "conditioning": ["5", 0], "latent": ["22", 0] }
+  },
+  "60": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": ["1", 0],
+      "positive": ["23", 0],
+      "negative": ["24", 0],
+      "cfg": 1
+    }
+  },
+  "61": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["7", 0],
+      "guider": ["60", 0],
+      "sampler": ["8", 0],
+      "sigmas": ["9", 0],
+      "latent_image": ["6", 0]
+    }
+  },
+  "62": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["61", 0], "vae": ["3", 0] }
+  },
+  "63": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["62", 0],
+      "filename_prefix": "images/H3_STUDIO/flux2_klein_edit"
+    }
+  }
+}

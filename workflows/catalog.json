@@ -20,6 +20,20 @@
       "role": "image",
       "name": "Krea 2 Character/Object Sheet",
       "api": "studio-krea2.api.json"
+    },
+    {
+      "id": "flux2-klein-edit-core",
+      "role": "image_edit",
+      "name": "Flux.2 Klein 4B Distilled Image Edit",
+      "api": "studio-flux2-klein-edit.api.json",
+      "referenceLimit": 4,
+      "defaults": {
+        "steps": 4,
+        "cfg": 1,
+        "sampler": "euler",
+        "kvCacheEnabled": false,
+        "attentionBackend": "auto"
+      }
     }
   ]
 }

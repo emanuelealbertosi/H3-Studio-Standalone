@@ -15,6 +15,7 @@ const defaults = {
   videoWorkflowId: "h3-aio-ultra",
   fastWorkflowId: "h3-fast-alibaba-pdd",
   imageWorkflowId: "krea2-character-sheet",
+  imageEditWorkflowId: "flux2-klein-edit-core",
   ffmpegPath: "ffmpeg",
 };
 

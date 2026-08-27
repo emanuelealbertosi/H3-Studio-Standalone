@@ -23,6 +23,13 @@ export const WORKFLOW_CATALOG = [
     description: "Grafo Krea 2 generato dal bridge per reference sheet coerenti.",
     file: "studio-krea2.api.json",
   },
+  {
+    id: "flux2-klein-edit-core",
+    role: "image_edit" as const,
+    name: "Flux.2 Klein 4B Distilled Image Edit",
+    description: "Grafo core ufficiale per edit con una o più reference, espanso dal bridge fino a quattro input.",
+    file: "studio-flux2-klein-edit.api.json",
+  },
 ] as const;
 
 export type InstallSettings = {
@@ -31,6 +38,7 @@ export type InstallSettings = {
   videoWorkflowId: string;
   fastWorkflowId: string;
   imageWorkflowId: string;
+  imageEditWorkflowId: string;
   ffmpegPath: string;
 };
 
@@ -87,14 +95,18 @@ export class InstallSettingsStore {
       ? value.ffmpegPath.trim()
       : "ffmpeg";
     const selected = {
-      videoWorkflowId: String(value.videoWorkflowId ?? ""),
-      fastWorkflowId: String(value.fastWorkflowId ?? ""),
-      imageWorkflowId: String(value.imageWorkflowId ?? ""),
+      videoWorkflowId: String(value.videoWorkflowId ?? this.defaults.videoWorkflowId),
+      fastWorkflowId: String(value.fastWorkflowId ?? this.defaults.fastWorkflowId),
+      imageWorkflowId: String(value.imageWorkflowId ?? this.defaults.imageWorkflowId),
+      imageEditWorkflowId: String(
+        value.imageEditWorkflowId ?? this.defaults.imageEditWorkflowId,
+      ),
     };
     for (const [key, role] of [
       ["videoWorkflowId", "video"],
       ["fastWorkflowId", "fast"],
       ["imageWorkflowId", "image"],
+      ["imageEditWorkflowId", "image_edit"],
     ] as const) {
       if (!WORKFLOW_CATALOG.some((item) => item.id === selected[key] && item.role === role)) {
         throw new Error(`Workflow ${role} non valido`);

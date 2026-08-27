@@ -9,7 +9,7 @@ workflow. Stato locale, password, database, log e media non vengono versionati.
 - Node.js 22 o superiore.
 - ComfyUI già funzionante e raggiungibile via HTTP.
 - FFmpeg nel `PATH` oppure il suo percorso configurato nell'Admin.
-- I modelli MiniMax H3/Krea scelti dall'Admin nelle cartelle ComfyUI corrette.
+- I modelli MiniMax H3, Krea e Flux.2 Klein scelti dall’Admin nelle cartelle ComfyUI corrette.
 
 ## Avvio
 
@@ -42,7 +42,7 @@ Il browser mostra un wizard che richiede:
 1. una nuova password Admin di almeno 10 caratteri;
 2. l'URL della ComfyUI, per esempio `http://127.0.0.1:8188`;
 3. la cartella `output` della stessa installazione ComfyUI;
-4. i workflow associati ai ruoli Video, FAST e Krea;
+4. i workflow associati ai ruoli Video, FAST, Krea e Flux Klein Edit;
 5. il comando o percorso di FFmpeg.
 
 La password viene derivata con `scrypt`; nel database non viene salvata in
@@ -55,7 +55,8 @@ HTTP-only della durata di 12 ore.
 - `workflows/studio-backend.ui.json`: AIO H3 da aprire in ComfyUI.
 - `workflows/studio-backend.api.json`: snapshot API usato dal bridge.
 - `workflows/studio-fast-pdd.api.json`: profilo FAST Alibaba PDD-Acc.
-- `workflows/studio-krea2.api.json`: character/object sheet Krea 2.
+- `workflows/studio-krea2.api.json`: generazione immagini Krea 2.
+- `workflows/studio-flux2-klein-edit.api.json`: edit Flux.2 Klein 4B Distilled con una-quattro reference.
 - `workflows/catalog.json`: ruoli e associazioni disponibili.
 - `workflows/dependencies.json`: nodi e modelli richiesti.
 

@@ -31,10 +31,24 @@ export type KreaEngineSettings = {
   steps: number;
 };
 
+export type ImageEditEngineSettings = {
+  model: string;
+  encoder: string;
+  vae: string;
+  steps: number;
+  cfg: number;
+  kvCacheEnabled: boolean;
+  attentionBackend:
+    | "auto"
+    | "pytorch attention"
+    | "comfy kitchen attention";
+};
+
 export type RuntimeSettings = {
   h3: H3EngineSettings;
   fast: FastEngineSettings;
   krea: KreaEngineSettings;
+  imageEdit: ImageEditEngineSettings;
 };
 
 export type ResolvedEngineSettings = H3EngineSettings & {
@@ -64,6 +78,15 @@ export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = Object.freeze({
     loras: [],
     steps: 8,
   },
+  imageEdit: {
+    model: "flux-2-klein-4b-fp8.safetensors",
+    encoder: "qwen_3_4b.safetensors",
+    vae: "flux2-vae.safetensors",
+    steps: 4,
+    cfg: 1,
+    kvCacheEnabled: false,
+    attentionBackend: "auto",
+  },
 });
 
 function cloneDefaults(): RuntimeSettings {
@@ -79,6 +102,9 @@ function cloneDefaults(): RuntimeSettings {
     krea: {
       ...DEFAULT_RUNTIME_SETTINGS.krea,
       loras: DEFAULT_RUNTIME_SETTINGS.krea.loras.map((slot) => ({ ...slot })),
+    },
+    imageEdit: {
+      ...DEFAULT_RUNTIME_SETTINGS.imageEdit,
     },
   };
 }
@@ -133,6 +159,7 @@ function migrateLegacySettings(value: Record<string, unknown>): RuntimeSettings 
     },
     fast: defaults.fast,
     krea: defaults.krea,
+    imageEdit: defaults.imageEdit,
   };
 }
 
@@ -146,6 +173,7 @@ function validateSettings(value: unknown): RuntimeSettings {
 
   const defaults = cloneDefaults();
   const fast = isRecord(value.fast) ? value.fast : defaults.fast;
+  const imageEdit = isRecord(value.imageEdit) ? value.imageEdit : defaults.imageEdit;
 
   const h3Model = typeof value.h3.model === "string" ? value.h3.model.trim() : "";
   const fastModel = typeof fast.model === "string" ? fast.model.trim() : "";
@@ -153,12 +181,34 @@ function validateSettings(value: unknown): RuntimeSettings {
   const kreaModel = typeof value.krea.model === "string" ? value.krea.model.trim() : "";
   const encoder = typeof value.krea.encoder === "string" ? value.krea.encoder.trim() : "";
   const vae = typeof value.krea.vae === "string" ? value.krea.vae.trim() : "";
+  const imageEditModel =
+    typeof imageEdit.model === "string" ? imageEdit.model.trim() : "";
+  const imageEditEncoder =
+    typeof imageEdit.encoder === "string" ? imageEdit.encoder.trim() : "";
+  const imageEditVae =
+    typeof imageEdit.vae === "string" ? imageEdit.vae.trim() : "";
+  const imageEditCfg = Number(imageEdit.cfg);
+  const imageEditKvCache =
+    imageEdit.kvCacheEnabled === undefined
+      ? defaults.imageEdit.kvCacheEnabled
+      : imageEdit.kvCacheEnabled === true;
+  const imageEditAttention =
+    imageEdit.attentionBackend === "pytorch attention" ||
+    imageEdit.attentionBackend === "comfy kitchen attention"
+      ? imageEdit.attentionBackend
+      : "auto";
   if (!h3Model) throw new Error("Seleziona un modello H3");
   if (!fastModel) throw new Error("Seleziona un modello FAST H3");
   if (!pddFile) throw new Error("Seleziona l'acceleratore PDD Alibaba per FAST");
   if (!kreaModel) throw new Error("Seleziona un modello Krea");
   if (!encoder) throw new Error("Seleziona il text encoder Krea");
   if (!vae) throw new Error("Seleziona la VAE Krea");
+  if (!imageEditModel) throw new Error("Seleziona un modello Flux.2 Klein Edit");
+  if (!imageEditEncoder) throw new Error("Seleziona il text encoder Flux.2 Klein Edit");
+  if (!imageEditVae) throw new Error("Seleziona la VAE Flux.2 Klein Edit");
+  if (!Number.isFinite(imageEditCfg) || imageEditCfg < 0 || imageEditCfg > 20) {
+    throw new Error("Il CFG Flux.2 Klein Edit deve essere compreso fra 0 e 20");
+  }
   assertPddModelCompatibility(fastModel, pddFile);
 
   return {
@@ -179,6 +229,15 @@ function validateSettings(value: unknown): RuntimeSettings {
       vae,
       loras: validateLoras(value.krea.loras, "Krea"),
       steps: validateStepCount(value.krea.steps, "Krea"),
+    },
+    imageEdit: {
+      model: imageEditModel,
+      encoder: imageEditEncoder,
+      vae: imageEditVae,
+      steps: validateStepCount(imageEdit.steps, "Flux.2 Klein Edit"),
+      cfg: imageEditCfg,
+      kvCacheEnabled: imageEditKvCache,
+      attentionBackend: imageEditAttention,
     },
   };
 }
@@ -206,7 +265,10 @@ export class RuntimeSettingsStore {
   }
 
   async update(value: unknown) {
-    const settings = validateSettings(value);
+    const current = await this.get();
+    const settings = isRecord(value) && !isRecord(value.imageEdit)
+      ? validateSettings({ ...value, imageEdit: current.imageEdit })
+      : validateSettings(value);
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const temporaryPath = `${this.filePath}.tmp`;
     await writeFile(temporaryPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");

@@ -379,7 +379,21 @@ Legenda: `[x]` completato e verificato; `[~]` parziale o presente solo a livello
 - [x] Picker media nel prompt tramite `@`, riuso diretto dalla libreria e didascalia/ruolo per asset.
 - [ ] Versioni look/abiti/voce.
 
-### Milestone 7 — Face refine, upscale e varianti
+### Milestone 7 — Studio immagini
+
+- [x] Selettore Video/Immagini nello Studio e layout candidati/composer coerente.
+- [x] Generazione Krea 2 generica con uno-quattro candidati e seed riproducibili.
+- [x] Edit Flux.2 Klein 4B Distilled con una-quattro reference ordinate.
+- [x] Ruoli Base/Soggetto/Stile/Posa/Sfondo tradotti nella mappa reference del prompt.
+- [x] Tag Personaggio/Oggetto/Sfondo per candidato e per progetto.
+- [x] Condivisione molti-a-molti delle singole immagini senza esporre il resto del batch.
+- [x] Persistenza SQLite, recupero polling, scelta, cancellazione e riuso output come reference.
+- [x] Workflow, modello, encoder, VAE, step, CFG, attention e KV Cache configurabili nell’Admin.
+- [x] Preflight live di workflow, nodi e pesi prima della creazione del job.
+- [x] Profilo pubblico core confrontato con il vecchio Multi Input Compact 9B/5-reference.
+- [~] Pesi ufficiali Flux 4B, Qwen 3 4B e Flux2 VAE in download verificato su F; manca il primo test GPU reale.
+
+### Milestone 8 — Face refine, upscale e varianti
 
 - [x] Nodo `Comfyui_Minimax_h3_latent_Upscaler` presente nella ComfyUI NVMe.
 - [x] `ComfyUI-H3-FaceRefine`, `ComfyUI-H3-NativeAudioLock` e `face_yolov8m.pt` installati; attivazione al prossimo riavvio ComfyUI.
@@ -393,7 +407,7 @@ Legenda: `[x]` completato e verificato; `[~]` parziale o presente solo a livello
 - [x] Cancellazione candidato dalla scheda o dalla Libreria con rimozione atomica da tutti i montaggi, varianti e file output.
 - [ ] Verifica dell'ordine consigliato face→upscale e confronto qualità/tempo con upscale→face.
 
-### Milestone 8 — Produzione e cloud opzionale
+### Milestone 9 — Produzione e cloud opzionale
 
 - [ ] Aggiornare le dipendenze runtime segnalate dall'audit senza usare fix forzati.
 - [x] Packaging GitHub portabile con launcher Node, wizard first-run e dati locali esclusi.

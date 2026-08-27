@@ -23,6 +23,11 @@ import { FastWorkflowStore } from "./fast-workflow-store.js";
 import { AdminAuthService } from "./admin-auth.js";
 import { pddModelCompatibility } from "./pdd-compatibility.js";
 import {
+  ImageJobRepository,
+  type ImageProjectTag,
+} from "./image-job-repository.js";
+import { ImageStudioService } from "./image-studio-service.js";
+import {
   InstallSettingsStore,
   WORKFLOW_CATALOG,
   workflowPath,
@@ -40,6 +45,7 @@ const installSettingsStore = new InstallSettingsStore(config.dataDir, {
   videoWorkflowId: "h3-aio-ultra",
   fastWorkflowId: "h3-fast-alibaba-pdd",
   imageWorkflowId: "krea2-character-sheet",
+  imageEditWorkflowId: "flux2-klein-edit-core",
   ffmpegPath: config.ffmpegPath,
 });
 let installSettings = await installSettingsStore.get();
@@ -91,12 +97,21 @@ const jobRepository = new JobRepository(config.dataDir);
 const adminAuth = new AdminAuthService(jobRepository.databasePath);
 const projectRepository = new ProjectRepository(jobRepository.databasePath);
 const creativeLibrary = new CreativeLibraryRepository(jobRepository.databasePath);
+const imageJobRepository = new ImageJobRepository(jobRepository.databasePath);
 const variantRepository = new CandidateVariantRepository(jobRepository.databasePath);
 const kreaAssets = new KreaAssetService(
   comfy,
   creativeLibrary,
   workflowPath(config.workflowOutputDir, installSettings.imageWorkflowId),
   runtimeSettings,
+);
+const imageStudio = new ImageStudioService(
+  comfy,
+  imageJobRepository,
+  runtimeSettings,
+  workflowPath(config.workflowOutputDir, installSettings.imageWorkflowId),
+  workflowPath(config.workflowOutputDir, installSettings.imageEditWorkflowId),
+  progressTracker,
 );
 const timelineExport = new TimelineExportService(
   comfy,
@@ -120,6 +135,7 @@ const postprocess = new PostprocessService(
   installSettings.comfyOutputDir,
 );
 const recoveredVariants = await postprocess.recover();
+const recoveredImages = await imageStudio.recover();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -181,7 +197,7 @@ await app.register(cors, {
     }
     callback(new Error("Origin non autorizzata"), false);
   },
-  methods: ["GET", "POST", "PUT", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
 });
 
@@ -262,10 +278,11 @@ app.addHook("onRequest", async (request, reply) => {
 });
 
 app.get("/api/health", async () => {
-  const [comfyui, workflow, engineSettings] = await Promise.all([
+  const [comfyui, workflow, engineSettings, imageSummary] = await Promise.all([
     comfy.health(),
     workflowStore.status(),
     runtimeSettings.get(),
+    imageStudio.summary(),
   ]);
 
   return {
@@ -280,6 +297,7 @@ app.get("/api/health", async () => {
     engineSettings,
     fastEngine: engineSettings.fast,
     standardEngine: engineSettings.h3,
+    imageStudio: imageSummary,
     progressEvents: {
       connected: progressTracker.connected,
     },
@@ -288,6 +306,7 @@ app.get("/api/health", async () => {
       recoveredCandidates,
       variants: variantRepository.count(),
       recoveredVariants,
+      recoveredImages,
     },
     checkedAt: new Date().toISOString(),
   };
@@ -385,6 +404,151 @@ app.get<{ Querystring: { limit?: string; projectId?: string } }>("/api/jobs", as
     }))),
   };
 });
+
+app.get("/api/image-jobs/capabilities", async (_request, reply) => {
+  try {
+    return { ok: true, imageStudio: await imageStudio.status() };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Motori immagine non disponibili";
+    return reply.status(503).send({ ok: false, error: message });
+  }
+});
+
+app.post("/api/image-jobs/dry-run", async (request, reply) => {
+  try {
+    return await imageStudio.dryRun(request.body);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Richiesta immagine non valida";
+    return reply.status(400).send({ ok: false, error: message });
+  }
+});
+
+app.post("/api/image-jobs", async (request, reply) => {
+  try {
+    const job = await imageStudio.submit(request.body);
+    return reply.status(202).send({ ok: true, job });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invio immagine fallito";
+    app.log.error(error, "Invio job immagine H3 Studio fallito");
+    return reply.status(400).send({ ok: false, error: message });
+  }
+});
+
+app.get<{ Querystring: { limit?: string; projectId?: string } }>(
+  "/api/image-jobs",
+  async (request) => ({
+    ok: true,
+    jobs: await imageStudio.list(
+      Number.parseInt(request.query.limit ?? "20", 10),
+      request.query.projectId?.trim() || null,
+    ),
+  }),
+);
+
+app.get<{ Params: { jobId: string } }>("/api/image-jobs/:jobId", async (request, reply) => {
+  const job = await imageStudio.get(request.params.jobId);
+  if (!job) return reply.status(404).send({ ok: false, error: "Job immagine non trovato" });
+  return { ok: true, job };
+});
+
+app.post<{ Params: { jobId: string } }>(
+  "/api/image-jobs/:jobId/cancel",
+  async (request, reply) => {
+    try {
+      const job = await imageStudio.cancel(request.params.jobId);
+      if (!job) return reply.status(404).send({ ok: false, error: "Job immagine non trovato" });
+      return { ok: true, job };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Interruzione immagine fallita";
+      return reply.status(400).send({ ok: false, error: message });
+    }
+  },
+);
+
+app.post<{
+  Params: { jobId: string };
+  Body: { candidateIndex?: number };
+}>("/api/image-jobs/:jobId/select", async (request, reply) => {
+  try {
+    return {
+      ok: true,
+      job: imageStudio.select(request.params.jobId, Number(request.body?.candidateIndex)),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Selezione immagine fallita";
+    return reply.status(400).send({ ok: false, error: message });
+  }
+});
+
+app.post<{ Params: { jobId: string; candidateIndex: string } }>(
+  "/api/image-jobs/:jobId/candidates/:candidateIndex/delete",
+  async (request, reply) => {
+    try {
+      const candidateIndex = Number(request.params.candidateIndex);
+      if (!Number.isInteger(candidateIndex) || candidateIndex < 1 || candidateIndex > 4) {
+        return reply.status(400).send({ ok: false, error: "Candidato immagine non valido" });
+      }
+      const deleted = imageStudio.deleteCandidate(request.params.jobId, candidateIndex);
+      const storage = await removeComfyOutputFiles(deleted.files);
+      return {
+        ok: true,
+        jobDeleted: deleted.jobDeleted,
+        job: deleted.jobDeleted
+          ? null
+          : await imageStudio.get(request.params.jobId),
+        removedFiles: storage.removedFiles,
+        warnings: storage.warnings,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Eliminazione immagine fallita";
+      return reply.status(400).send({ ok: false, error: message });
+    }
+  },
+);
+
+app.put<{
+  Params: { jobId: string; candidateIndex: string; projectId: string };
+  Body: { tag?: ImageProjectTag };
+}>(
+  "/api/image-jobs/:jobId/candidates/:candidateIndex/projects/:projectId",
+  async (request, reply) => {
+    try {
+      return {
+        ok: true,
+        job: imageStudio.linkProject(
+          request.params.jobId,
+          Number(request.params.candidateIndex),
+          request.params.projectId,
+          request.body?.tag ?? "untagged",
+        ),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Condivisione immagine fallita";
+      return reply.status(400).send({ ok: false, error: message });
+    }
+  },
+);
+
+app.delete<{
+  Params: { jobId: string; candidateIndex: string; projectId: string };
+}>(
+  "/api/image-jobs/:jobId/candidates/:candidateIndex/projects/:projectId",
+  async (request, reply) => {
+    try {
+      return {
+        ok: true,
+        job: imageStudio.unlinkProject(
+          request.params.jobId,
+          Number(request.params.candidateIndex),
+          request.params.projectId,
+        ),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Rimozione condivisione fallita";
+      return reply.status(400).send({ ok: false, error: message });
+    }
+  },
+);
 
 app.post<{
   Params: { jobId: string; candidateIndex: string };
@@ -934,7 +1098,7 @@ app.get<{
 });
 
 async function engineSettingsPayload() {
-  const [settings, models, loras, pddFiles, textEncoders, vaes, workflow, fastWorkflow, fastRuntime] = await Promise.all([
+  const [settings, models, loras, pddFiles, textEncoders, vaes, workflow, fastWorkflow, fastRuntime, imageAttentionBackends] = await Promise.all([
     runtimeSettings.get(),
     comfy.models("diffusion_models"),
     comfy.models("loras"),
@@ -944,6 +1108,7 @@ async function engineSettingsPayload() {
     workflowStore.status(),
     fastWorkflowStore.status(),
     fastRuntimeStatus(),
+    imageStudio.attentionBackends().catch((): string[] => []),
   ]);
   return {
     ok: true,
@@ -961,6 +1126,9 @@ async function engineSettingsPayload() {
     kreaWorkflow: {
       source: workflowPath(config.workflowOutputDir, installSettings.imageWorkflowId),
     },
+    imageEditWorkflow: {
+      source: workflowPath(config.workflowOutputDir, installSettings.imageEditWorkflowId),
+    },
     settings,
     defaults: DEFAULT_RUNTIME_SETTINGS,
     capabilities: {
@@ -969,6 +1137,7 @@ async function engineSettingsPayload() {
       pddFiles: [...new Set(pddFiles)].sort(),
       textEncoders: [...new Set(textEncoders)].sort(),
       vaes: [...new Set(vaes)].sort(),
+      imageAttentionBackends,
       stepRange: { min: 4, max: 40 },
     },
   };
@@ -1086,10 +1255,14 @@ async function saveEngineSettings(
     const h3 = (body as { h3?: unknown }).h3;
     const fast = (body as { fast?: unknown }).fast;
     const krea = (body as { krea?: unknown }).krea;
+    const currentSettings = await runtimeSettings.get();
+    const imageEdit =
+      (body as { imageEdit?: unknown }).imageEdit ?? currentSettings.imageEdit;
     if (
       typeof h3 !== "object" || h3 === null || Array.isArray(h3) ||
       typeof fast !== "object" || fast === null || Array.isArray(fast) ||
-      typeof krea !== "object" || krea === null || Array.isArray(krea)
+      typeof krea !== "object" || krea === null || Array.isArray(krea) ||
+      typeof imageEdit !== "object" || imageEdit === null || Array.isArray(imageEdit)
     ) {
       return reply.status(400).send({ ok: false, error: "Configurazione H3, FAST o Krea mancante" });
     }
@@ -1127,6 +1300,29 @@ async function saveEngineSettings(
     if (!vaes.includes(String((krea as { vae?: unknown }).vae ?? ""))) {
       return reply.status(400).send({ ok: false, error: "VAE Krea non installata" });
     }
+    if (!models.includes(String((imageEdit as { model?: unknown }).model ?? ""))) {
+      return reply.status(400).send({ ok: false, error: "Modello Flux.2 Klein Edit non installato" });
+    }
+    if (!textEncoders.includes(String((imageEdit as { encoder?: unknown }).encoder ?? ""))) {
+      return reply.status(400).send({ ok: false, error: "Text encoder Flux.2 Klein Edit non installato" });
+    }
+    if (!vaes.includes(String((imageEdit as { vae?: unknown }).vae ?? ""))) {
+      return reply.status(400).send({ ok: false, error: "VAE Flux.2 Klein Edit non installata" });
+    }
+    const requestedAttention = String(
+      (imageEdit as { attentionBackend?: unknown }).attentionBackend ?? "auto",
+    );
+    if (
+      requestedAttention !== "auto" &&
+      !(await imageStudio.attentionBackends().catch((): string[] => [])).includes(
+        requestedAttention,
+      )
+    ) {
+      return reply.status(400).send({
+        ok: false,
+        error: "Attention backend non disponibile in ComfyUI: " + requestedAttention,
+      });
+    }
     const fastLoras =
       (((fast as { loras?: unknown }).loras as Array<{ name?: unknown }> | undefined) ?? [])
         .map((slot) => String(slot?.name ?? ""))
@@ -1148,7 +1344,7 @@ async function saveEngineSettings(
     if (missingLora) {
       return reply.status(400).send({ ok: false, error: `LoRA non installato: ${missingLora}` });
     }
-    const settings = await runtimeSettings.update(body);
+    const settings = await runtimeSettings.update({ ...body, imageEdit });
     return { ok: true, settings };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Impostazioni non valide";
@@ -1165,6 +1361,7 @@ app.put("/api/admin/fast-settings", saveEngineSettings);
 app.addHook("onClose", async () => {
   progressTracker.stop();
   adminAuth.close();
+  imageJobRepository.close();
   variantRepository.close();
   projectRepository.close();
   jobRepository.close();

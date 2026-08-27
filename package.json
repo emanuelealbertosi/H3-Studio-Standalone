@@ -24,6 +24,7 @@
     "test:export": "tsx scripts/test-timeline-export.ts",
     "test:library": "tsx scripts/test-creative-library.ts",
     "test:krea-contract": "tsx scripts/test-krea-contract.ts",
+    "test:images": "tsx scripts/test-image-studio.ts",
     "test:fast": "tsx scripts/test-fast-engine.ts",
     "test:cancel": "tsx scripts/test-comfy-cancel.ts",
     "test:restart": "node scripts/test-bridge-restart.mjs",

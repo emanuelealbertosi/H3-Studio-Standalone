@@ -74,6 +74,19 @@
       "requiredFor": ["image"]
     },
     {
+      "id": "flux2-klein-core",
+      "label": "ComfyUI core Flux.2 Klein Edit",
+      "kind": "custom_node",
+      "requiredClasses": [
+        "EmptyFlux2LatentImage",
+        "Flux2Scheduler",
+        "ReferenceLatent"
+      ],
+      "url": "https://github.com/Comfy-Org/ComfyUI",
+      "notes": "Aggiorna ComfyUI se uno dei nodi core Flux.2 manca. FluxKVCache e ModelAttentionBackend sono ottimizzazioni opzionali configurabili.",
+      "requiredFor": ["image_edit"]
+    },
+    {
       "id": "h3-face-refine",
       "label": "ComfyUI-H3-FaceRefine",
       "kind": "custom_node",
@@ -195,6 +208,33 @@
       "folder": "vae",
       "filenames": ["qwen_image_vae.safetensors"],
       "requiredFor": ["image"]
+    },
+    {
+      "id": "flux2-klein-edit-model",
+      "label": "Flux.2 Klein 4B Distilled FP8",
+      "kind": "model",
+      "folder": "diffusion_models",
+      "filenames": ["flux-2-klein-4b-fp8.safetensors"],
+      "url": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8",
+      "requiredFor": ["image_edit"]
+    },
+    {
+      "id": "flux2-klein-edit-encoder",
+      "label": "Qwen 3 4B encoder per Flux.2 Klein",
+      "kind": "model",
+      "folder": "text_encoders",
+      "filenames": ["qwen_3_4b.safetensors"],
+      "url": "https://huggingface.co/Comfy-Org/z_image_turbo",
+      "requiredFor": ["image_edit"]
+    },
+    {
+      "id": "flux2-klein-edit-vae",
+      "label": "Flux.2 VAE",
+      "kind": "model",
+      "folder": "vae",
+      "filenames": ["flux2-vae.safetensors"],
+      "url": "https://huggingface.co/Comfy-Org/flux2-dev",
+      "requiredFor": ["image_edit"]
     },
     {
       "id": "face-detector",

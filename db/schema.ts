@@ -347,4 +347,86 @@ export const JOB_DATABASE_MIGRATIONS = [
       `ALTER TABLE candidates ADD COLUMN error TEXT`,
     ],
   },
+  {
+    version: 15,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS image_jobs (
+        id TEXT PRIMARY KEY,
+        origin_project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+        mode TEXT NOT NULL CHECK (mode IN ('generate', 'edit')),
+        prompt TEXT NOT NULL,
+        candidate_count INTEGER NOT NULL CHECK (candidate_count BETWEEN 1 AND 4),
+        aspect_format TEXT NOT NULL,
+        width INTEGER NOT NULL CHECK (width BETWEEN 64 AND 4096 AND width % 16 = 0),
+        height INTEGER NOT NULL CHECK (height BETWEEN 64 AND 4096 AND height % 16 = 0),
+        seed_mode TEXT NOT NULL CHECK (seed_mode IN ('random', 'base', 'fixed')),
+        requested_seed TEXT,
+        selected_candidate_index INTEGER CHECK (selected_candidate_index BETWEEN 1 AND 4),
+        status TEXT NOT NULL CHECK (
+          status IN ('prepared', 'queued', 'running', 'ready', 'partial', 'failed', 'cancelled')
+        ),
+        engine_snapshot_json TEXT NOT NULL,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS image_candidates (
+        job_id TEXT NOT NULL REFERENCES image_jobs(id) ON DELETE CASCADE,
+        candidate_index INTEGER NOT NULL CHECK (candidate_index BETWEEN 1 AND 4),
+        seed TEXT NOT NULL,
+        filename_prefix TEXT NOT NULL,
+        prompt_id TEXT,
+        queue_number INTEGER,
+        status TEXT NOT NULL CHECK (
+          status IN ('prepared', 'submitted', 'queued', 'running', 'ready', 'failed', 'cancelled')
+        ),
+        api_prompt_json TEXT NOT NULL,
+        output_filename TEXT,
+        output_subfolder TEXT,
+        output_type TEXT CHECK (output_type IS NULL OR output_type IN ('input', 'output', 'temp')),
+        output_format TEXT,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (job_id, candidate_index)
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS image_job_references (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES image_jobs(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL CHECK (position BETWEEN 0 AND 3),
+        role TEXT NOT NULL DEFAULT 'other'
+          CHECK (role IN ('base', 'subject', 'style', 'pose', 'background', 'other')),
+        file TEXT NOT NULL,
+        name TEXT NOT NULL,
+        width INTEGER,
+        height INTEGER,
+        created_at TEXT NOT NULL,
+        UNIQUE (job_id, position)
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS project_image_links (
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        image_job_id TEXT NOT NULL,
+        image_candidate_index INTEGER NOT NULL CHECK (image_candidate_index BETWEEN 1 AND 4),
+        tag TEXT NOT NULL DEFAULT 'untagged'
+          CHECK (tag IN ('untagged', 'character', 'object', 'background')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (project_id, image_job_id, image_candidate_index),
+        FOREIGN KEY (image_job_id, image_candidate_index)
+          REFERENCES image_candidates(job_id, candidate_index)
+          ON DELETE CASCADE
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_image_jobs_origin_created
+       ON image_jobs(origin_project_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_image_jobs_status
+       ON image_jobs(status)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_image_candidates_prompt_id
+       ON image_candidates(prompt_id)
+       WHERE prompt_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_image_references_job_position
+       ON image_job_references(job_id, position)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_image_links_project_updated
+       ON project_image_links(project_id, updated_at DESC)`,
+    ],
+  },
 ] as const;

@@ -44,6 +44,14 @@ reference multiple tramite drag-and-drop e character/object sheet con Krea 2.
 Il pulsante **Usa nel video** trasferisce le immagini alla modalità H3 Reference
 e compila automaticamente i ruoli Picture.
 
+Lo **Studio Immagini** condivide progetti e layout con lo Studio Video. Genera
+da uno a quattro candidati con Krea 2 oppure esegue edit Flux.2 Klein con un
+massimo di quattro reference ordinate. Ogni candidato può essere taggato come
+Personaggio, Oggetto o Sfondo, riusato come reference e condiviso
+singolarmente con altri progetti. Il profilo Flux predefinito è il 4B
+Distilled FP8 a quattro step e CFG 1; workflow, modello, encoder, VAE, cache e
+attention backend sono gestiti dall’Admin.
+
 Ogni candidato completato espone inoltre tre derivati non distruttivi: **Face**,
 **Upscale 1 MP** e **Face + 1 MP**. L'upscale rigenera lo stesso seed con il
 Latent Upscaler 3D verso 0,98 MP; non è un semplice resize del file MP4.
@@ -75,6 +83,7 @@ video corrispondenti dall'output ComfyUI.
 - `docs/ARCHITECTURE.md`: componenti e flussi tecnici.
 - `docs/GENERATION-MODES.md`: mapping verificato di T2V, I2V, Reference, Keyframes, Continue ed Edit.
 - `docs/CREATIVE-LIBRARY.md`: personaggi, oggetti, reference e sheet Krea 2.
+- `docs/IMAGE-STUDIO.md`: generazione, edit Flux Klein, reference e condivisione immagini fra progetti.
 - `docs/INSTALLATION.md`: clone, primo avvio, sicurezza e dipendenze ComfyUI.
 - `docs/GITHUB-RELEASE.md`: sanitizzazione, CI e checklist di pubblicazione.
 - `docs/WORKLOG.md`: cronologia sintetica del lavoro.
@@ -82,6 +91,7 @@ video corrispondenti dall'output ComfyUI.
 Test locali principali: `npm run test:projects`, `npm run test:export`,
 `npm run test:library`, `npm run test:krea-contract` e `npm run test:fast`.
 Il bootstrap e l'autenticazione locale si verificano con `npm run test:setup`.
+Il contratto completo Image Studio si verifica con `npm run test:images`.
 
 ## Avvio rapido
 

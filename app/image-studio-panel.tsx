@@ -1,0 +1,600 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type SeedMode = "random" | "base" | "fixed";
+type ImageMode = "generate" | "edit";
+type ImageTag = "untagged" | "character" | "object" | "background";
+type ReferenceRole = "base" | "subject" | "style" | "pose" | "background" | "other";
+type ProjectOption = { id: string; name: string };
+
+type ImageReference = {
+  file: string;
+  name?: string;
+  width?: number | null;
+  height?: number | null;
+  mediaPath?: string;
+  role: ReferenceRole;
+  uid: string;
+};
+
+type ImageOutput = {
+  mediaPath: string;
+  filename?: string;
+  file?: string;
+  subfolder?: string;
+  type?: "input" | "output" | "temp";
+  width?: number | null;
+  height?: number | null;
+};
+
+type ImageCandidate = {
+  index: number;
+  seed: number;
+  status: string;
+  promptId?: string | null;
+  phaseLabel?: string | null;
+  progress?: number | null;
+  output: ImageOutput | null;
+  error?: string | null;
+  projectLinks?: ImageProjectLink[];
+};
+
+type ImageProjectLink = string | {
+  projectId: string;
+  projectName?: string | null;
+  candidateIndex?: number | null;
+  tag?: ImageTag | null;
+};
+
+type ImageJob = {
+  id: string;
+  originProjectId: string | null;
+  originProjectName: string | null;
+  mode: ImageMode;
+  prompt: string;
+  candidateCount: number;
+  aspectFormat: string;
+  width: number;
+  height: number;
+  seedMode: SeedMode;
+  requestedSeed?: number | null;
+  selectedCandidateIndex: number | null;
+  status: string;
+  engine: string | { model?: string; workflow?: string };
+  references: Array<Omit<ImageReference, "uid">>;
+  candidates: ImageCandidate[];
+  projectLinks: ImageProjectLink[];
+  tag?: ImageTag;
+};
+
+type Props = {
+  bridgeUrl: string;
+  projects: ProjectOption[];
+  projectId: string;
+  projectName?: string | null;
+};
+
+type ImageStudioStatus = {
+  generate: { ready: boolean };
+  edit: { ready: boolean };
+};
+
+const formats = [
+  { value: "1:1", label: "1:1 · Quadrato", width: 1344, height: 1344 },
+  { value: "16:9", label: "16:9 · Orizzontale", width: 1792, height: 1008 },
+  { value: "9:16", label: "9:16 · Verticale", width: 1008, height: 1792 },
+  { value: "4:3", label: "4:3 · Orizzontale", width: 1536, height: 1152 },
+  { value: "3:4", label: "3:4 · Verticale", width: 1152, height: 1536 },
+] as const;
+
+const tags: Array<{ value: ImageTag; label: string }> = [
+  { value: "untagged", label: "Senza tag" },
+  { value: "character", label: "Personaggio" },
+  { value: "object", label: "Oggetto" },
+  { value: "background", label: "Sfondo" },
+];
+
+const roles: Array<{ value: ReferenceRole; label: string }> = [
+  { value: "base", label: "Base" },
+  { value: "subject", label: "Soggetto" },
+  { value: "style", label: "Stile" },
+  { value: "pose", label: "Posa" },
+  { value: "background", label: "Sfondo" },
+  { value: "other", label: "Altro" },
+];
+
+function mediaUrl(bridgeUrl: string, path: string) {
+  return /^https?:\/\//i.test(path) ? path : `${bridgeUrl}${path}`;
+}
+
+function downloadUrl(bridgeUrl: string, path: string) {
+  const url = mediaUrl(bridgeUrl, path);
+  return `${url}${url.includes("?") ? "&" : "?"}download=1`;
+}
+
+function ready(candidate: ImageCandidate) {
+  return candidate.status === "ready" || candidate.status === "completed";
+}
+
+function failed(candidate: ImageCandidate) {
+  return candidate.status === "failed" || candidate.status === "cancelled";
+}
+
+function active(job: ImageJob | null) {
+  if (!job) return false;
+  const activeStates = ["prepared", "submitted", "queued", "running", "processing"];
+  return activeStates.includes(job.status) || job.candidates.some((candidate) => activeStates.includes(candidate.status));
+}
+
+function engineLabel(engine: ImageJob["engine"]) {
+  return typeof engine === "string" ? engine : engine.model ?? engine.workflow ?? "Motore immagini";
+}
+
+function statusLabel(candidate: ImageCandidate) {
+  if (candidate.phaseLabel) return candidate.phaseLabel;
+  if (candidate.status === "idle") return "Pronto a generare";
+  if (["prepared", "submitted"].includes(candidate.status)) return "Invio a ComfyUI";
+  if (candidate.status === "queued") return "In coda";
+  if (["running", "processing"].includes(candidate.status)) return "Generazione immagine";
+  if (candidate.status === "cancelled") return "Interrotta";
+  if (candidate.status === "failed") return "Generazione fallita";
+  if (ready(candidate)) return "Pronta";
+  return candidate.status;
+}
+
+function linksFor(job: ImageJob, candidateIndex: number) {
+  return (job.projectLinks ?? []).flatMap((link) => {
+    if (typeof link === "string") return [{ projectId: link, projectName: null, tag: "untagged" as ImageTag }];
+    if (link.candidateIndex != null && link.candidateIndex !== candidateIndex) return [];
+    return [{ projectId: link.projectId, projectName: link.projectName ?? null, tag: link.tag ?? "untagged" }];
+  });
+}
+
+function referenceFile(output: ImageOutput) {
+  if (output.file) return output.file;
+  const relative = [output.subfolder, output.filename].filter(Boolean).join("/");
+  return relative ? `${relative} [${output.type ?? "output"}]` : output.mediaPath;
+}
+
+function referenceMediaPath(file: string) {
+  const normalized = file.trim().replaceAll("\\", "/");
+  const match = normalized.match(/^(.*?)(?: \[(input|output|temp)\])$/i);
+  if (!match) return undefined;
+  const relative = match[1];
+  const slash = relative.lastIndexOf("/");
+  const query = new URLSearchParams({
+    filename: slash >= 0 ? relative.slice(slash + 1) : relative,
+    subfolder: slash >= 0 ? relative.slice(0, slash) : "",
+    type: match[2].toLowerCase(),
+  });
+  return "/api/media?" + query.toString();
+}
+
+export default function ImageStudioPanel({ bridgeUrl, projects, projectId, projectName }: Props) {
+  const [mode, setMode] = useState<ImageMode>("generate");
+  const [prompt, setPrompt] = useState("");
+  const [candidateCount, setCandidateCount] = useState(4);
+  const [format, setFormat] = useState<(typeof formats)[number]["value"]>("1:1");
+  const [seedMode, setSeedMode] = useState<SeedMode>("random");
+  const [seedValue, setSeedValue] = useState("1024");
+  const [tag, setTag] = useState<ImageTag>("untagged");
+  const [references, setReferences] = useState<ImageReference[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [jobs, setJobs] = useState<ImageJob[]>([]);
+  const [job, setJob] = useState<ImageJob | null>(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [shareTargets, setShareTargets] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState<string | null>(null);
+  const [engineStatus, setEngineStatus] = useState<ImageStudioStatus | null>(null);
+  const [engineStatusError, setEngineStatusError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(true);
+  const composerRef = useRef<HTMLElement>(null);
+  const loadGenerationRef = useRef(0);
+  const selectedFormat = formats.find((item) => item.value === format) ?? formats[0];
+  const orderedProjects = useMemo(() => [...projects].sort((a, b) => a.name.localeCompare(b.name)), [projects]);
+  const visibleCandidates = job
+    ? job.candidates.filter((candidate) => {
+        const candidateLinks = candidate.projectLinks === undefined
+          ? linksFor(job, candidate.index)
+          : candidate.projectLinks.flatMap((link) =>
+              typeof link === "string"
+                ? [{ projectId: link }]
+                : [{ projectId: link.projectId }],
+            );
+        return candidateLinks.some((link) => link.projectId === projectId);
+      })
+    : Array.from({ length: candidateCount }, (_, index): ImageCandidate => ({ index: index + 1, seed: 0, status: "idle", output: null }));
+  const selectedEngineReady = mode === "edit"
+    ? engineStatus?.edit.ready === true
+    : engineStatus?.generate.ready === true;
+
+  async function loadJobs(preferId?: string | null) {
+    const loadGeneration = ++loadGenerationRef.current;
+    if (!projectId) { setJobs([]); setJob(null); setActiveJobId(null); return; }
+    const query = new URLSearchParams({ projectId, limit: "40" });
+    const response = await fetch(`${bridgeUrl}/api/image-jobs?${query}`, { cache: "no-store" });
+    const payload = (await response.json()) as { jobs?: ImageJob[]; error?: string };
+    if (!response.ok) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+    if (loadGeneration !== loadGenerationRef.current) return;
+    const loaded = payload.jobs ?? [];
+    const selected = loaded.find((item) => item.id === preferId) ?? loaded[0] ?? null;
+    setJobs(loaded);
+    setJob(selected);
+    setActiveJobId(selected && active(selected) ? selected.id : null);
+  }
+
+  useEffect(() => {
+    let disposed = false;
+    loadGenerationRef.current += 1;
+    const timer = window.setTimeout(() => {
+      setActiveJobId(null);
+      setJob(null);
+      void loadJobs().catch((error) => { if (!disposed) setMessage(error instanceof Error ? error.message : "Immagini non disponibili"); });
+    }, 0);
+    return () => { disposed = true; window.clearTimeout(timer); };
+  }, [projectId]);
+
+  useEffect(() => {
+    let disposed = false;
+    void fetch(bridgeUrl + "/api/image-jobs/capabilities", { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as { imageStudio?: ImageStudioStatus; error?: string };
+        if (!response.ok || !payload.imageStudio) {
+          throw new Error(payload.error ?? "Bridge HTTP " + response.status);
+        }
+        if (!disposed) {
+          setEngineStatus(payload.imageStudio);
+          setEngineStatusError(null);
+        }
+      })
+      .catch((error) => {
+        if (!disposed) {
+          setEngineStatus(null);
+          setEngineStatusError(error instanceof Error ? error.message : "Motore immagini non disponibile");
+        }
+      });
+    return () => { disposed = true; };
+  }, [bridgeUrl]);
+
+  useEffect(() => {
+    if (!activeJobId) return;
+    let disposed = false;
+    const poll = async () => {
+      try {
+        const response = await fetch(`${bridgeUrl}/api/image-jobs/${activeJobId}`, { cache: "no-store" });
+        const payload = (await response.json()) as { job?: ImageJob; error?: string };
+        if (!response.ok || !payload.job) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+        if (disposed) return;
+        setJob(payload.job);
+        setJobs((current) => [payload.job!, ...current.filter((item) => item.id !== payload.job!.id)]);
+        if (!active(payload.job)) {
+          setActiveJobId(null);
+          setMessage(payload.job.status === "failed" ? "Generazione immagini fallita" : payload.job.status === "cancelled" ? "Generazione immagini interrotta" : "Generazione immagini completata");
+        }
+      } catch (error) {
+        if (!disposed) setMessage(error instanceof Error ? error.message : "Monitoraggio immagini fallito");
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 2500);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [activeJobId, bridgeUrl]);
+
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    const selected = Array.from(files).slice(0, Math.max(0, 4 - references.length));
+    if (!selected.length) { setMessage("Puoi usare al massimo 4 reference."); return; }
+    setUploading(true);
+    try {
+      const added: ImageReference[] = [];
+      for (const file of selected) {
+        const body = new FormData(); body.append("file", file, file.name);
+        const response = await fetch(`${bridgeUrl}/api/assets/upload`, { method: "POST", body });
+        const payload = (await response.json()) as { asset?: { kind?: string; file: string; name?: string; mediaPath?: string; width?: number | null; height?: number | null }; error?: string };
+        if (!response.ok || !payload.asset) throw new Error(payload.error ?? `Upload HTTP ${response.status}`);
+        if (payload.asset.kind && payload.asset.kind !== "picture") throw new Error(`${file.name} non è un'immagine`);
+        added.push({
+          ...payload.asset,
+          mediaPath: payload.asset.mediaPath ?? referenceMediaPath(payload.asset.file),
+          role: references.length + added.length === 0 ? "base" : "subject",
+          uid: crypto.randomUUID(),
+        });
+      }
+      setReferences((current) => [...current, ...added].slice(0, 4)); setMode("edit");
+      setMessage(`${added.length} reference caricate`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Upload fallito"); }
+    finally { setUploading(false); }
+  }
+
+  function moveReference(index: number, delta: -1 | 1) {
+    setReferences((current) => {
+      const target = index + delta;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current]; [next[index], next[target]] = [next[target], next[index]]; return next;
+    });
+  }
+
+  async function run() {
+    if (!projectId || !prompt.trim()) { setMessage(!projectId ? "Seleziona un progetto." : "Descrivi l'immagine."); return; }
+    if (!selectedEngineReady) { setMessage(engineStatusError ?? "Il motore immagini selezionato non è pronto: controlla Admin → Dipendenze."); return; }
+    if (mode === "edit" && !references.length) { setMessage("Edit richiede almeno una reference."); return; }
+    const numericSeed = Number(seedValue);
+    if (seedMode !== "random" && (!Number.isSafeInteger(numericSeed) || numericSeed < 0)) { setMessage("Seed non valido."); return; }
+    setBusy("run"); setMessage("Invio al motore immagini…");
+    try {
+      const response = await fetch(`${bridgeUrl}/api/image-jobs`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ projectId, mode, prompt: prompt.trim(), candidateCount, aspectFormat: selectedFormat.value, width: selectedFormat.width, height: selectedFormat.height, seedMode, seed: seedMode === "random" ? undefined : numericSeed, references: references.map((reference) => ({ file: reference.file, name: reference.name, width: reference.width, height: reference.height, role: reference.role })), tag }),
+      });
+      const payload = (await response.json()) as { job?: ImageJob; error?: string };
+      if (!response.ok || !payload.job) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      setJob(payload.job); setJobs((current) => [payload.job!, ...current.filter((item) => item.id !== payload.job!.id)]);
+      setActiveJobId(active(payload.job) ? payload.job.id : null); setMessage(`Batch ${payload.job.id.slice(0, 8)} avviato`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Generazione non avviata"); }
+    finally { setBusy(null); }
+  }
+
+  async function refresh(jobId: string) {
+    const response = await fetch(`${bridgeUrl}/api/image-jobs/${jobId}`, { cache: "no-store" });
+    const payload = (await response.json()) as { job?: ImageJob; error?: string };
+    if (!response.ok || !payload.job) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+    setJob(payload.job); setJobs((current) => [payload.job!, ...current.filter((item) => item.id !== payload.job!.id)]);
+  }
+
+  async function select(index: number) {
+    if (!job) return; setBusy(`select-${index}`);
+    try {
+      const response = await fetch(`${bridgeUrl}/api/image-jobs/${job.id}/select`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ candidateIndex: index }) });
+      const payload = (await response.json()) as { job?: ImageJob; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      if (payload.job) { setJob(payload.job); setJobs((current) => [payload.job!, ...current.filter((item) => item.id !== payload.job!.id)]); }
+      else setJob({ ...job, selectedCandidateIndex: index });
+      setMessage(`Candidato ${index} selezionato`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Selezione fallita"); }
+    finally { setBusy(null); }
+  }
+
+  async function cancel() {
+    if (!job) return; setBusy("cancel");
+    try {
+      const response = await fetch(`${bridgeUrl}/api/image-jobs/${job.id}/cancel`, { method: "POST" });
+      const payload = (await response.json()) as { job?: ImageJob; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      if (payload.job) setJob(payload.job); setActiveJobId(null); setMessage("Interruzione richiesta");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Interruzione fallita"); }
+    finally { setBusy(null); }
+  }
+
+  async function removeCandidate(index: number) {
+    if (!job || !window.confirm("Eliminare definitivamente questa immagine anche dai progetti condivisi?")) return;
+    setBusy(`delete-${index}`);
+    try {
+      const response = await fetch(`${bridgeUrl}/api/image-jobs/${job.id}/candidates/${index}/delete`, { method: "POST" });
+      const payload = (await response.json()) as { job?: ImageJob | null; jobDeleted?: boolean; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      if (payload.jobDeleted || !payload.job) { setJob(null); setActiveJobId(null); await loadJobs(); }
+      else { setJob(payload.job); setJobs((current) => [payload.job!, ...current.filter((item) => item.id !== payload.job!.id)]); }
+      setMessage("Immagine eliminata");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Eliminazione fallita"); }
+    finally { setBusy(null); }
+  }
+
+  async function setProjectLink(index: number, targetId: string, targetTag: ImageTag) {
+    if (!job || !targetId) return; setBusy(`link-${index}-${targetId}`);
+    try {
+      const response = await fetch(`${bridgeUrl}/api/image-jobs/${job.id}/candidates/${index}/projects/${targetId}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ tag: targetTag }) });
+      const payload = (await response.json()) as { job?: ImageJob; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      if (payload.job) { setJob(payload.job); setJobs((current) => [payload.job!, ...current.filter((item) => item.id !== payload.job!.id)]); } else await refresh(job.id);
+      setMessage("Progetto e tag aggiornati");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Condivisione fallita"); }
+    finally { setBusy(null); }
+  }
+
+  async function unsetProjectLink(index: number, targetId: string) {
+    if (!job) return; setBusy(`unlink-${index}-${targetId}`);
+    try {
+      const response = await fetch(`${bridgeUrl}/api/image-jobs/${job.id}/candidates/${index}/projects/${targetId}`, { method: "DELETE" });
+      const payload = (await response.json()) as { job?: ImageJob; error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Bridge HTTP " + response.status);
+      if (targetId === projectId) await loadJobs();
+      else if (payload.job) {
+        setJob(payload.job);
+        setJobs((current) => [payload.job!, ...current.filter((item) => item.id !== payload.job!.id)]);
+      } else await refresh(job.id);
+      setMessage("Condivisione rimossa");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Rimozione fallita"); }
+    finally { setBusy(null); }
+  }
+
+  function editCandidate(candidate: ImageCandidate) {
+    if (!candidate.output) return;
+    setMode("edit"); setReferences([{ file: referenceFile(candidate.output), name: candidate.output.filename ?? `candidate_${candidate.index}.png`, width: candidate.output.width, height: candidate.output.height, mediaPath: candidate.output.mediaPath, role: "base", uid: crypto.randomUUID() }]);
+    setExpanded(true); setMessage(`Candidato ${candidate.index} impostato come base`);
+    window.requestAnimationFrame(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }));
+  }
+
+  function addCandidateReference(candidate: ImageCandidate) {
+    if (!candidate.output) return;
+    if (references.length >= 4) { setMessage("Hai già raggiunto il limite di 4 reference."); return; }
+    setMode("edit");
+    setReferences((current) => [...current, {
+      file: referenceFile(candidate.output!),
+      name: candidate.output!.filename ?? `candidate_${candidate.index}.png`,
+      width: candidate.output!.width,
+      height: candidate.output!.height,
+      mediaPath: candidate.output!.mediaPath,
+      role: (current.length === 0 ? "base" : "other") as ReferenceRole,
+      uid: crypto.randomUUID(),
+    }].slice(0, 4));
+    setExpanded(true);
+    setMessage(`Candidato ${candidate.index} aggiunto alle reference`);
+  }
+
+  return (
+    <>
+      {jobs.length > 0 && (
+        <section className="project-batches image-project-batches" aria-label="Batch immagini del progetto">
+          <div>
+            <span className="section-index">IMMAGINI DEL PROGETTO</span>
+            <strong>{projectName ?? "Progetto"}</strong>
+            <small>Generazioni ed edit restano insieme e possono essere condivisi.</small>
+          </div>
+          <div className="project-batch-strip image-batch-strip">
+            {jobs.map((item) => {
+              const preview = item.candidates.find((candidate) => candidate.index === item.selectedCandidateIndex)?.output ?? item.candidates.find((candidate) => candidate.output)?.output;
+              return (
+                <button
+                  className={item.id === job?.id ? "active" : ""}
+                  key={item.id}
+                  onClick={() => {
+                    setJob(item); setActiveJobId(active(item) ? item.id : null); setMode(item.mode); setPrompt(item.prompt); setCandidateCount(item.candidateCount);
+                    setFormat((formats.some((candidate) => candidate.value === item.aspectFormat) ? item.aspectFormat : "1:1") as typeof format);
+                    setSeedMode(item.seedMode);
+                    setSeedValue(item.requestedSeed === null || item.requestedSeed === undefined ? "1024" : String(item.requestedSeed));
+                    setReferences(item.mode === "edit"
+                      ? item.references.map((reference) => ({
+                          ...reference,
+                          mediaPath: referenceMediaPath(reference.file),
+                          uid: crypto.randomUUID(),
+                        }))
+                      : []);
+                    const ownLink = item.projectLinks
+                      .flatMap((link) => typeof link === "string" ? [] : [link])
+                      .find((link) => link.projectId === projectId);
+                    setTag(ownLink?.tag ?? "untagged");
+                  }}
+                  type="button"
+                >
+                  {preview ? <img alt="" src={mediaUrl(bridgeUrl, preview.mediaPath)} /> : <span>{item.status}</span>}
+                  <i>{item.mode === "edit" ? "EDIT · " : ""}{item.id.slice(0, 8)}</i>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section className="results image-results" aria-labelledby="image-results-title">
+        <div className="results-heading">
+          <div><span className="section-index">01</span><h2 id="image-results-title">Candidati immagine</h2><span className="result-count">{visibleCandidates.length}</span></div>
+          <div className="results-tools">
+            <div className="queue-status"><span className={active(job) ? "pulse" : ""} />{active(job) ? "Coda attiva" : "Coda pronta"}</div>
+            {active(job) && job && <button className="stop-run-button" disabled={busy === "cancel"} onClick={() => void cancel()} type="button">{busy === "cancel" ? "Interruzione…" : "■ Interrompi"}</button>}
+          </div>
+        </div>
+
+        <div className={`candidate-grid image-candidate-grid count-${Math.max(1, visibleCandidates.length)}`}>
+          {visibleCandidates.map((candidate) => {
+            const isReady = ready(candidate) && Boolean(candidate.output);
+            const isFailed = failed(candidate);
+            const chosen = job?.selectedCandidateIndex === candidate.index;
+            const links = job ? linksFor(job, candidate.index) : [];
+            const ownLink = links.find((link) => link.projectId === projectId);
+            const shareKey = `${job?.id ?? "new"}-${candidate.index}`;
+            const shareTarget = shareTargets[shareKey] ?? orderedProjects.find((project) => project.id !== projectId)?.id ?? projectId;
+            return (
+              <article className={`candidate-card image-candidate-card ${isReady ? "ready" : isFailed ? "failed" : "processing"} ${chosen ? "chosen" : ""}`} key={candidate.index}>
+                <div className={`video-surface image-surface visual-${candidate.index}`} style={{ aspectRatio: `${job?.width ?? selectedFormat.width} / ${job?.height ?? selectedFormat.height}` }}>
+                  {!isReady && <><div className="video-noise" /><div className="video-blur" /></>}
+                  {isReady && candidate.output ? (
+                    <>
+                      <img alt={`Candidato ${candidate.index}`} src={mediaUrl(bridgeUrl, candidate.output.mediaPath)} />
+                      {chosen && <div className="selected-label">Scelta</div>}
+                      <div className="image-open-actions">
+                        <a href={mediaUrl(bridgeUrl, candidate.output.mediaPath)} rel="noreferrer" target="_blank">Apri</a>
+                        <a download={candidate.output.filename ?? true} href={downloadUrl(bridgeUrl, candidate.output.mediaPath)}>Scarica</a>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="progress-overlay" role="status">
+                      <span className="candidate-label">Candidato {candidate.index}</span>
+                      <strong className={isFailed ? "failure-mark" : undefined}>{isFailed ? "!" : typeof candidate.progress === "number" ? `${candidate.progress}%` : "—"}</strong>
+                      <span>{statusLabel(candidate)}</span>
+                      {typeof candidate.progress === "number" && !isFailed && <div className="progress-track"><i style={{ width: `${Math.max(0, Math.min(100, candidate.progress))}%` }} /></div>}
+                      {candidate.error && <small className="image-candidate-error">{candidate.error}</small>}
+                    </div>
+                  )}
+                  {job && (isReady || isFailed) && <button aria-label={`Elimina candidato ${candidate.index}`} className="video-trash-button" disabled={busy === `delete-${candidate.index}`} onClick={() => void removeCandidate(candidate.index)} type="button">🗑</button>}
+                </div>
+
+                <footer className="candidate-footer image-candidate-footer">
+                  <div className="image-candidate-meta"><div><strong>Candidato {candidate.index}</strong><span>{candidate.seed ? `Seed ${candidate.seed}` : "Seed al lancio"}</span></div>{job && <small>{engineLabel(job.engine)}</small>}</div>
+                  {isReady && job && candidate.output ? (
+                    <div className="image-card-actions">
+                      <div className="image-tag-chips" aria-label="Tag nel progetto">
+                        {tags.map((item) => <button className={(ownLink?.tag ?? job.tag ?? "untagged") === item.value ? "active" : ""} disabled={busy === `link-${candidate.index}-${projectId}`} key={item.value} onClick={() => void setProjectLink(candidate.index, projectId, item.value)} type="button">{item.label}</button>)}
+                      </div>
+                      <div className="image-primary-actions">
+                        <button className={chosen ? "primary-action selected" : "primary-action"} disabled={busy === `select-${candidate.index}`} onClick={() => void select(candidate.index)} type="button">{chosen ? "Selezionata" : "Scegli"}</button>
+                        <button onClick={() => editCandidate(candidate)} type="button">Edita questa</button>
+                        <button disabled={references.length >= 4} onClick={() => addCandidateReference(candidate)} type="button">+ Reference</button>
+                      </div>
+                      <div className="image-share-row">
+                        <select aria-label="Progetto di destinazione" onChange={(event) => setShareTargets((current) => ({ ...current, [shareKey]: event.target.value }))} value={shareTarget}>{orderedProjects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select>
+                        <button disabled={!shareTarget || busy === `link-${candidate.index}-${shareTarget}`} onClick={() => void setProjectLink(candidate.index, shareTarget, ownLink?.tag ?? tag)} type="button">Condividi</button>
+                        {links.some((link) => link.projectId === shareTarget) && shareTarget !== job.originProjectId && <button className="unlink" disabled={busy === `unlink-${candidate.index}-${shareTarget}`} onClick={() => void unsetProjectLink(candidate.index, shareTarget)} type="button">Rimuovi</button>}
+                      </div>
+                      {links.length > 0 && <small className="image-shared-projects">In: {links.map((link) => link.projectName ?? projects.find((project) => project.id === link.projectId)?.name ?? link.projectId.slice(0, 8)).join(" · ")}</small>}
+                    </div>
+                  ) : <span className="waiting-label">{statusLabel(candidate)}</span>}
+                </footer>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section ref={composerRef} className={`composer image-composer ${expanded ? "expanded" : "collapsed"}`} aria-labelledby="image-composer-title">
+        <div className="composer-heading">
+          <div><span className="section-index">02</span><h2 id="image-composer-title">Crea immagini</h2></div>
+          <div className="composer-heading-actions"><span className="autosave">Nel progetto {projectName ?? "corrente"}</span><button aria-expanded={expanded} className="composer-toggle" onClick={() => setExpanded((current) => !current)} type="button">{expanded ? "Riduci" : "Impostazioni"}<span aria-hidden="true">{expanded ? "⌄" : "⌃"}</span></button></div>
+        </div>
+        <div className="composer-body">
+          <label className="prompt-field">
+            <span>{mode === "edit" ? "Descrivi la modifica" : "Descrivi l'immagine"}</span>
+            <textarea onChange={(event) => setPrompt(event.target.value)} placeholder={mode === "edit" ? "Mantieni il soggetto e cambia sfondo, luce, abito…" : "Soggetto, ambiente, inquadratura, luce e stile…"} rows={2} value={prompt} />
+            <span className="prompt-hint">{mode === "edit" ? "Le reference vengono inviate a Flux Klein nell'ordine mostrato." : "Genera fino a quattro variazioni nello stesso batch."}</span>
+          </label>
+
+          <div className="image-control-grid">
+            <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => setMode("edit")} type="button">Edit</button></div></fieldset>
+            <label className="select-control"><span>Formato</span><select onChange={(event) => setFormat(event.target.value as typeof format)} value={format}>{formats.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            <fieldset className="segmented-control"><legend>Generazioni</legend><div>{[1, 2, 3, 4].map((value) => <button className={candidateCount === value ? "selected" : ""} key={value} onClick={() => setCandidateCount(value)} type="button">{value}</button>)}</div></fieldset>
+            <fieldset className="segmented-control"><legend>Seed</legend><div>{(["random", "base", "fixed"] as SeedMode[]).map((value) => <button className={seedMode === value ? "selected" : ""} key={value} onClick={() => setSeedMode(value)} type="button">{value === "random" ? "Random" : value === "base" ? "Base +1" : "Bloccato"}</button>)}</div></fieldset>
+            <label className="seed-input"><span>Valore seed</span><input disabled={seedMode === "random"} min="0" onChange={(event) => setSeedValue(event.target.value)} type="number" value={seedValue} /></label>
+          </div>
+
+          <fieldset className="image-initial-tags"><legend>Tag nel progetto</legend><div>{tags.map((item) => <button className={tag === item.value ? "selected" : ""} key={item.value} onClick={() => setTag(item.value)} type="button">{item.label}</button>)}</div><p>Il tag indica come riusare l’asset; non cambia il prompt.</p></fieldset>
+
+          {mode === "edit" && (
+            <div className="asset-panel image-reference-panel">
+              <div className="asset-panel-heading"><div><strong>Reference Flux Klein</strong><span>Da 1 a 4 immagini · ordine e ruolo modificabili</span></div><label className="asset-upload">{uploading ? "Caricamento…" : `+ Aggiungi (${references.length}/4)`}<input accept="image/*" disabled={uploading || references.length >= 4} multiple onChange={(event) => { void upload(event.currentTarget.files); event.currentTarget.value = ""; }} type="file" /></label></div>
+              <div className="image-reference-list">
+                {!references.length ? <span className="asset-empty">Carica una base e, se servono, soggetto, stile, posa o sfondo.</span> : references.map((reference, index) => (
+                  <article key={reference.uid}>
+                    <div className="image-reference-preview">{reference.mediaPath ? <img alt={reference.name ?? "Reference"} src={mediaUrl(bridgeUrl, reference.mediaPath)} /> : <span>{index + 1}</span>}<i>{index + 1}</i></div>
+                    <div><strong>{reference.name ?? reference.file}</strong><small>{reference.width && reference.height ? `${reference.width} × ${reference.height}` : "Reference"}</small></div>
+                    <label><span>Ruolo</span><select onChange={(event) => setReferences((current) => current.map((item) => item.uid === reference.uid ? { ...item, role: event.target.value as ReferenceRole } : item))} value={reference.role}>{roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
+                    <div className="image-reference-order"><button disabled={index === 0} onClick={() => moveReference(index, -1)} title="Sposta prima" type="button">←</button><button disabled={index === references.length - 1} onClick={() => moveReference(index, 1)} title="Sposta dopo" type="button">→</button><button className="remove" onClick={() => setReferences((current) => current.filter((item) => item.uid !== reference.uid))} title="Rimuovi" type="button">×</button></div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="composer-footer">
+          <div className={selectedEngineReady ? "image-engine-state ready" : "image-engine-state blocked"}>
+            {selectedEngineReady ? "Motore immagini pronto" : engineStatusError ?? "Dipendenze motore mancanti"}
+          </div>
+          <div className="preset-note"><span className="fast-badge">{mode === "edit" ? "FLUX KLEIN EDIT" : "IMAGE"}</span>{selectedFormat.width} × {selectedFormat.height} · {(selectedFormat.width * selectedFormat.height / 1_000_000).toFixed(1)} MP</div>
+          <div className="generation-cta"><div><span>Output</span><strong>{candidateCount} immagin{candidateCount === 1 ? "e" : "i"} · {tag === "untagged" ? "senza tag" : tags.find((item) => item.value === tag)?.label}</strong></div><button disabled={busy === "run" || active(job) || !projectId || !selectedEngineReady} onClick={() => void run()} type="button">{busy === "run" || active(job) ? "Generazione in corso" : !selectedEngineReady ? "Motore non pronto" : mode === "edit" ? "Crea " + candidateCount + " edit" : "Genera " + candidateCount + " immagini"}</button></div>
+        </div>
+        {message && <div className="run-message">{message}</div>}
+      </section>
+    </>
+  );
+}

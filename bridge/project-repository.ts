@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import type { MediaOutput } from "./studio-job.js";
 
-type ProjectRow = { id: string; name: string; created_at: string; updated_at: string; clip_count: number; timeline_count: number; job_count: number };
+type ProjectRow = { id: string; name: string; created_at: string; updated_at: string; clip_count: number; timeline_count: number; job_count: number; image_count: number };
 type TimelineRow = {
   id: string; project_id: string; project_name: string; name: string;
   external_audio_file: string | null; external_audio_name: string | null;
@@ -88,22 +88,24 @@ export class ProjectRepository {
       `SELECT projects.id, projects.name, projects.created_at, projects.updated_at,
        (SELECT COUNT(*) FROM project_clips WHERE project_clips.project_id = projects.id) AS clip_count,
        (SELECT COUNT(*) FROM project_timelines WHERE project_timelines.project_id = projects.id) AS timeline_count,
-       (SELECT COUNT(*) FROM jobs WHERE jobs.project_id = projects.id) AS job_count
+       (SELECT COUNT(*) FROM jobs WHERE jobs.project_id = projects.id) AS job_count,
+       (SELECT COUNT(*) FROM project_image_links WHERE project_image_links.project_id = projects.id) AS image_count
        FROM projects ORDER BY projects.updated_at DESC`
     ).all() as unknown as ProjectRow[];
-    return rows.map(row => ({ id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at, clipCount: row.clip_count, timelineCount: row.timeline_count, jobCount: row.job_count }));
+    return rows.map(row => ({ id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at, clipCount: row.clip_count, timelineCount: row.timeline_count, jobCount: row.job_count, imageCount: row.image_count }));
   }
   get(projectId: string) {
     const row = this.database.prepare(
       `SELECT projects.id, projects.name, projects.created_at, projects.updated_at,
        (SELECT COUNT(*) FROM project_clips WHERE project_clips.project_id = projects.id) AS clip_count,
        (SELECT COUNT(*) FROM project_timelines WHERE project_timelines.project_id = projects.id) AS timeline_count,
-       (SELECT COUNT(*) FROM jobs WHERE jobs.project_id = projects.id) AS job_count
+       (SELECT COUNT(*) FROM jobs WHERE jobs.project_id = projects.id) AS job_count,
+       (SELECT COUNT(*) FROM project_image_links WHERE project_image_links.project_id = projects.id) AS image_count
        FROM projects WHERE projects.id = ?`
     ).get(projectId) as ProjectRow | undefined;
     if (!row) return null;
     const timelines = this.listTimelines(projectId);
-    return { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at, clipCount: row.clip_count, timelineCount: row.timeline_count, jobCount: row.job_count, timelines, clips: timelines[0] ? this.getTimeline(timelines[0].id)?.clips ?? [] : [] };
+    return { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at, clipCount: row.clip_count, timelineCount: row.timeline_count, jobCount: row.job_count, imageCount: row.image_count, timelines, clips: timelines[0] ? this.getTimeline(timelines[0].id)?.clips ?? [] : [] };
   }
   listTimelines(projectId: string) {
     const rows = this.database.prepare(
