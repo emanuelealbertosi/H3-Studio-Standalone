@@ -172,3 +172,11 @@
 - Corretto il footer delle preview: Face/Upscale e le azioni principali usano due griglie interne a tre colonne, mentre le versioni scorrono orizzontalmente senza uscire dalla card.
 - Le esecuzioni fallite non mostrano più una barra di avanzamento indeterminata e possono essere eliminate anche quando ComfyUI non ha prodotto alcun file.
 - Montaggi ora include il browser delle candidate appartenenti al progetto, con anteprima e selezione preventiva di Originale, Face, Upscale o Face + Upscale; la versione resta sostituibile anche dopo l’aggiunta in timeline.
+
+## 27 agosto 2026 — Abbinamento sicuro FAST PDD Ref2VA/FL2VA
+
+- Centralizzata la matrice delle due coppie ufficiali non-pruned: Ref2VA con PDD Ref2VA e FL2VA con PDD FL2VA; il backend rifiuta modelli simili ma non ufficiali oltre a mismatch, pruned e GGUF.
+- L’Admin auto-abbina la patch quando cambia il modello FAST e mostra nel selettore soltanto i file PDD compatibili con la famiglia attiva.
+- Esteso il manifest dipendenze con entrambi i modelli base INT8 ConvRot ufficiali; ne basta uno con la patch corrispondente, mentre entrambi permettono il cambio famiglia dall’Admin.
+- Esteso il test FAST con il percorso positivo FL2VA, la selezione automatica della patch, il filtro anti-mismatch, il manifest e il rifiuto dei modelli non ufficiali.
+- Verificati `npm run test:fast`, `npm run typecheck -- --incremental false` e build Vinext con Node 24, senza coda GPU né avvio dei server.

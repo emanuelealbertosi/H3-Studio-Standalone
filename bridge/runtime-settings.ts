@@ -1,6 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { assertPddModelCompatibility } from "./pdd-compatibility.js";
+import {
+  assertPddModelCompatibility,
+  FAST_PDD_PAIRS,
+} from "./pdd-compatibility.js";
 
 export type EngineLoraSettings = {
   name: string;
@@ -49,8 +52,8 @@ export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = Object.freeze({
     steps: 8,
   },
   fast: {
-    model: "minimax_h3_ref2va_int8_convrot.safetensors",
-    pddFile: "MiniMax-H3-Ref2VA-Acc-8Step.safetensors",
+    model: FAST_PDD_PAIRS[0].model,
+    pddFile: FAST_PDD_PAIRS[0].pddFile,
     loras: [],
     steps: 8,
   },

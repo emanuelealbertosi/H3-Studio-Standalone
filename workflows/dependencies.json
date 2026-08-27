@@ -127,11 +127,15 @@
     },
     {
       "id": "h3-fast-base-model",
-      "label": "Modello H3 FAST Ref2VA INT8 ConvRot non-pruned",
+      "label": "Modello H3 FAST Ref2VA / FL2VA INT8 ConvRot non-pruned",
       "kind": "model",
       "folder": "diffusion_models",
-      "filenames": ["minimax_h3_ref2va_int8_convrot.safetensors"],
-      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3/blob/main/diffusion_models/minimax_h3_ref2va_int8_convrot.safetensors",
+      "filenames": [
+        "minimax_h3_ref2va_int8_convrot.safetensors",
+        "minimax_h3_fl2va_int8_convrot.safetensors"
+      ],
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3/tree/main/diffusion_models",
+      "notes": "Installa almeno un modello ufficiale non-pruned e la patch PDD della stessa famiglia; installali entrambi per poter cambiare famiglia dall'Admin.",
       "requiredFor": ["fast"]
     },
     {

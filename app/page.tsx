@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  compatiblePddFilesForModel,
+  fastPddPairForModel,
+  isOfficialFastPddModel,
+  preferredPddFileForModel,
+} from "../bridge/pdd-compatibility";
 
 type CandidateStatus =
   | "idle"
@@ -262,15 +268,6 @@ type EngineLoraSlot = {
   name: string;
   strength: number;
 };
-
-function isPddBaseModel(name: string) {
-  const normalized = name.toLowerCase();
-  const ref2va = normalized.includes("ref2va");
-  const fl2va = normalized.includes("fl2va");
-  return ref2va !== fl2va &&
-    !/(?:pruned|int8int4|ref[-_ ]?delta|fused|hybrid|10eros|b25[-_]?49)/i.test(name) &&
-    !/\.gguf$/i.test(name);
-}
 
 function isFastCreativeLora(name: string) {
   return !/(?:turbo|distill|pdd|acc[-_ ]?8)/i.test(name);
@@ -2246,6 +2243,16 @@ function AdminPanel() {
       const installPayload = (await installResponse.json()) as InstallAdminResponse & { error?: string };
       if (!engineResponse.ok) throw new Error(enginePayload.error ?? `Bridge HTTP ${engineResponse.status}`);
       if (!installResponse.ok) throw new Error(installPayload.error ?? `Bridge HTTP ${installResponse.status}`);
+      const pairedPddFile = preferredPddFileForModel(
+        enginePayload.settings.fast.model,
+        enginePayload.capabilities.pddFiles,
+      );
+      if (pairedPddFile) {
+        enginePayload.settings.fast = {
+          ...enginePayload.settings.fast,
+          pddFile: pairedPddFile,
+        };
+      }
       setData(enginePayload);
       setInstallData(installPayload);
       setLoginRequired(false);
@@ -2300,6 +2307,19 @@ function AdminPanel() {
       settings: {
         ...data.settings,
         [engine]: { ...data.settings[engine], loras },
+      },
+    });
+  }
+
+  function updateFastModel(model: string) {
+    if (!data) return;
+    const pddFile = preferredPddFileForModel(model, data.capabilities.pddFiles);
+    if (!pddFile) return;
+    setData({
+      ...data,
+      settings: {
+        ...data.settings,
+        fast: { ...data.settings.fast, model, pddFile },
       },
     });
   }
@@ -2397,6 +2417,17 @@ function AdminPanel() {
     setLoginRequired(true);
     setMessage("Sessione Admin chiusa");
   }
+
+  const fastModels = data?.capabilities.models.filter(isOfficialFastPddModel) ?? [];
+  const selectedFastPair = data
+    ? fastPddPairForModel(data.settings.fast.model)
+    : null;
+  const compatibleFastPddFiles = data
+    ? compatiblePddFilesForModel(
+        data.settings.fast.model,
+        data.capabilities.pddFiles,
+      )
+    : [];
 
   if (loginRequired) {
     return (
@@ -2588,24 +2619,19 @@ function AdminPanel() {
                   <span>Modello FAST H3</span>
                   <select
                     value={data.settings.fast.model}
-                    onChange={(event) => setData({
-                      ...data,
-                      settings: {
-                        ...data.settings,
-                        fast: { ...data.settings.fast, model: event.target.value },
-                      },
-                    })}
+                    onChange={(event) => updateFastModel(event.target.value)}
                   >
-                    {!data.capabilities.models.filter(isPddBaseModel).includes(data.settings.fast.model) && (
+                    {!fastModels.includes(data.settings.fast.model) && (
                       <option value={data.settings.fast.model}>{data.settings.fast.model} · da installare</option>
                     )}
-                    {data.capabilities.models.filter(isPddBaseModel).map((model) => <option key={model} value={model}>{model}</option>)}
+                    {fastModels.map((model) => <option key={model} value={model}>{model}</option>)}
                   </select>
                 </label>
                 <label>
                   <span>Acceleratore PDD</span>
                   <select
                     value={data.settings.fast.pddFile}
+                    disabled={compatibleFastPddFiles.length === 0}
                     onChange={(event) => setData({
                       ...data,
                       settings: {
@@ -2614,11 +2640,16 @@ function AdminPanel() {
                       },
                     })}
                   >
-                    {data.capabilities.pddFiles.length === 0 && (
-                      <option value={data.settings.fast.pddFile}>{data.settings.fast.pddFile}</option>
+                    {!compatibleFastPddFiles.includes(data.settings.fast.pddFile) && (
+                      <option value={data.settings.fast.pddFile}>
+                        {data.settings.fast.pddFile} · da installare
+                      </option>
                     )}
-                    {data.capabilities.pddFiles.map((file) => <option key={file} value={file}>{file}</option>)}
+                    {compatibleFastPddFiles.map((file) => <option key={file} value={file}>{file}</option>)}
                   </select>
+                  <small>
+                    Patch {selectedFastPair?.family.toUpperCase() ?? "—"} auto-abbinata al modello
+                  </small>
                 </label>
                 <div className="engine-fixed-recipe fast-recipe">
                   <span>Ricetta bloccata</span>

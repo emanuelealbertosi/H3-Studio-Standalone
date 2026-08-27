@@ -1,6 +1,7 @@
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ComfyApiNode, ComfyApiPrompt } from "./comfy-client.js";
+import { FAST_PDD_PAIRS } from "./pdd-compatibility.js";
 import type { WorkflowStore } from "./workflow-store.js";
 
 function uniqueNode(prompt: ComfyApiPrompt, classType: string): ComfyApiNode {
@@ -30,11 +31,11 @@ export class FastWorkflowStore {
     const sampler = uniqueNode(prompt, "H3ReferenceMemorySampler");
     const shift = uniqueNode(prompt, "MiniMaxH3SigmaShift");
     const model = uniqueNode(prompt, "H3ModelLoaderAny");
-    model.inputs.model_name = "minimax_h3_ref2va_int8_convrot.safetensors";
+    model.inputs.model_name = FAST_PDD_PAIRS[0].model;
     sampler.inputs.steps = 8;
     sampler.inputs.sampler_name = "euler";
     sampler.inputs.scheduler = "simple";
-    sampler.inputs.pdd_acc_file = "MiniMax-H3-Ref2VA-Acc-8Step.safetensors";
+    sampler.inputs.pdd_acc_file = FAST_PDD_PAIRS[0].pddFile;
     shift.inputs.shift_video = 12;
     shift.inputs.shift_audio = 3;
 
