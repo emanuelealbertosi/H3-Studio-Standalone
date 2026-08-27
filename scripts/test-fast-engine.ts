@@ -161,6 +161,68 @@ assert.throws(
   /soltanto in I2V/i,
 );
 
+const fifteenSeconds = prepareStudioJob(
+  source,
+  {
+    ...baseRequest,
+    durationSeconds: 15,
+    megapixels: 0.7,
+    qualityMode: "fast",
+    turboEnabled: false,
+  },
+  structuredClone(DEFAULT_RUNTIME_SETTINGS),
+  "00000000-0000-4000-8000-000000000008",
+);
+const fifteenRequest = uniqueNode(
+  fifteenSeconds.candidates[0].prompt,
+  "H3AIOAutopromptRequest",
+);
+assert.equal(fifteenRequest.inputs.shot_seconds, 15);
+assert.throws(
+  () => prepareStudioJob(
+    source,
+    {
+      ...baseRequest,
+      durationSeconds: 15,
+      megapixels: 0.98,
+      qualityMode: "fast",
+      turboEnabled: false,
+    },
+    structuredClone(DEFAULT_RUNTIME_SETTINGS),
+  ),
+  /massima supportata è 0\.7 MP/i,
+);
+
+const continuation = prepareStudioJob(
+  source,
+  {
+    ...baseRequest,
+    durationSeconds: 15,
+    megapixels: 0.7,
+    generationMode: "VIDEO EXTENSION",
+    mediaState: JSON.stringify([
+      { kind: "video", file: "source.mp4 [input]", duration: 15.1 },
+      { kind: "picture", file: "reference.png [input]" },
+    ]),
+    qualityMode: "fast",
+    turboEnabled: false,
+  },
+  structuredClone(DEFAULT_RUNTIME_SETTINGS),
+  "00000000-0000-4000-8000-000000000009",
+);
+const continuationSampler = uniqueNode(
+  continuation.candidates[0].prompt,
+  "H3ReferenceMemorySampler",
+);
+const continuationRequest = uniqueNode(
+  continuation.candidates[0].prompt,
+  "H3AIOAutopromptRequest",
+);
+assert.equal(continuationSampler.inputs.memory_frames, 2);
+assert.equal(continuationSampler.inputs.anchor_frames, 1);
+assert.match(String(continuationRequest.inputs.natural_prompt), /CONTINUATION LOCK/);
+assert.match(String(continuationRequest.inputs.natural_prompt), /no cut/i);
+
 const mismatch = structuredClone(DEFAULT_RUNTIME_SETTINGS);
 mismatch.fast.pddFile = fl2vaPair.pddFile;
 assert.throws(

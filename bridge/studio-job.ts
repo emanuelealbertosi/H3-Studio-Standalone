@@ -45,7 +45,7 @@ export type QualityMode = "fast" | "min" | "med" | "max";
 export type StudioJobRequest = {
   prompt: string;
   candidateCount: 1 | 2 | 3 | 4;
-  durationSeconds: 5 | 10;
+  durationSeconds: 5 | 10 | 15;
   megapixels: 0.5 | 0.7 | 0.98;
   generationMode: GenerationMode;
   aspectFormat: AspectFormat;
@@ -192,8 +192,8 @@ function normalizeRequest(value: unknown): StudioJobRequest {
   }
 
   const durationSeconds = Number(value.durationSeconds);
-  if (durationSeconds !== 5 && durationSeconds !== 10) {
-    throw new Error("durationSeconds deve essere 5 oppure 10");
+  if (durationSeconds !== 5 && durationSeconds !== 10 && durationSeconds !== 15) {
+    throw new Error("durationSeconds deve essere 5, 10 oppure 15");
   }
 
   const requestedMegapixels = Number(value.megapixels);
@@ -201,6 +201,9 @@ function normalizeRequest(value: unknown): StudioJobRequest {
     throw new Error("megapixels deve essere 0.5, 0.7 oppure 0.98");
   }
   const megapixels = requestedMegapixels === 1 ? 0.98 : requestedMegapixels;
+  if (durationSeconds === 15 && megapixels > 0.7) {
+    throw new Error("A 15 secondi la risoluzione massima supportata è 0.7 MP");
+  }
 
   const generationMode =
     typeof value.generationMode === "string"
@@ -263,10 +266,10 @@ function normalizeRequest(value: unknown): StudioJobRequest {
       (item) =>
         item.kind === "video" &&
         typeof item.duration === "number" &&
-        item.duration > 10.5,
+        item.duration > 15.5,
     )
   ) {
-    throw new Error("Continue/Edit nello Studio accetta video fino a 10 secondi");
+    throw new Error("Continue/Edit nello Studio accetta video fino a 15 secondi");
   }
   if (
     generationMode === "R2V" &&
@@ -300,7 +303,7 @@ function normalizeRequest(value: unknown): StudioJobRequest {
   return {
     prompt,
     candidateCount: candidateCount as 1 | 2 | 3 | 4,
-    durationSeconds: durationSeconds as 5 | 10,
+    durationSeconds: durationSeconds as 5 | 10 | 15,
     megapixels: megapixels as 0.5 | 0.7 | 0.98,
     generationMode: generationMode as GenerationMode,
     aspectFormat: aspectFormat as AspectFormat,
@@ -320,13 +323,17 @@ function normalizeRequest(value: unknown): StudioJobRequest {
 }
 
 function audioPolicyPrompt(request: StudioJobRequest) {
-  if (!request.muteDiegetic && !request.muteNonDiegetic) return request.prompt;
+  let prompt = request.prompt;
+  if (request.generationMode === "VIDEO EXTENSION") {
+    prompt += "\n\nCONTINUATION LOCK: Continue seamlessly from the exact final state of Video 1. Preserve the existing camera position, lens, trajectory and speed; character identity, position, pose and ongoing motion; environment geometry, lighting, color and composition. Begin with continuous motion from the source ending, with no cut, scene reset, reframing, teleport, pose reset or sudden camera change. If the requested action or camera direction differs, transition into it gradually and physically rather than switching instantly.";
+  }
+  if (!request.muteDiegetic && !request.muteNonDiegetic) return prompt;
   const directive = request.muteDiegetic && request.muteNonDiegetic
     ? "AUDIO POLICY: produce complete silence. No dialogue, voices, sound effects, ambience, music, score or narration."
     : request.muteDiegetic
       ? "AUDIO POLICY: mute all diegetic scene audio, including dialogue, voices, ambience and sound effects. Generate only explicitly requested non-diegetic music, score or narration."
       : "AUDIO POLICY: mute all non-diegetic audio, including music, score and narration. Generate only natural diegetic dialogue, ambience and sound effects occurring inside the scene.";
-  return `${request.prompt}\n\n${directive}`;
+  return `${prompt}\n\n${directive}`;
 }
 
 function randomSeed() {
@@ -465,7 +472,9 @@ export function prepareStudioJob(
     ]) {
       requireInput(requestNode, input);
     }
-    for (const input of ["seed", "steps"]) requireInput(sampler, input);
+    for (const input of ["seed", "steps", "memory_frames", "anchor_frames"]) {
+      requireInput(sampler, input);
+    }
     for (const input of ["megapixels", "aspect_format", "size_mode"]) {
       requireInput(size, input);
     }
@@ -497,6 +506,10 @@ export function prepareStudioJob(
     requestNode.inputs.keyframe_positions = request.keyframePositions;
     requestNode.inputs.source_video_audio = request.sourceVideoAudio;
     sampler.inputs.seed = candidateSeed;
+    if (request.generationMode === "VIDEO EXTENSION") {
+      sampler.inputs.memory_frames = 2;
+      sampler.inputs.anchor_frames = 1;
+    }
     requireInput(model, "model_name");
     sampler.inputs.steps = resolvedEngine.steps;
     const keepSourceAspect = request.aspectFormat === "keep source aspect";

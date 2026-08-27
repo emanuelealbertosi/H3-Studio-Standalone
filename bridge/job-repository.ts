@@ -355,7 +355,7 @@ export class JobRepository {
         prompt: job.prompt,
         promptLength: job.prompt.length,
         candidateCount: job.candidate_count as 1 | 2 | 3 | 4,
-        durationSeconds: job.duration_seconds as 5 | 10,
+        durationSeconds: job.duration_seconds as 5 | 10 | 15,
         megapixels: (job.megapixels === 1 ? 0.98 : job.megapixels) as
           | 0.5
           | 0.7

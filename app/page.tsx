@@ -536,7 +536,7 @@ type RemoteJob = {
     prompt: string;
     promptLength: number;
     candidateCount: 1 | 2 | 3 | 4;
-    durationSeconds: 5 | 10;
+    durationSeconds: 5 | 10 | 15;
     megapixels: Megapixels;
     generationMode: GenerationMode;
     aspectFormat: string;
@@ -3620,7 +3620,7 @@ function StudioApp() {
   const [qualityMode, setQualityMode] = useState<QualityMode>("fast");
   const [turboEnabled, setTurboEnabled] = useState(true);
   const [candidateCount, setCandidateCount] = useState(4);
-  const [duration, setDuration] = useState<5 | 10>(10);
+  const [duration, setDuration] = useState<5 | 10 | 15>(10);
   const [megapixels, setMegapixels] = useState<Megapixels>(0.5);
   const [mode, setMode] = useState<StudioMode>("t2v");
   const [aspectFormat, setAspectFormat] = useState("16:9 landscape");
@@ -5255,11 +5255,18 @@ function StudioApp() {
               <fieldset className="segmented-control">
                 <legend>Durata</legend>
                 <div>
-                  {[5, 10].map((value) => (
+                  {[5, 10, 15].map((value) => (
                     <button
                       className={duration === value ? "selected" : ""}
                       key={value}
-                      onClick={() => setDuration(value as 5 | 10)}
+                      onClick={() => {
+                        const nextDuration = value as 5 | 10 | 15;
+                        setDuration(nextDuration);
+                        if (nextDuration === 15 && megapixels > 0.7) {
+                          setMegapixels(0.7);
+                          setRunMessage("A 15 secondi la qualità massima è 0.7 MP.");
+                        }
+                      }}
                       type="button"
                     >
                       {value}s
@@ -5278,8 +5285,10 @@ function StudioApp() {
                   ].map((item) => (
                     <button
                       className={megapixels === item.value ? "selected" : ""}
+                      disabled={duration === 15 && item.value > 0.7}
                       key={item.value}
                       onClick={() => setMegapixels(item.value as Megapixels)}
+                      title={duration === 15 && item.value > 0.7 ? "Non disponibile a 15 secondi" : undefined}
                       type="button"
                     >
                       <strong>{item.label}</strong>
@@ -5287,6 +5296,9 @@ function StudioApp() {
                     </button>
                   ))}
                 </div>
+                {duration === 15 && (
+                  <small className="duration-resolution-note">15 s supporta al massimo 0.7 MP.</small>
+                )}
               </fieldset>
             </div>
 

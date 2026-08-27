@@ -112,7 +112,12 @@ try {
     const request: StudioJobRequest = {
       prompt: String(requestNode.inputs.natural_prompt ?? "Imported Studio job"),
       candidateCount: Math.min(4, Math.max(1, candidates.length)) as 1 | 2 | 3 | 4,
-      durationSeconds: Number(requestNode.inputs.shot_seconds) === 10 ? 10 : 5,
+      durationSeconds:
+        Number(requestNode.inputs.shot_seconds) === 15
+          ? 15
+          : Number(requestNode.inputs.shot_seconds) === 10
+            ? 10
+            : 5,
       megapixels:
         Number(size.inputs.megapixels) === 1
           ? 0.98
