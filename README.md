@@ -115,6 +115,8 @@ video corrispondenti dall'output ComfyUI.
 ## Documentazione
 
 - `docs/PROJECT-PLAN.md`: specifica e tracking principale.
+- `docs/STANDALONE-HANDOFF.md`: stato completo e prompt di ripresa della variante standalone.
+- `docs/STANDALONE-ENGINE-PLAN.md`: roadmap sintetica del motore incorporato.
 - `docs/ARCHITECTURE.md`: componenti e flussi tecnici.
 - `docs/GENERATION-MODES.md`: mapping verificato di T2V, I2V, Reference, Keyframes, Continue ed Edit.
 - `docs/CREATIVE-LIBRARY.md`: personaggi, oggetti, reference e sheet Krea 2.
