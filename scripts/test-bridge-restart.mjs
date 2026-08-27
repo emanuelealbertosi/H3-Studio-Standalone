@@ -183,7 +183,7 @@ async function runPortPreparationHelper(projectRoot, port, hostAddress) {
   if (hostAddress) {
     argumentsList.push("-HostAddress", hostAddress);
   }
-  return runCaptured(windowsPowerShell, argumentsList);
+  return runCaptured(windowsPowerShell, argumentsList, 30_000);
 }
 
 function testLauncherWiring() {
