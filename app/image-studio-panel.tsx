@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   composeImagePrompt,
   IMAGE_COMPOSITION_PRESETS,
@@ -91,6 +92,33 @@ export type ImageStudioIncomingReference = {
   height?: number | null;
   mediaPath?: string;
   role?: ReferenceRole;
+};
+
+type ImageLibraryReference = {
+  id: string;
+  file: string;
+  name?: string;
+  label?: string;
+  mediaPath: string;
+  width?: number | null;
+  height?: number | null;
+};
+
+type ImageLibraryAsset = {
+  id: string;
+  name: string;
+  description?: string;
+  references?: ImageLibraryReference[];
+};
+
+type ImageLibraryItem = {
+  id: string;
+  name: string;
+  detail: string;
+  file: string;
+  mediaPath: string;
+  width?: number | null;
+  height?: number | null;
 };
 
 type ImageStudioStatus = {
@@ -217,6 +245,9 @@ export default function ImageStudioPanel({
       uid: crypto.randomUUID(),
     })),
   );
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryBusy, setLibraryBusy] = useState(false);
+  const [libraryImages, setLibraryImages] = useState<ImageLibraryItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [jobs, setJobs] = useState<ImageJob[]>([]);
   const [job, setJob] = useState<ImageJob | null>(null);
@@ -232,6 +263,7 @@ export default function ImageStudioPanel({
   const [engineStatusError, setEngineStatusError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
   const composerRef = useRef<HTMLElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
   const loadGenerationRef = useRef(0);
   const selectedFormat = formats.find((item) => item.value === format) ?? formats[0];
   const selectedComposition = imageCompositionPreset(compositionPreset);
@@ -257,6 +289,125 @@ export default function ImageStudioPanel({
   const selectedEngineReady = mode === "edit"
     ? engineStatus?.edit.ready === true
     : engineStatus?.generate.ready === true;
+
+  useEffect(() => {
+    if (!libraryOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLibraryOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [libraryOpen]);
+
+  async function openImageLibrary() {
+    setLibraryOpen(true);
+    setLibraryBusy(true);
+    try {
+      const [jobsResponse, assetsResponse] = await Promise.all([
+        fetch(`${bridgeUrl}/api/image-jobs?limit=200`, { cache: "no-store" }),
+        fetch(`${bridgeUrl}/api/library`, { cache: "no-store" }),
+      ]);
+      const jobsPayload = (await jobsResponse.json()) as { jobs?: ImageJob[]; error?: string };
+      const assetsPayload = (await assetsResponse.json()) as { assets?: ImageLibraryAsset[]; error?: string };
+      if (!jobsResponse.ok) throw new Error(jobsPayload.error ?? `Bridge HTTP ${jobsResponse.status}`);
+      if (!assetsResponse.ok) throw new Error(assetsPayload.error ?? `Bridge HTTP ${assetsResponse.status}`);
+      const assets = await Promise.all(
+        (assetsPayload.assets ?? []).map(async (asset) => {
+          const response = await fetch(`${bridgeUrl}/api/library/${asset.id}`, { cache: "no-store" });
+          if (!response.ok) return asset;
+          const payload = (await response.json()) as { asset?: ImageLibraryAsset };
+          return payload.asset ?? asset;
+        }),
+      );
+      const collected: ImageLibraryItem[] = [];
+      const seen = new Set<string>();
+      for (const imageJob of jobsPayload.jobs ?? []) {
+        for (const candidate of imageJob.candidates) {
+          if (!ready(candidate) || !candidate.output) continue;
+          const file = referenceFile(candidate.output);
+          const key = file.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          collected.push({
+            id: `generated:${imageJob.id}:${candidate.index}`,
+            name: `Immagine ${imageJob.id.slice(0, 8)} · candidato ${candidate.index}`,
+            detail: imageJob.prompt,
+            file,
+            mediaPath: candidate.output.mediaPath,
+            width: candidate.output.width ?? imageJob.width,
+            height: candidate.output.height ?? imageJob.height,
+          });
+        }
+      }
+      for (const asset of assets) {
+        for (const reference of asset.references ?? []) {
+          const key = reference.file.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          collected.push({
+            id: `asset:${reference.id}`,
+            name: `${asset.name} · ${reference.label ?? reference.name ?? "reference"}`,
+            detail: asset.description ?? "Asset della libreria",
+            file: reference.file,
+            mediaPath: reference.mediaPath,
+            width: reference.width,
+            height: reference.height,
+          });
+        }
+      }
+      setLibraryImages(collected);
+      setMessage(collected.length ? `${collected.length} immagini disponibili in libreria` : "La libreria immagini è vuota");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Libreria immagini non disponibile");
+    } finally {
+      setLibraryBusy(false);
+    }
+  }
+
+  function addLibraryReference(image: ImageLibraryItem) {
+    setReferences((current) => {
+      if (current.some((reference) => reference.file.toLowerCase() === image.file.toLowerCase())) {
+        setMessage("Questa immagine è già allegata");
+        return current;
+      }
+      if (current.length >= 4) {
+        setMessage("Flux Klein accetta al massimo quattro reference");
+        return current;
+      }
+      const next = [...current, {
+        file: image.file,
+        name: image.name,
+        width: image.width,
+        height: image.height,
+        mediaPath: image.mediaPath,
+        role: (current.length === 0 ? "base" : "other") as ReferenceRole,
+        uid: crypto.randomUUID(),
+      }];
+      setMessage(`${image.name} allegata all’Edit`);
+      return next;
+    });
+    setMode("edit");
+  }
+
+  function insertReferenceInPrompt(index: number) {
+    const token = `reference image ${index + 1}`;
+    const textarea = promptRef.current;
+    const start = textarea?.selectionStart ?? prompt.length;
+    const end = textarea?.selectionEnd ?? start;
+    let caret = start + token.length;
+    setPrompt((current) => {
+      const before = current.slice(0, start);
+      const after = current.slice(end);
+      const prefix = before && !/\s$/.test(before) ? " " : "";
+      const suffix = after && !/^\s/.test(after) ? " " : "";
+      caret = before.length + prefix.length + token.length;
+      return `${before}${prefix}${token}${suffix}${after}`;
+    });
+    window.requestAnimationFrame(() => {
+      promptRef.current?.focus();
+      promptRef.current?.setSelectionRange(caret, caret);
+    });
+  }
 
   async function loadJobs(preferId?: string | null) {
     const loadGeneration = ++loadGenerationRef.current;
@@ -615,7 +766,7 @@ export default function ImageStudioPanel({
         <div className="composer-body">
           <label className="prompt-field">
             <span>{mode === "edit" ? "Descrivi la modifica" : "Descrivi l'immagine"}</span>
-            <textarea onChange={(event) => setPrompt(event.target.value)} placeholder={mode === "edit" ? "Mantieni il soggetto e cambia sfondo, luce, abito…" : "Soggetto, ambiente, inquadratura, luce e stile…"} rows={2} value={prompt} />
+            <textarea ref={promptRef} onChange={(event) => setPrompt(event.target.value)} placeholder={mode === "edit" ? "Mantieni il soggetto e cambia sfondo, luce, abito…" : "Soggetto, ambiente, inquadratura, luce e stile…"} rows={2} value={prompt} />
             <span className="prompt-hint">{mode === "edit" ? "Le reference vengono inviate a Flux Klein nell'ordine mostrato." : "Genera fino a quattro variazioni nello stesso batch."}</span>
           </label>
 
@@ -670,7 +821,7 @@ export default function ImageStudioPanel({
           </details>
 
           <div className="image-control-grid">
-            <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => setMode("edit")} type="button">Edit</button></div></fieldset>
+            <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => { setMode("edit"); if (!references.length) void openImageLibrary(); }} type="button">Edit</button></div></fieldset>
             <label className="select-control">
               <span>Formato</span>
               <select
@@ -691,20 +842,67 @@ export default function ImageStudioPanel({
 
           {mode === "edit" && (
             <div className="asset-panel image-reference-panel">
-              <div className="asset-panel-heading"><div><strong>Reference Flux Klein</strong><span>Da 1 a 4 immagini · ordine e ruolo modificabili</span></div><label className="asset-upload">{uploading ? "Caricamento…" : `+ Aggiungi (${references.length}/4)`}<input accept="image/*" disabled={uploading || references.length >= 4} multiple onChange={(event) => { void upload(event.currentTarget.files); event.currentTarget.value = ""; }} type="file" /></label></div>
+              <div className="asset-panel-heading"><div><strong>Reference Flux Klein</strong><span>Da 1 a 4 immagini · ordine e ruolo modificabili</span></div><div className="asset-source-actions"><button onClick={() => void openImageLibrary()} type="button">▧ Scegli dalla libreria</button><label className="asset-upload">{uploading ? "Caricamento…" : `+ Carica (${references.length}/4)`}<input accept="image/*" disabled={uploading || references.length >= 4} multiple onChange={(event) => { void upload(event.currentTarget.files); event.currentTarget.value = ""; }} type="file" /></label></div></div>
               <div className="image-reference-list">
                 {!references.length ? <span className="asset-empty">Carica una base e, se servono, soggetto, stile, posa o sfondo.</span> : references.map((reference, index) => (
                   <article key={reference.uid}>
                     <div className="image-reference-preview">{reference.mediaPath ? <img alt={reference.name ?? "Reference"} src={mediaUrl(bridgeUrl, reference.mediaPath)} /> : <span>{index + 1}</span>}<i>{index + 1}</i></div>
                     <div><strong>{reference.name ?? reference.file}</strong><small>{reference.width && reference.height ? `${reference.width} × ${reference.height}` : "Reference"}</small></div>
                     <label><span>Ruolo</span><select onChange={(event) => setReferences((current) => current.map((item) => item.uid === reference.uid ? { ...item, role: event.target.value as ReferenceRole } : item))} value={reference.role}>{roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
-                    <div className="image-reference-order"><button disabled={index === 0} onClick={() => moveReference(index, -1)} title="Sposta prima" type="button">←</button><button disabled={index === references.length - 1} onClick={() => moveReference(index, 1)} title="Sposta dopo" type="button">→</button><button className="remove" onClick={() => setReferences((current) => current.filter((item) => item.uid !== reference.uid))} title="Rimuovi" type="button">×</button></div>
+                    <div className="image-reference-order"><button className="insert" onClick={() => insertReferenceInPrompt(index)} title={`Inserisci reference image ${index + 1} nel prompt`} type="button">Inserisci</button><button disabled={index === 0} onClick={() => moveReference(index, -1)} title="Sposta prima" type="button">←</button><button disabled={index === references.length - 1} onClick={() => moveReference(index, 1)} title="Sposta dopo" type="button">→</button><button className="remove" onClick={() => setReferences((current) => current.filter((item) => item.uid !== reference.uid))} title="Rimuovi" type="button">×</button></div>
                   </article>
                 ))}
               </div>
             </div>
           )}
         </div>
+
+        {libraryOpen && typeof document !== "undefined" && createPortal((
+          <div
+            className="media-picker-backdrop"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setLibraryOpen(false);
+            }}
+            role="presentation"
+          >
+            <div aria-modal="true" className="media-library-picker media-library-modal image-library-modal" role="dialog">
+              <div className="media-picker-heading">
+                <div><strong>Scegli immagini dalla libreria</strong><span>Tutte le immagini generate e gli asset storici · massimo 4 reference</span></div>
+                <button aria-label="Chiudi libreria" onClick={() => setLibraryOpen(false)} type="button">×</button>
+              </div>
+              {libraryBusy && !libraryImages.length ? (
+                <span className="media-picker-empty">Caricamento…</span>
+              ) : (
+                <div className="media-picker-section">
+                  <div className="media-picker-grid image-edit-library-grid">
+                    {libraryImages.map((image) => {
+                      const selected = references.some((reference) => reference.file.toLowerCase() === image.file.toLowerCase());
+                      return (
+                        <button
+                          className={selected ? "selected" : ""}
+                          disabled={!selected && references.length >= 4}
+                          key={image.id}
+                          onClick={() => addLibraryReference(image)}
+                          title={image.detail}
+                          type="button"
+                        >
+                          <div><img alt="" src={mediaUrl(bridgeUrl, image.mediaPath)} /></div>
+                          <strong>{image.name}</strong>
+                          <small>{selected ? "✓ Allegata" : image.width && image.height ? `${image.width} × ${image.height}` : "Immagine"}</small>
+                        </button>
+                      );
+                    })}
+                    {!libraryImages.length && <span className="media-picker-empty">Nessuna immagine disponibile</span>}
+                  </div>
+                </div>
+              )}
+              <div className="media-picker-footer">
+                <span>{references.length}/4 reference allegate</span>
+                <button onClick={() => setLibraryOpen(false)} type="button">Fine</button>
+              </div>
+            </div>
+          </div>
+        ), document.body)}
 
         <div className="composer-footer">
           <div className={selectedEngineReady ? "image-engine-state ready" : "image-engine-state blocked"}>

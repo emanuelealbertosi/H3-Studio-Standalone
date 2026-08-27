@@ -31,6 +31,19 @@ Le immagini vengono preparate contemporaneamente per i due contesti disponibili:
 Il selettore Video/Immagini dello Studio permette quindi di scegliere il motore
 senza ricaricare i file.
 
+Lo stesso catalogo è disponibile direttamente nello **Studio**:
+
+- nelle modalità video che usano media, **Scegli dalla libreria** apre una modale
+  con tutte le immagini generate, gli asset storici e i video completati;
+- passando a **Immagini → Edit**, se non ci sono reference, la modale immagini si
+  apre automaticamente; può essere riaperta dal pulsante **Scegli dalla libreria**;
+- Image Edit permette di allegare fino a quattro immagini senza duplicare i file.
+
+Ogni media già allegato allo Studio video espone **Inserisci**, che scrive nel
+prompt il token H3 esatto (`<Picture 1>`, `<Video 1>` o `<Audio 1>`) nella posizione
+del cursore. Le reference di Image Edit espongono lo stesso comando usando la
+forma testuale `reference image N`, adatta al prompt Flux Klein.
+
 ## Uso dei video
 
 Ogni video nella **Libreria** espone **Manda a Studio**. Il comando apre lo

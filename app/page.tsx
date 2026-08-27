@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import ImageStudioPanel, {
   type ImageStudioIncomingReference,
 } from "./image-studio-panel";
@@ -3408,6 +3409,14 @@ function StudioApp() {
   const mediaPickerLoadGenerationRef = useRef(0);
   const studioProjectIdRef = useRef(studioProjectId);
   studioProjectIdRef.current = studioProjectId;
+  useEffect(() => {
+    if (!mediaPickerOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMediaPickerOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [mediaPickerOpen]);
   const [prompt, setPrompt] = useState(
     "A brilliant fantasy wizard faces a colossal golden dragon above a sunlit mountain citadel. Fast cinematic action, sweeping camera moves, magical shields and spectacular elemental attacks.",
   );
@@ -4057,12 +4066,12 @@ function StudioApp() {
     mediaPickerLoadedProjectRef.current = requestedProjectId;
     setMediaProjectImageJobs([]);
     try {
-      const projectImageQuery = new URLSearchParams({ limit: "40" });
+      const projectImageQuery = new URLSearchParams({ limit: "200" });
       if (studioProjectId) projectImageQuery.set("projectId", studioProjectId);
-      const reusableImageQuery = new URLSearchParams({ limit: "100" });
+      const reusableImageQuery = new URLSearchParams({ limit: "200" });
       const [libraryResponse, jobsResponse, projectImagesResponse, reusableImagesResponse] = await Promise.all([
         fetch(`${bridgeUrl}/api/library`, { cache: "no-store" }),
-        fetch(`${bridgeUrl}/api/jobs?limit=30`, { cache: "no-store" }),
+        fetch(`${bridgeUrl}/api/jobs?limit=200`, { cache: "no-store" }),
         studioProjectId
           ? fetch(`${bridgeUrl}/api/image-jobs?${projectImageQuery.toString()}`, { cache: "no-store" })
           : Promise.resolve(null),
@@ -4102,6 +4111,27 @@ function StudioApp() {
       const separator = current && !/\s$/.test(current) ? " " : "";
       caret = current.length + separator.length + tag.length;
       return `${current}${separator}${tag}`;
+    });
+    setMentionState(null);
+    window.requestAnimationFrame(() => {
+      promptRef.current?.focus();
+      promptRef.current?.setSelectionRange(caret, caret);
+    });
+  }
+
+  function insertMediaInPrompt(index: number) {
+    const token = mediaToken(mediaAssets, index);
+    const textarea = promptRef.current;
+    const start = textarea?.selectionStart ?? prompt.length;
+    const end = textarea?.selectionEnd ?? start;
+    let caret = start + token.length;
+    setPrompt((current) => {
+      const before = current.slice(0, start);
+      const after = current.slice(end);
+      const prefix = before && !/\s$/.test(before) ? " " : "";
+      const suffix = after && !/^\s/.test(after) ? " " : "";
+      caret = before.length + prefix.length + token.length;
+      return `${before}${prefix}${token}${suffix}${after}`;
     });
     setMentionState(null);
     window.requestAnimationFrame(() => {
@@ -5137,24 +5167,41 @@ function StudioApp() {
                             />
                           </label>
                         </div>
-                        <button
-                          aria-label={"Rimuovi " + asset.name}
-                          onClick={() =>
-                            setMediaAssets((current) =>
-                              current.filter((_, itemIndex) => itemIndex !== index),
-                            )
-                          }
-                          type="button"
-                        >
-                          ×
-                        </button>
+                        <div className="media-asset-actions">
+                          <button
+                            onClick={() => insertMediaInPrompt(index)}
+                            title={`Inserisci ${mediaToken(mediaAssets, index)} nel prompt`}
+                            type="button"
+                          >
+                            Inserisci
+                          </button>
+                          <button
+                            aria-label={"Rimuovi " + asset.name}
+                            className="remove"
+                            onClick={() =>
+                              setMediaAssets((current) =>
+                                current.filter((_, itemIndex) => itemIndex !== index),
+                              )
+                            }
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </article>
                     ))
                   )}
                 </div>
 
-                {mediaPickerOpen && (
-                  <div className="media-library-picker">
+                {mediaPickerOpen && typeof document !== "undefined" && createPortal((
+                  <div
+                    className="media-picker-backdrop"
+                    onMouseDown={(event) => {
+                      if (event.target === event.currentTarget) setMediaPickerOpen(false);
+                    }}
+                    role="presentation"
+                  >
+                  <div aria-modal="true" className="media-library-picker media-library-modal" role="dialog">
                     <div className="media-picker-heading">
                       <div><strong>Libreria media</strong><span>Aggiungi senza ricaricare file già disponibili</span></div>
                       <button onClick={() => setMediaPickerOpen(false)} type="button">×</button>
@@ -5166,7 +5213,7 @@ function StudioApp() {
                         <div className="media-picker-section">
                           <strong>Immagini del progetto</strong>
                           <div className="media-picker-grid generated-images">
-                            {mediaProjectGeneratedImages.slice(0, 12).map((item) => (
+                            {mediaProjectGeneratedImages.map((item) => (
                               <button
                                 key={`${item.job.id}-${item.candidate.index}`}
                                 onClick={() => addGeneratedImage(item)}
@@ -5184,7 +5231,7 @@ function StudioApp() {
                         <div className="media-picker-section">
                           <strong>Altre immagini generate</strong>
                           <div className="media-picker-grid generated-images reusable-images">
-                            {mediaOtherGeneratedImages.slice(0, 12).map((item) => (
+                            {mediaOtherGeneratedImages.map((item) => (
                               <button
                                 key={`${item.job.id}-${item.candidate.index}`}
                                 onClick={() => addGeneratedImage(item)}
@@ -5221,14 +5268,15 @@ function StudioApp() {
                                 <strong>{job.projectName ?? "Senza progetto"}</strong>
                                 <small>{job.id.slice(0, 8)} · candidato {candidate.index}</small>
                               </button>
-                            ))).slice(0, 12)}
+                            )))}
                             {!mediaRecentJobs.some((job) => job.candidates.some((candidate) => candidate.output)) && <span className="media-picker-empty">Nessun video completato</span>}
                           </div>
                         </div>
                       </>
                     )}
                   </div>
-                )}
+                  </div>
+                ), document.body)}
 
                 {mode === "keyframes" && (
                   <label className="asset-text-input">

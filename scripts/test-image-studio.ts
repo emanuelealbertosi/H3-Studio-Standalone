@@ -77,6 +77,19 @@ try {
   assert.match(imageStudioSource, /incomingReferences\?: ImageStudioIncomingReference\[\]/);
   assert.match(imageStudioSource, /incomingReferences\.length \? "edit" : "generate"/);
   assert.match(imageStudioSource, /asset ricevuti dalla libreria/);
+  assert.match(imageStudioSource, /async function openImageLibrary/);
+  assert.match(imageStudioSource, /\/api\/image-jobs\?limit=200/);
+  assert.match(imageStudioSource, /\/api\/library/);
+  assert.match(imageStudioSource, /Scegli immagini dalla libreria/);
+  assert.match(imageStudioSource, /void openImageLibrary\(\)/);
+  assert.match(imageStudioSource, /function insertReferenceInPrompt/);
+  assert.match(imageStudioSource, />Inserisci<\/button>/);
+  assert.match(pageSource, /function insertMediaInPrompt/);
+  assert.match(pageSource, /title=\{`Inserisci \$\{mediaToken\(mediaAssets, index\)\} nel prompt`\}/);
+  assert.match(pageSource, /className="media-picker-backdrop"/);
+  assert.match(pageSource, /aria-modal="true"/);
+  assert.doesNotMatch(pageSource, /mediaProjectGeneratedImages\.slice\(0, 12\)/);
+  assert.doesNotMatch(pageSource, /mediaOtherGeneratedImages\.slice\(0, 12\)/);
   assert.match(
     serverSource,
     /"\/api\/image-jobs"[\s\S]{0,500}request\.query\.projectId/,

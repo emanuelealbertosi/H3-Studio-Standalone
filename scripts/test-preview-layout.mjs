@@ -129,5 +129,11 @@ assert.match(css, /\.send-assets-to-studio\s*\{[^}]*display:\s*flex/s);
 assert.match(page, /className="asset-library-grid"/);
 assert.match(page, /className=\{`asset-studio-dropzone/);
 assert.match(page, /Manda a Studio/);
+assert.match(css, /\.media-picker-backdrop\s*\{[^}]*position:\s*fixed/s);
+assert.match(css, /\.media-library-modal\s*\{[^}]*width:\s*min\(1320px,/s);
+assert.match(css, /\.media-asset-actions\s*\{[^}]*display:\s*flex/s);
+assert.match(css, /\.image-reference-order\s*\{[^}]*grid-template-columns:\s*1\.7fr 1fr 1fr 1fr/s);
+assert.match(page, /className="media-asset-actions"/);
+assert.match(imageStudio, /className="media-library-picker media-library-modal image-library-modal"/);
 
 console.log("Preview layout, image turnaround and Assets handoff UI: OK");
