@@ -169,6 +169,14 @@ assert.match(page, /item\.previewKind === "picture"/);
 assert.match(page, /item\.previewKind === "video"/);
 assert.match(page, /item\.previewPath\}#t=0\.1/);
 assert.match(page, /aria-selected="false"/);
+assert.match(page, /fetch\(`\$\{bridgeUrl\}\/api\/external-media`/);
+assert.match(page, /<strong>Esterni<\/strong>/);
+assert.match(page, /asset caricati e salvati in Libreria come Esterni/);
+assert.match(page, /item\.kind === "external"/);
+assert.match(page, /onUseExternal=\{addExternalMedia\}/);
+assert.match(imageStudio, /fetch\(`\$\{bridgeUrl\}\/api\/external-media`/);
+assert.match(imageStudio, /detail: "Esterno"/);
+assert.match(imageStudio, /salvate in Libreria come Esterni/);
 assert.match(css, /\.mention-thumbnail\s*\{[^}]*width:\s*54px[^}]*height:\s*46px/s);
 assert.match(css, /\.mention-thumbnail img,[\s\S]*?object-fit:\s*cover/s);
 

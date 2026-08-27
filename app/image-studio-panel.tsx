@@ -319,14 +319,28 @@ export default function ImageStudioPanel({
     setLibraryOpen(true);
     setLibraryBusy(true);
     try {
-      const [jobsResponse, assetsResponse] = await Promise.all([
+      const [jobsResponse, assetsResponse, externalResponse] = await Promise.all([
         fetch(`${bridgeUrl}/api/image-jobs?limit=200`, { cache: "no-store" }),
         fetch(`${bridgeUrl}/api/library`, { cache: "no-store" }),
+        fetch(`${bridgeUrl}/api/external-media`, { cache: "no-store" }),
       ]);
       const jobsPayload = (await jobsResponse.json()) as { jobs?: ImageJob[]; error?: string };
       const assetsPayload = (await assetsResponse.json()) as { assets?: ImageLibraryAsset[]; error?: string };
+      const externalPayload = (await externalResponse.json()) as {
+        assets?: Array<{
+          id: string;
+          kind: "picture" | "video" | "audio";
+          file: string;
+          originalName: string;
+          mediaPath: string;
+          width: number | null;
+          height: number | null;
+        }>;
+        error?: string;
+      };
       if (!jobsResponse.ok) throw new Error(jobsPayload.error ?? `Bridge HTTP ${jobsResponse.status}`);
       if (!assetsResponse.ok) throw new Error(assetsPayload.error ?? `Bridge HTTP ${assetsResponse.status}`);
+      if (!externalResponse.ok) throw new Error(externalPayload.error ?? `Bridge HTTP ${externalResponse.status}`);
       const assets = await Promise.all(
         (assetsPayload.assets ?? []).map(async (asset) => {
           const response = await fetch(`${bridgeUrl}/api/library/${asset.id}`, { cache: "no-store" });
@@ -354,6 +368,21 @@ export default function ImageStudioPanel({
             height: candidate.output.height ?? imageJob.height,
           });
         }
+      }
+      for (const external of externalPayload.assets ?? []) {
+        if (external.kind !== "picture") continue;
+        const key = external.file.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        collected.push({
+          id: `external:${external.id}`,
+          name: external.originalName,
+          detail: "Esterno",
+          file: external.file,
+          mediaPath: external.mediaPath,
+          width: external.width,
+          height: external.height,
+        });
       }
       for (const asset of assets) {
         for (const reference of asset.references ?? []) {
@@ -506,7 +535,8 @@ export default function ImageStudioPanel({
       const added: ImageReference[] = [];
       for (const file of selected) {
         const body = new FormData(); body.append("file", file, file.name);
-        const response = await fetch(`${bridgeUrl}/api/assets/upload`, { method: "POST", body });
+        const query = `?${new URLSearchParams({ projectId }).toString()}`;
+        const response = await fetch(`${bridgeUrl}/api/assets/upload${query}`, { method: "POST", body });
         const payload = (await response.json()) as { asset?: { kind?: string; file: string; name?: string; mediaPath?: string; width?: number | null; height?: number | null }; error?: string };
         if (!response.ok || !payload.asset) throw new Error(payload.error ?? `Upload HTTP ${response.status}`);
         if (payload.asset.kind && payload.asset.kind !== "picture") throw new Error(`${file.name} non è un'immagine`);
@@ -518,7 +548,7 @@ export default function ImageStudioPanel({
         });
       }
       setReferences((current) => [...current, ...added].slice(0, 4)); setMode("edit");
-      setMessage(`${added.length} reference caricate`);
+      setMessage(`${added.length} reference caricate e salvate in Libreria come Esterni`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Upload fallito"); }
     finally { setUploading(false); }
   }

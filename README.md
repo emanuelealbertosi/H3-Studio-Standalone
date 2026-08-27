@@ -44,6 +44,12 @@ reference multiple tramite drag-and-drop e character/object sheet con Krea 2.
 Il pulsante **Usa nel video** trasferisce le immagini alla modalità H3 Reference
 e compila automaticamente i ruoli Picture.
 
+Ogni immagine, video o audio caricato da disco nello Studio viene inoltre
+registrato automaticamente nella sezione **Libreria → Esterni**. Il file resta
+riutilizzabile dal picker e dal menu `@` anche dopo un riavvio e fra progetti
+diversi; il progetto attivo viene conservato come origine. Un nuovo caricamento
+con lo stesso nome originale, tipo e dimensione riusa la voce già registrata.
+
 Lo **Studio Immagini** condivide progetti e layout con lo Studio Video. Genera
 da uno a quattro candidati con Krea 2 oppure esegue edit Flux.2 Klein con un
 massimo di quattro reference ordinate. I preset di composizione Libero,
@@ -103,7 +109,7 @@ video corrispondenti dall'output ComfyUI.
 - `docs/WORKLOG.md`: cronologia sintetica del lavoro.
 
 Test locali principali: `npm run test:projects`, `npm run test:export`,
-`npm run test:library`, `npm run test:krea-contract` e `npm run test:fast`.
+`npm run test:library`, `npm run test:external`, `npm run test:krea-contract` e `npm run test:fast`.
 Il bootstrap e l'autenticazione locale si verificano con `npm run test:setup`.
 Il contratto completo Image Studio si verifica con `npm run test:images`.
 

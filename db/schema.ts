@@ -9,7 +9,7 @@ export const JOB_DATABASE_MIGRATIONS = [
         updated_at TEXT NOT NULL,
         prompt TEXT NOT NULL,
         candidate_count INTEGER NOT NULL CHECK (candidate_count BETWEEN 1 AND 4),
-        duration_seconds INTEGER NOT NULL CHECK (duration_seconds IN (5, 10)),
+        duration_seconds INTEGER NOT NULL CHECK (duration_seconds IN (5, 10, 15)),
         megapixels REAL NOT NULL CHECK (megapixels IN (0.5, 0.7, 1.0)),
         generation_mode TEXT NOT NULL,
         aspect_format TEXT NOT NULL,
@@ -444,6 +444,31 @@ export const JOB_DATABASE_MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS idx_candidate_variants_parent
        ON candidate_variants(source_variant_id)
        WHERE source_variant_id IS NOT NULL`,
+    ],
+  },
+  {
+    version: 17,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS external_media (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('picture', 'video', 'audio')),
+        file TEXT NOT NULL,
+        name TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        source_key TEXT NOT NULL UNIQUE,
+        size INTEGER,
+        duration REAL,
+        has_audio INTEGER NOT NULL DEFAULT 0 CHECK (has_audio IN (0, 1)),
+        width INTEGER,
+        height INTEGER,
+        origin_project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_external_media_updated
+       ON external_media(updated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_external_media_project_updated
+       ON external_media(origin_project_id, updated_at DESC)`,
     ],
   },
 ] as const;

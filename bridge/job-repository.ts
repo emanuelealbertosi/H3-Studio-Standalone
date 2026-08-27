@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { JOB_DATABASE_MIGRATIONS } from "../db/schema.js";
@@ -167,7 +167,107 @@ export class JobRepository {
         throw error;
       }
     }
+    this.ensureFifteenSecondJobs();
     this.database.exec("PRAGMA optimize");
+  }
+
+  private ensureFifteenSecondJobs() {
+    const schema = this.database
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'jobs'")
+      .get() as { sql?: string } | undefined;
+    if (
+      !schema?.sql ||
+      !/duration_seconds[\s\S]{0,120}duration_seconds\s+IN\s*\(5,\s*10\)/i.test(schema.sql)
+    ) {
+      return;
+    }
+
+    const indexStatements = (
+      this.database
+        .prepare(
+          `SELECT sql FROM sqlite_master
+           WHERE type = 'index' AND tbl_name = 'jobs' AND sql IS NOT NULL`,
+        )
+        .all() as Array<{ sql: string }>
+    ).map((row) => row.sql);
+
+    this.database.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    const backupDirectory = path.join(path.dirname(this.databasePath), "backups");
+    mkdirSync(backupDirectory, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    copyFileSync(
+      this.databasePath,
+      path.join(backupDirectory, `h3-studio-before-15s-${timestamp}.sqlite`),
+    );
+
+    this.database.exec("PRAGMA foreign_keys = OFF");
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      this.database.exec(`CREATE TABLE jobs_duration_upgrade (
+        id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        candidate_count INTEGER NOT NULL CHECK (candidate_count BETWEEN 1 AND 4),
+        duration_seconds INTEGER NOT NULL CHECK (duration_seconds IN (5, 10, 15)),
+        megapixels REAL NOT NULL CHECK (megapixels IN (0.5, 0.7, 1.0)),
+        generation_mode TEXT NOT NULL,
+        aspect_format TEXT NOT NULL,
+        requested_seed TEXT,
+        model TEXT NOT NULL,
+        lora TEXT NOT NULL,
+        lora_strength REAL NOT NULL,
+        steps INTEGER NOT NULL CHECK (steps BETWEEN 4 AND 30),
+        selected_candidate_index INTEGER CHECK (selected_candidate_index BETWEEN 1 AND 4),
+        seed_mode TEXT NOT NULL DEFAULT 'random' CHECK (seed_mode IN ('random', 'base', 'fixed')),
+        media_state TEXT NOT NULL DEFAULT '[]',
+        reference_roles TEXT NOT NULL DEFAULT 'AUTO',
+        keyframe_positions TEXT NOT NULL DEFAULT 'AUTO',
+        source_video_audio TEXT NOT NULL DEFAULT 'AUTO'
+          CHECK (source_video_audio IN ('AUTO', 'IGNORE', 'REFERENCE', 'REUSE')),
+        project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+        source_job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+        mute_diegetic INTEGER NOT NULL DEFAULT 0 CHECK (mute_diegetic IN (0, 1)),
+        mute_non_diegetic INTEGER NOT NULL DEFAULT 0 CHECK (mute_non_diegetic IN (0, 1)),
+        quality_mode TEXT NOT NULL DEFAULT 'fast'
+          CHECK (quality_mode IN ('fast', 'min', 'med', 'max')),
+        turbo_enabled INTEGER NOT NULL DEFAULT 1 CHECK (turbo_enabled IN (0, 1)),
+        engine_profile TEXT NOT NULL DEFAULT 'standard'
+          CHECK (engine_profile IN ('standard', 'fast')),
+        pdd_file TEXT
+      ) STRICT`);
+      this.database.exec(`INSERT INTO jobs_duration_upgrade(
+        id, status, created_at, updated_at, prompt, candidate_count,
+        duration_seconds, megapixels, generation_mode, aspect_format,
+        requested_seed, model, lora, lora_strength, steps,
+        selected_candidate_index, seed_mode, media_state, reference_roles,
+        keyframe_positions, source_video_audio, project_id, source_job_id,
+        mute_diegetic, mute_non_diegetic, quality_mode, turbo_enabled,
+        engine_profile, pdd_file
+      ) SELECT
+        id, status, created_at, updated_at, prompt, candidate_count,
+        duration_seconds, megapixels, generation_mode, aspect_format,
+        requested_seed, model, lora, lora_strength, steps,
+        selected_candidate_index, seed_mode, media_state, reference_roles,
+        keyframe_positions, source_video_audio, project_id, source_job_id,
+        mute_diegetic, mute_non_diegetic, quality_mode, turbo_enabled,
+        engine_profile, pdd_file
+      FROM jobs`);
+      this.database.exec("DROP TABLE jobs");
+      this.database.exec("ALTER TABLE jobs_duration_upgrade RENAME TO jobs");
+      for (const statement of indexStatements) this.database.exec(statement);
+      this.database.exec("COMMIT");
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    } finally {
+      this.database.exec("PRAGMA foreign_keys = ON");
+    }
+    const violations = this.database.prepare("PRAGMA foreign_key_check").all();
+    if (violations.length) {
+      throw new Error("Migrazione durata 15s completata con riferimenti SQLite non validi");
+    }
   }
 
   createPrepared(prepared: PreparedJob, settings: ResolvedEngineSettings) {

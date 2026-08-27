@@ -16,6 +16,7 @@ import { JobRepository } from "./job-repository.js";
 import { ProjectRepository } from "./project-repository.js";
 import { TimelineExportService } from "./timeline-export.js";
 import { CreativeLibraryRepository } from "./creative-library-repository.js";
+import { ExternalMediaRepository } from "./external-media-repository.js";
 import { KreaAssetService } from "./krea-asset-service.js";
 import { CandidateVariantRepository } from "./candidate-variant-repository.js";
 import { PostprocessService } from "./postprocess-service.js";
@@ -97,6 +98,7 @@ const jobRepository = new JobRepository(config.dataDir);
 const adminAuth = new AdminAuthService(jobRepository.databasePath);
 const projectRepository = new ProjectRepository(jobRepository.databasePath);
 const creativeLibrary = new CreativeLibraryRepository(jobRepository.databasePath);
+const externalMedia = new ExternalMediaRepository(jobRepository.databasePath);
 const imageJobRepository = new ImageJobRepository(jobRepository.databasePath);
 const variantRepository = new CandidateVariantRepository(jobRepository.databasePath);
 const kreaAssets = new KreaAssetService(
@@ -310,6 +312,7 @@ app.get("/api/health", async () => {
       variants: variantRepository.count(),
       recoveredVariants,
       recoveredImages,
+      externalMedia: externalMedia.count(),
     },
     checkedAt: new Date().toISOString(),
   };
@@ -317,7 +320,25 @@ app.get("/api/health", async () => {
 
 app.get("/api/workflow/status", async () => workflowStore.status());
 
-app.post("/api/assets/upload", async (request, reply) => {
+app.get("/api/external-media", async () => ({
+  ok: true,
+  assets: externalMedia.list(),
+}));
+
+app.post<{ Params: { mediaId: string } }>(
+  "/api/external-media/:mediaId/delete",
+  async (request, reply) => {
+    try {
+      externalMedia.delete(request.params.mediaId);
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Rimozione media esterno fallita";
+      return reply.status(400).send({ ok: false, error: message });
+    }
+  },
+);
+
+app.post<{ Querystring: { projectId?: string } }>("/api/assets/upload", async (request, reply) => {
   try {
     const contentType = request.headers["content-type"] ?? "";
     if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
@@ -327,8 +348,31 @@ app.post("/api/assets/upload", async (request, reply) => {
     if (!(body instanceof Buffer) || body.byteLength === 0) {
       return reply.status(400).send({ ok: false, error: "File mancante" });
     }
-    const asset = await comfy.uploadMedia(body, contentType);
-    return reply.status(201).send({ ok: true, asset });
+    const projectId = request.query.projectId?.trim() || null;
+    if (projectId && !projectRepository.get(projectId)) {
+      return reply.status(404).send({ ok: false, error: "Progetto non trovato" });
+    }
+    const uploaded = await comfy.uploadMedia(body, contentType);
+    const external = externalMedia.upsert(uploaded, projectId);
+    return reply.status(201).send({
+      ok: true,
+      asset: {
+        ...uploaded,
+        kind: external.kind,
+        file: external.file,
+        name: external.name,
+        original: external.originalName,
+        size: external.size,
+        duration: external.duration,
+        has_audio: external.hasAudio,
+        width: external.width,
+        height: external.height,
+        mediaPath: external.mediaPath,
+        externalMediaId: external.id,
+        origin: external.origin,
+      },
+      external,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload fallito";
     return reply.status(400).send({ ok: false, error: message });

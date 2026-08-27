@@ -135,6 +135,8 @@ type MediaAsset = {
   mention?: string;
   mediaPath?: string;
   libraryAssetId?: string;
+  externalMediaId?: string;
+  origin?: "external";
   referenceRole?: string;
   duration?: number | null;
   width?: number | null;
@@ -142,6 +144,25 @@ type MediaAsset = {
   has_audio?: boolean;
   audio_mode?: "paired" | "standalone" | "off";
   uid: string;
+};
+
+type ExternalMediaAsset = {
+  id: string;
+  origin: "external";
+  kind: "picture" | "video" | "audio";
+  file: string;
+  name: string;
+  originalName: string;
+  size: number | null;
+  duration: number | null;
+  hasAudio: boolean;
+  width: number | null;
+  height: number | null;
+  originProjectId: string | null;
+  originProjectName: string | null;
+  mediaPath: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type ImageProjectTag = "untagged" | "character" | "object" | "background";
@@ -1422,7 +1443,10 @@ function MontagesPanel({
     try {
       const body = new FormData();
       body.append("file", file, file.name);
-      const response = await fetch(`${bridgeUrl}/api/assets/upload`, { method: "POST", body });
+      const query = projectId
+        ? `?${new URLSearchParams({ projectId }).toString()}`
+        : "";
+      const response = await fetch(`${bridgeUrl}/api/assets/upload${query}`, { method: "POST", body });
       const payload = (await response.json()) as { asset?: { kind: string; file: string; name: string }; error?: string };
       if (!response.ok || !payload.asset || payload.asset.kind !== "audio") throw new Error(payload.error ?? "Seleziona un file audio");
       await saveMixer({ externalAudioFile: payload.asset.file, externalAudioName: payload.asset.name });
@@ -1709,11 +1733,13 @@ function MontagesPanel({
 function MediaLibraryPanel({
   onUseReferences,
   onUseVideo,
+  onUseExternal,
   onOpenMontage,
   onVideoDeleted,
 }: {
   onUseReferences: (asset: CreativeAsset, references: CreativeReference[]) => void;
   onUseVideo: (job: RemoteJob, candidate: RemoteJob["candidates"][number]) => void;
+  onUseExternal: (asset: ExternalMediaAsset) => void;
   onOpenMontage: (projectId: string, timelineId: string) => void;
   onVideoDeleted: (
     jobId: string,
@@ -1723,6 +1749,7 @@ function MediaLibraryPanel({
 }) {
   const [assets, setAssets] = useState<CreativeAsset[]>([]);
   const [jobs, setJobs] = useState<RemoteJob[]>([]);
+  const [externalAssets, setExternalAssets] = useState<ExternalMediaAsset[]>([]);
   const [montages, setMontages] = useState<TimelineDetail[]>([]);
   const [message, setMessage] = useState("Caricamento libreria media…");
   const [deletingVideo, setDeletingVideo] = useState<string | null>(null);
@@ -1731,14 +1758,16 @@ function MediaLibraryPanel({
     let disposed = false;
     const load = async () => {
       try {
-        const [assetResponse, jobResponse, projectResponse] = await Promise.all([
+        const [assetResponse, jobResponse, projectResponse, externalResponse] = await Promise.all([
           fetch(`${bridgeUrl}/api/library`, { cache: "no-store" }),
           fetch(`${bridgeUrl}/api/jobs?limit=40`, { cache: "no-store" }),
           fetch(`${bridgeUrl}/api/projects`, { cache: "no-store" }),
+          fetch(`${bridgeUrl}/api/external-media`, { cache: "no-store" }),
         ]);
         const assetPayload = (await assetResponse.json()) as { assets?: CreativeAsset[] };
         const jobPayload = (await jobResponse.json()) as { jobs?: RemoteJob[] };
         const projectPayload = (await projectResponse.json()) as { projects?: ProjectSummary[] };
+        const externalPayload = (await externalResponse.json()) as { assets?: ExternalMediaAsset[] };
         const timelineLists = await Promise.all((projectPayload.projects ?? []).map(async (project) => {
           const response = await fetch(`${bridgeUrl}/api/projects/${project.id}/timelines`, { cache: "no-store" });
           const payload = (await response.json()) as { timelines?: ProjectTimelineSummary[] };
@@ -1752,6 +1781,7 @@ function MediaLibraryPanel({
         if (disposed) return;
         setAssets(assetPayload.assets ?? []);
         setJobs(jobPayload.jobs ?? []);
+        setExternalAssets(externalPayload.assets ?? []);
         setMontages(timelineDetails.filter((item): item is TimelineDetail => Boolean(item)));
         setMessage("Asset pronti: scegli cosa riutilizzare senza nuovi upload");
       } catch (error) {
@@ -1809,6 +1839,23 @@ function MediaLibraryPanel({
     }
   }
 
+  async function deleteExternalMedia(asset: ExternalMediaAsset) {
+    if (!window.confirm(
+      `Rimuovere “${asset.originalName}” dalla Libreria? Il file già copiato in ComfyUI non verrà cancellato.`,
+    )) return;
+    try {
+      const response = await fetch(`${bridgeUrl}/api/external-media/${asset.id}/delete`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      setExternalAssets((current) => current.filter((item) => item.id !== asset.id));
+      setMessage(`“${asset.originalName}” rimossa dalla Libreria`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Rimozione media esterno fallita");
+    }
+  }
+
   const videos = jobs.flatMap((job) =>
     job.candidates.filter((candidate) => candidate.output).map((candidate) => ({ job, candidate })),
   );
@@ -1846,6 +1893,43 @@ function MediaLibraryPanel({
             </article>
           ))}
           {!assets.length && <div className="media-library-empty">Nessun personaggio o oggetto</div>}
+        </div>
+      </section>
+
+      <section className="media-library-section">
+        <div><h3>Esterni</h3><span>{externalAssets.length} media</span></div>
+        <div className="media-library-grid">
+          {externalAssets.map((asset) => (
+            <article key={asset.id}>
+              <div className="media-library-preview">
+                {asset.kind === "picture" ? (
+                  <img alt="" src={`${bridgeUrl}${asset.mediaPath}`} />
+                ) : asset.kind === "video" ? (
+                  <video muted playsInline preload="metadata" src={`${bridgeUrl}${asset.mediaPath}`} />
+                ) : (
+                  <span>♪</span>
+                )}
+                <button
+                  aria-label={`Rimuovi ${asset.originalName} dalla Libreria`}
+                  className="video-trash-button"
+                  onClick={() => void deleteExternalMedia(asset)}
+                  title="Rimuovi dalla Libreria senza cancellare il file ComfyUI"
+                  type="button"
+                >
+                  🗑
+                </button>
+              </div>
+              <div>
+                <strong>{asset.originalName}</strong>
+                <small>Esterno · {asset.originProjectName ?? "Condiviso"}</small>
+              </div>
+              <button onClick={() => onUseExternal(asset)} type="button">
+                Manda a Studio
+                <span>Allegato {asset.kind === "picture" ? "immagine" : asset.kind}</span>
+              </button>
+            </article>
+          ))}
+          {!externalAssets.length && <div className="media-library-empty">Nessun media esterno caricato</div>}
         </div>
       </section>
 
@@ -3634,6 +3718,7 @@ function StudioApp() {
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [mediaPickerBusy, setMediaPickerBusy] = useState(false);
   const [mediaLibraryAssets, setMediaLibraryAssets] = useState<CreativeAsset[]>([]);
+  const [mediaExternalAssets, setMediaExternalAssets] = useState<ExternalMediaAsset[]>([]);
   const [mediaRecentJobs, setMediaRecentJobs] = useState<RemoteJob[]>([]);
   const [mediaProjectImageJobs, setMediaProjectImageJobs] = useState<ImagePickerJob[]>([]);
   const [mediaReusableImageJobs, setMediaReusableImageJobs] = useState<ImagePickerJob[]>([]);
@@ -3757,6 +3842,14 @@ function StudioApp() {
       previewPath: asset.hero?.mediaPath,
       asset,
     }));
+    const external = mediaExternalAssets.map((asset) => ({
+      kind: "external" as const,
+      label: mentionBase(asset.originalName),
+      detail: `Esterno · ${asset.originProjectName ?? "condiviso"}`,
+      previewKind: asset.kind,
+      previewPath: asset.mediaPath,
+      asset,
+    }));
     const images = mediaGeneratedImages.map((item) => ({
       kind: "image" as const,
       label: mentionBase(`immagine_${item.job.id.slice(0, 8)}_${item.candidate.index}`),
@@ -3778,10 +3871,10 @@ function StudioApp() {
           candidate,
         })),
     );
-    return [...loaded, ...images, ...library, ...videos]
+    return [...loaded, ...external, ...images, ...library, ...videos]
       .filter((item) => !query || `${item.label} ${item.detail}`.toLowerCase().includes(query))
       .slice(0, 12);
-  }, [mediaAssets, mediaGeneratedImages, mediaLibraryAssets, mediaRecentJobs, mentionState?.query]);
+  }, [mediaAssets, mediaExternalAssets, mediaGeneratedImages, mediaLibraryAssets, mediaRecentJobs, mentionState?.query]);
   const modeConfig = modes.find((item) => item.value === mode) ?? modes[0];
   const effectiveSteps =
     qualityMode === "fast"
@@ -4330,13 +4423,20 @@ function StudioApp() {
       const projectImageQuery = new URLSearchParams({ limit: "200" });
       if (studioProjectId) projectImageQuery.set("projectId", studioProjectId);
       const reusableImageQuery = new URLSearchParams({ limit: "200" });
-      const [libraryResponse, jobsResponse, projectImagesResponse, reusableImagesResponse] = await Promise.all([
+      const [
+        libraryResponse,
+        jobsResponse,
+        projectImagesResponse,
+        reusableImagesResponse,
+        externalResponse,
+      ] = await Promise.all([
         fetch(`${bridgeUrl}/api/library`, { cache: "no-store" }),
         fetch(`${bridgeUrl}/api/jobs?limit=200`, { cache: "no-store" }),
         studioProjectId
           ? fetch(`${bridgeUrl}/api/image-jobs?${projectImageQuery.toString()}`, { cache: "no-store" })
           : Promise.resolve(null),
         fetch(`${bridgeUrl}/api/image-jobs?${reusableImageQuery.toString()}`, { cache: "no-store" }),
+        fetch(`${bridgeUrl}/api/external-media`, { cache: "no-store" }),
       ]);
       const libraryPayload = (await libraryResponse.json()) as { assets?: CreativeAsset[] };
       const jobsPayload = (await jobsResponse.json()) as { jobs?: RemoteJob[] };
@@ -4344,6 +4444,7 @@ function StudioApp() {
         ? ((await projectImagesResponse.json()) as { jobs?: ImagePickerJob[] })
         : { jobs: [] as ImagePickerJob[] };
       const reusableImagesPayload = (await reusableImagesResponse.json()) as { jobs?: ImagePickerJob[] };
+      const externalPayload = (await externalResponse.json()) as { assets?: ExternalMediaAsset[] };
       if (
         loadGeneration !== mediaPickerLoadGenerationRef.current ||
         requestedProjectId !== studioProjectIdRef.current
@@ -4352,6 +4453,7 @@ function StudioApp() {
       if (jobsResponse.ok) setMediaRecentJobs(jobsPayload.jobs ?? []);
       if (projectImagesResponse?.ok) setMediaProjectImageJobs(projectImagesPayload.jobs ?? []);
       if (reusableImagesResponse.ok) setMediaReusableImageJobs(reusableImagesPayload.jobs ?? []);
+      if (externalResponse.ok) setMediaExternalAssets(externalPayload.assets ?? []);
     } catch (error) {
       if (loadGeneration === mediaPickerLoadGenerationRef.current) {
         setRunMessage(error instanceof Error ? error.message : "Libreria media non disponibile");
@@ -4517,6 +4619,53 @@ function StudioApp() {
     setRunMessage("Video della libreria inviato allo Studio come allegato");
   }
 
+  function addExternalMedia(asset: ExternalMediaAsset) {
+    const existing = mediaAssets.find(
+      (item) => item.externalMediaId === asset.id || item.file === asset.file,
+    );
+    if (existing) {
+      if (existing.mention) insertPromptMention(existing.mention);
+      setMediaPickerOpen(false);
+      setActiveView("studio");
+      setRunMessage(`“${asset.originalName}” è già collegato allo Studio`);
+      return;
+    }
+    if (mediaAssets.length >= 18) {
+      setRunMessage("Puoi collegare al massimo 18 media");
+      return;
+    }
+    const mention = uniqueMention(asset.originalName, mediaAssets);
+    setMediaAssets((current) => [
+      ...current,
+      {
+        kind: asset.kind,
+        file: asset.file,
+        name: asset.name,
+        caption: asset.originalName.replace(/\.[^.]+$/, ""),
+        mention,
+        mediaPath: asset.mediaPath,
+        externalMediaId: asset.id,
+        origin: "external" as const,
+        duration: asset.duration,
+        width: asset.width,
+        height: asset.height,
+        has_audio: asset.hasAudio,
+        audio_mode:
+          asset.kind === "video"
+            ? "paired" as const
+            : asset.kind === "audio"
+              ? "standalone" as const
+              : "off" as const,
+        uid: crypto.randomUUID(),
+      },
+    ].slice(0, 18));
+    if (mode === "t2v") setMode("reference");
+    insertPromptMention(mention);
+    setMediaPickerOpen(false);
+    setActiveView("studio");
+    setRunMessage(`Media esterno “${asset.originalName}” collegato senza nuovo upload`);
+  }
+
   async function uploadAssetFiles(files: FileList | null) {
     if (!files?.length) return;
     setUploadingAssets(true);
@@ -4525,12 +4674,16 @@ function StudioApp() {
       for (const file of Array.from(files)) {
         const body = new FormData();
         body.append("file", file, file.name);
-        const response = await fetch(`${bridgeUrl}/api/assets/upload`, {
+        const query = studioProjectId
+          ? `?${new URLSearchParams({ projectId: studioProjectId }).toString()}`
+          : "";
+        const response = await fetch(`${bridgeUrl}/api/assets/upload${query}`, {
           method: "POST",
           body,
         });
         const payload = (await response.json()) as {
           asset?: Omit<MediaAsset, "uid" | "audio_mode">;
+          external?: ExternalMediaAsset;
           error?: string;
         };
         if (!response.ok || !payload.asset) {
@@ -4541,6 +4694,12 @@ function StudioApp() {
           audio_mode: payload.asset.kind === "video" ? "paired" : "off",
           uid: crypto.randomUUID(),
         });
+        if (payload.external) {
+          setMediaExternalAssets((current) => [
+            payload.external!,
+            ...current.filter((item) => item.id !== payload.external!.id),
+          ]);
+        }
       }
       setMediaAssets((current) => {
         const next = [...current];
@@ -4553,7 +4712,7 @@ function StudioApp() {
         }
         return next.slice(0, 18);
       });
-      setRunMessage(`${uploaded.length} asset caricati in ComfyUI`);
+      setRunMessage(`${uploaded.length} asset caricati e salvati in Libreria come Esterni`);
     } catch (error) {
       setRunMessage(error instanceof Error ? error.message : "Upload fallito");
     } finally {
@@ -5067,6 +5226,7 @@ function StudioApp() {
             />
           ) : activeView === "library" ? (
             <MediaLibraryPanel
+              onUseExternal={addExternalMedia}
               onUseReferences={useCreativeReferences}
               onUseVideo={addRecentVideo}
               onVideoDeleted={applyCandidateDeletion}
@@ -5135,7 +5295,7 @@ function StudioApp() {
                 <div className="mention-menu" role="listbox" aria-label="Media disponibili">
                   <div className="mention-menu-head">
                     <strong>Inserisci un riferimento</strong>
-                    <span>Caricati · Immagini · Libreria · Video recenti</span>
+                    <span>Caricati · Esterni · Immagini · Libreria · Video recenti</span>
                   </div>
                   {mediaPickerBusy && !promptMentionOptions.length ? (
                     <span className="mention-empty">Caricamento media…</span>
@@ -5146,6 +5306,7 @@ function StudioApp() {
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => {
                           if (item.kind === "loaded") insertPromptMention(item.label);
+                          else if (item.kind === "external") addExternalMedia(item.asset);
                           else if (item.kind === "image") addGeneratedImage(item);
                           else if (item.kind === "library") void addLibraryAsset(item.asset);
                           else addRecentVideo(item.job, item.candidate);
@@ -5166,7 +5327,7 @@ function StudioApp() {
                           )}
                         </div>
                         <div className="mention-copy"><strong>@{item.label}</strong><small>{item.detail}</small></div>
-                        <i>{item.kind === "loaded" ? "Caricato" : item.kind === "image" ? "Immagine" : item.kind === "library" ? "Libreria" : "Video"}</i>
+                        <i>{item.kind === "loaded" ? "Caricato" : item.kind === "external" ? "Esterno" : item.kind === "image" ? "Immagine" : item.kind === "library" ? "Libreria" : "Video"}</i>
                       </button>
                     ))
                   ) : (
@@ -5498,10 +5659,31 @@ function StudioApp() {
                       <div><strong>Libreria media</strong><span>Aggiungi senza ricaricare file già disponibili</span></div>
                       <button onClick={() => setMediaPickerOpen(false)} type="button">×</button>
                     </div>
-                    {mediaPickerBusy && !mediaLibraryAssets.length && !mediaGeneratedImages.length && !mediaRecentJobs.length ? (
+                    {mediaPickerBusy && !mediaLibraryAssets.length && !mediaExternalAssets.length && !mediaGeneratedImages.length && !mediaRecentJobs.length ? (
                       <span className="media-picker-empty">Caricamento…</span>
                     ) : (
                       <>
+                        <div className="media-picker-section">
+                          <strong>Esterni</strong>
+                          <div className="media-picker-grid external-media">
+                            {mediaExternalAssets.map((asset) => (
+                              <button key={asset.id} onClick={() => addExternalMedia(asset)} type="button">
+                                <div>
+                                  {asset.kind === "picture" ? (
+                                    <img alt="" src={`${bridgeUrl}${asset.mediaPath}`} />
+                                  ) : asset.kind === "video" ? (
+                                    <video muted playsInline preload="metadata" src={`${bridgeUrl}${asset.mediaPath}`} />
+                                  ) : (
+                                    <span>♪</span>
+                                  )}
+                                </div>
+                                <strong>{asset.originalName}</strong>
+                                <small>Esterno · {asset.originProjectName ?? "Condiviso"}</small>
+                              </button>
+                            ))}
+                            {!mediaExternalAssets.length && <span className="media-picker-empty">Nessun media esterno caricato</span>}
+                          </div>
+                        </div>
                         <div className="media-picker-section">
                           <strong>Immagini del progetto</strong>
                           <div className="media-picker-grid generated-images">
