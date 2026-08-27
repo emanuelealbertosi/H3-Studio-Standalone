@@ -409,6 +409,11 @@ function compatibleEngineOptions(
   return options;
 }
 
+function preferredFlux2Encoder(model: string, encoders: string[], fallback: string) {
+  const pattern = /(?:9b|snofs)/i.test(model) ? /qwen.*3.*8b/i : /qwen.*3.*4b/i;
+  return encoders.find((encoder) => pattern.test(encoder)) ?? fallback;
+}
+
 type EngineAdminResponse = {
   workflow: {
     source: string;
@@ -2981,7 +2986,7 @@ function AdminPanel() {
     ? compatibleEngineOptions(
         data.capabilities.models,
         data.settings.imageEdit.model,
-        /flux.*2.*klein|klein.*flux|unstable.*f2k/i,
+        /flux.*2.*klein|klein.*flux|unstable.*f2k|snofs/i,
       )
     : [];
   const kreaTextEncoders = data
@@ -3373,10 +3378,18 @@ function AdminPanel() {
               <div className="admin-form image-edit-engine-form">
                 <label>
                   <span>Modello Flux.2 Klein</span>
-                  <select value={data.settings.imageEdit.model} onChange={(event) => setData({
-                    ...data,
-                    settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, model: event.target.value } },
-                  })}>
+                  <select value={data.settings.imageEdit.model} onChange={(event) => {
+                    const model = event.target.value;
+                    const encoder = preferredFlux2Encoder(
+                      model,
+                      imageEditTextEncoders,
+                      data.settings.imageEdit.encoder,
+                    );
+                    setData({
+                      ...data,
+                      settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, model, encoder } },
+                    });
+                  }}>
                     {imageEditModels.map((model) => <option key={model} value={model}>{model}</option>)}
                   </select>
                 </label>
@@ -3430,7 +3443,7 @@ function AdminPanel() {
                   })} type="checkbox" />
                   <span><strong>Flux KV Cache (sperimentale)</strong><small>Accelera edit multi-reference; disattivabile in caso di incompatibilità</small></span>
                 </label>
-                <p className="image-edit-profile-note">Profilo consigliato: Klein 4B Distilled FP8 · Qwen 3 4B · Flux2 VAE · 4 step / CFG 1. Modelli Base, 9B o community possono richiedere un workflow e parametri diversi.</p>
+                <p className="image-edit-profile-note">Profilo consigliato: Klein 4B usa Qwen 3 4B; Klein 9B e SNOFS usano Qwen 3 8B. Il selettore abbina automaticamente l’encoder · Flux2 VAE · 4 step / CFG 1.</p>
               </div>
             </article>
           </div>

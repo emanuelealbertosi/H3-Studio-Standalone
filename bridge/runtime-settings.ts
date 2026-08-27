@@ -60,7 +60,11 @@ export type ResolvedEngineSettings = H3EngineSettings & {
 };
 
 export function isFlux2KleinModelFilename(value: string) {
-  return /(?:flux.*2.*klein|klein.*flux|unstable.*f2k)/i.test(value);
+  return /(?:flux.*2.*klein|klein.*flux|unstable.*f2k|snofs)/i.test(value);
+}
+
+export function isFlux2Klein9BModelFilename(value: string) {
+  return /(?:9b|snofs)/i.test(value);
 }
 
 export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = Object.freeze({
@@ -214,6 +218,17 @@ function validateSettings(value: unknown): RuntimeSettings {
     );
   }
   if (!imageEditEncoder) throw new Error("Seleziona il text encoder Flux.2 Klein Edit");
+  const expectedEncoderSize = isFlux2Klein9BModelFilename(imageEditModel)
+    ? "8B"
+    : "4B";
+  const encoderPattern = expectedEncoderSize === "8B"
+    ? /qwen.*3.*8b/i
+    : /qwen.*3.*4b/i;
+  if (!encoderPattern.test(imageEditEncoder)) {
+    throw new Error(
+      `Il modello ${imageEditModel} richiede un text encoder Qwen 3 ${expectedEncoderSize}`,
+    );
+  }
   if (!imageEditVae) throw new Error("Seleziona la VAE Flux.2 Klein Edit");
   if (!Number.isFinite(imageEditCfg) || imageEditCfg < 0 || imageEditCfg > 20) {
     throw new Error("Il CFG Flux.2 Klein Edit deve essere compreso fra 0 e 20");

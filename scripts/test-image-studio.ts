@@ -514,11 +514,33 @@ try {
     DEFAULT_RUNTIME_SETTINGS.h3.model,
     "updating Flux Image Edit must not alter the H3 model",
   );
+  const snofsUpdated = await runtime.update({
+    ...updated,
+    imageEdit: {
+      ...updated.imageEdit,
+      model: "snofsSexNudesAndOtherFunStuff_distilledV12Fp8.safetensors",
+      encoder: "qwen3_8b_abliterated_v2-fp8mixed.safetensors",
+    },
+  });
+  assert.equal(
+    snofsUpdated.imageEdit.encoder,
+    "qwen3_8b_abliterated_v2-fp8mixed.safetensors",
+  );
   await assert.rejects(
     runtime.update({
-      ...updated,
+      ...snofsUpdated,
       imageEdit: {
-        ...updated.imageEdit,
+        ...snofsUpdated.imageEdit,
+        encoder: "qwen_3_4b.safetensors",
+      },
+    }),
+    /richiede un text encoder Qwen 3 8B/,
+  );
+  await assert.rejects(
+    runtime.update({
+      ...snofsUpdated,
+      imageEdit: {
+        ...snofsUpdated.imageEdit,
         model: "sulphur2Mxfp8_sulphurMxfp8Distil.safetensors",
       },
     }),
