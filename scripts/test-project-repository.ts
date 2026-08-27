@@ -158,9 +158,15 @@ try {
     assert.equal(reordered?.clips[0].id, moved!.clips[1].id);
     assert.equal(projects.list().length, 2);
 
+    const removed = projects.removeClip(reordered!.clips[0].id);
+    assert.equal(removed?.clips.length, 1);
+    assert.equal(removed?.clips[0].position, 0);
+    assert.equal(removed?.clips[0].id, reordered!.clips[1].id);
+    assert.equal(projects.get(first.id)?.clips.length, 0);
+
     const deleted = jobs.deleteCandidate("test-job", 1);
     assert.equal(deleted.jobDeleted, true);
-    assert.equal(deleted.removedClips, 3);
+    assert.equal(deleted.removedClips, 2);
     assert.deepEqual(
       deleted.files.map((file) => file.filename).sort(),
       [

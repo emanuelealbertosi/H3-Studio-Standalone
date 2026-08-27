@@ -1246,6 +1246,7 @@ function MontagesPanel({
   const [projectJobs, setProjectJobs] = useState<RemoteJob[]>([]);
   const [sourceVersions, setSourceVersions] = useState<Record<string, string>>({});
   const [addingSource, setAddingSource] = useState<string | null>(null);
+  const [removingClipId, setRemovingClipId] = useState<string | null>(null);
   const [loadingSources, setLoadingSources] = useState(false);
   const [newName, setNewName] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1442,6 +1443,33 @@ function MontagesPanel({
     } catch (error) { setMessage(error instanceof Error ? error.message : "Riordino fallito"); }
   }
 
+  async function removeClip(clip: ProjectClip) {
+    if (!window.confirm(
+      `Rimuovere “${clip.label}” da questo montaggio?\n\nIl video originale resterà nel progetto e nella Libreria.`,
+    )) return;
+    setRemovingClipId(clip.id);
+    setPlaying(false);
+    try {
+      const response = await fetch(`${bridgeUrl}/api/project-clips/${clip.id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { timeline?: TimelineDetail; error?: string };
+      if (!response.ok || !payload.timeline) {
+        throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      }
+      setTimeline(payload.timeline);
+      setCurrentIndex(index => Math.min(index, Math.max(0, payload.timeline!.clips.length - 1)));
+      setExportedMediaPath("");
+      if (projectId) await loadTimelines(projectId);
+      setMessage(`“${clip.label}” rimossa dal montaggio · il video originale è ancora in Libreria`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Rimozione clip fallita");
+      if (timelineId) await loadTimeline(timelineId);
+    } finally {
+      setRemovingClipId(null);
+    }
+  }
+
   useEffect(() => {
     void loadProjects().catch(error => setMessage(error instanceof Error ? error.message : "Progetti non disponibili"));
   }, []);
@@ -1588,6 +1616,14 @@ function MontagesPanel({
                 />
               ) : <div className="montage-empty">Aggiungi clip da Progetti</div>}
               {currentClip && <span className="montage-counter">{currentIndex + 1} / {timeline.clips.length}</span>}
+              {currentClip && <button
+                aria-label={`Rimuovi ${currentClip.label} dal montaggio`}
+                className="timeline-player-remove"
+                disabled={removingClipId === currentClip.id}
+                onClick={() => void removeClip(currentClip)}
+                title="Rimuovi soltanto da questo montaggio"
+                type="button"
+              >🗑 <span>Rimuovi dalla timeline</span></button>}
             </div>
             <aside className="audio-mixer">
               <span className="section-index">AUDIO</span>
@@ -1642,6 +1678,13 @@ function MontagesPanel({
                     <button disabled={index === timeline.clips.length - 1} onClick={() => void reorder(clip, index + 1)} type="button">→</button>
                     <button onClick={() => onUseClip(clip, "continue")} type="button">Continua</button>
                     <button onClick={() => onUseClip(clip, "edit")} type="button">Edita</button>
+                    <button
+                      className="remove"
+                      disabled={removingClipId === clip.id}
+                      onClick={() => void removeClip(clip)}
+                      title="Il video originale resterà in Libreria"
+                      type="button"
+                    >🗑 Rimuovi</button>
                   </div>
                 </div>
               </article>

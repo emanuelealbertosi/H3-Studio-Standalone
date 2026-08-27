@@ -920,6 +920,19 @@ app.post<{
   }
 });
 
+app.delete<{ Params: { clipId: string } }>(
+  "/api/project-clips/:clipId",
+  async (request, reply) => {
+    try {
+      const timeline = projectRepository.removeClip(request.params.clipId);
+      return { ok: true, timeline };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Rimozione clip fallita";
+      return reply.status(400).send({ ok: false, error: message });
+    }
+  },
+);
+
 app.post<{
   Params: { clipId: string };
   Body: { trimStart?: number; trimEnd?: number; volume?: number; variantId?: string | null };

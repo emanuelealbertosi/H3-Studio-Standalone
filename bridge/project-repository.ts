@@ -286,6 +286,25 @@ export class ProjectRepository {
     } catch (error) { this.database.exec("ROLLBACK"); throw error; }
     return this.getTimeline(clip.timeline_id);
   }
+  removeClip(clipId: string) {
+    const clip = this.clip(clipId);
+    if (!clip) throw new Error("Clip non trovata");
+    const now = new Date().toISOString();
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      this.database.prepare("DELETE FROM project_clips WHERE id = ?").run(clipId);
+      this.database.prepare(
+        "UPDATE project_clips SET position = position - 1, updated_at = ? WHERE timeline_id = ? AND position > ?",
+      ).run(now, clip.timeline_id, clip.position);
+      this.touchTimeline(clip.timeline_id, now);
+      this.touchProject(clip.project_id, now);
+      this.database.exec("COMMIT");
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    }
+    return this.getTimeline(clip.timeline_id);
+  }
   private resolveTimeline(timelineOrProjectId: string) {
     return this.timelineRow(timelineOrProjectId) ?? this.timelineRow(this.listTimelines(timelineOrProjectId)[0]?.id ?? "");
   }
