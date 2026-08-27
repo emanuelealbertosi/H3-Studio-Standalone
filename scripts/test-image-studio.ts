@@ -17,6 +17,7 @@ import {
   type PreparedImageJob,
 } from "../bridge/image-job-repository.js";
 import {
+  buildAnimaGeneratePrompt,
   buildFlux2KleinEditPrompt,
   buildKreaGeneratePrompt,
 } from "../bridge/image-workflow-builder.js";
@@ -57,6 +58,9 @@ try {
     /const roles:[\s\S]*?value: "background", label: "Sfondo"[\s\S]*?\];/,
   );
   assert.match(imageStudioSource, /IMAGE_COMPOSITION_PRESETS\.map/);
+  assert.match(imageStudioSource, /type ImageMode = "generate" \| "edit" \| "anima"/);
+  assert.match(imageStudioSource, />Anima<\/button>/);
+  assert.match(pageSource, /ANIME IMAGE ENGINE/);
   assert.match(imageStudioSource, /Mantieni proporzioni · Reference 1/);
   assert.match(imageStudioSource, /imageEditKeepAspectDimensions/);
   assert.match(
@@ -177,6 +181,22 @@ try {
   assert.equal(normalizedComposition.aspectFormat, CHARACTER_TURNAROUND_FORMAT.aspectFormat);
   assert.equal(normalizedComposition.width, CHARACTER_TURNAROUND_FORMAT.width);
   assert.equal(normalizedComposition.height, CHARACTER_TURNAROUND_FORMAT.height);
+  const normalizedAnima = normalizeImageRequest({
+    projectId: "project-test",
+    mode: "anima",
+    prompt: "A heroine flying above a neon city",
+    compositionPreset: "free",
+    candidateCount: 1,
+    aspectFormat: "16:9",
+    width: 1792,
+    height: 1008,
+    seedMode: "fixed",
+    seed: 7,
+    references: [],
+    tag: "character",
+  });
+  assert.equal(normalizedAnima.mode, "generate");
+  assert.equal(normalizedAnima.imageMode, "anima");
   assert.throws(
     () => normalizeImageRequest({
       ...normalizedComposition,
@@ -209,6 +229,7 @@ try {
     prepareRuntime,
     path.join(process.cwd(), "workflows", "studio-krea2.api.json"),
     path.join(process.cwd(), "workflows", "studio-flux2-klein-edit.api.json"),
+    path.join(process.cwd(), "workflows", "studio-anima.api.json"),
   );
   const preparedComposition = await imageService.prepare({
     projectId: firstProject.id,
@@ -239,6 +260,27 @@ try {
   );
   assert.equal(preparedComposition.candidates[0].apiPrompt["7"].inputs.width, 1792);
   assert.equal(preparedComposition.candidates[0].apiPrompt["7"].inputs.height, 1008);
+
+  const preparedAnima = await imageService.prepare({
+    projectId: firstProject.id,
+    mode: "anima",
+    prompt: "A heroine flying above a neon city",
+    compositionPreset: "free",
+    candidateCount: 1,
+    aspectFormat: "16:9",
+    width: 1792,
+    height: 1008,
+    seedMode: "fixed",
+    seed: 7,
+    references: [],
+    tag: "character",
+  });
+  assert.equal(preparedAnima.mode, "generate");
+  assert.equal(preparedAnima.engine.kind, "anima");
+  assert.equal(preparedAnima.candidates[0].apiPrompt["1"].inputs.unet_name, DEFAULT_RUNTIME_SETTINGS.anima.model);
+  assert.equal(preparedAnima.candidates[0].apiPrompt["2"].inputs.type, "stable_diffusion");
+  assert.equal(preparedAnima.candidates[0].apiPrompt["40"].inputs.steps, 8);
+  assert.equal(preparedAnima.candidates[0].apiPrompt["40"].inputs.cfg, 1);
 
   const storedComposition = images.createPrepared(preparedComposition);
   assert.equal(storedComposition.prompt, userPrompt);
@@ -285,6 +327,22 @@ try {
     kvCacheEnabled: false,
     attentionBackend: "auto" as const,
   };
+  const animaGraph = buildAnimaGeneratePrompt({
+    prompt: "Anime pilot in a bright mechanical hangar",
+    seed: 3,
+    width: 1344,
+    height: 1344,
+    filenamePrefix: "tests/anima",
+    settings: {
+      ...DEFAULT_RUNTIME_SETTINGS.anima,
+      loras: [{ name: "anima-highres-aesthetic-boost.safetensors", strength: 0.8 }],
+    },
+  });
+  assert.equal(animaGraph["1"].inputs.unet_name, "anima_turboV10.safetensors");
+  assert.equal(animaGraph["2"].inputs.clip_name, "anima_baseV10_txt.safetensors");
+  assert.deepEqual(animaGraph["40"].inputs.model, ["20", 0]);
+  assert.equal(animaGraph["20"].inputs.strength_model, 0.8);
+  assert.deepEqual(animaGraph["42"].inputs.images, ["41", 0]);
   const oneReferenceGraph = buildFlux2KleinEditPrompt({
     prompt: "Change the coat to blue",
     seed: 1,
@@ -511,6 +569,7 @@ try {
   const runtime = new RuntimeSettingsStore(temporaryDir);
   const migrated = await runtime.get();
   assert.deepEqual(migrated.imageEdit, DEFAULT_RUNTIME_SETTINGS.imageEdit);
+  assert.deepEqual(migrated.anima, DEFAULT_RUNTIME_SETTINGS.anima);
   const updated = await runtime.update({
     ...oldSettings,
     imageEdit: {
@@ -521,6 +580,7 @@ try {
   });
   assert.equal(updated.imageEdit.kvCacheEnabled, true);
   assert.equal(updated.imageEdit.attentionBackend, "pytorch attention");
+  assert.deepEqual(updated.anima, DEFAULT_RUNTIME_SETTINGS.anima);
   assert.equal(
     updated.h3.model,
     DEFAULT_RUNTIME_SETTINGS.h3.model,

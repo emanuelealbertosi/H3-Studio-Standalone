@@ -12,7 +12,7 @@ import {
 } from "../lib/image-composition";
 
 type SeedMode = "random" | "base" | "fixed";
-type ImageMode = "generate" | "edit";
+type ImageMode = "generate" | "edit" | "anima";
 type ImageTag = "untagged" | "character" | "object" | "background";
 type ReferenceRole = "base" | "subject" | "style" | "pose" | "background" | "other";
 type ProjectOption = { id: string; name: string };
@@ -126,6 +126,7 @@ type ImageLibraryItem = {
 type ImageStudioStatus = {
   generate: { ready: boolean };
   edit: { ready: boolean };
+  anima: { ready: boolean };
 };
 
 const formats = [
@@ -304,7 +305,9 @@ export default function ImageStudioPanel({
     : Array.from({ length: candidateCount }, (_, index): ImageCandidate => ({ index: index + 1, seed: 0, status: "idle", output: null }));
   const selectedEngineReady = mode === "edit"
     ? engineStatus?.edit.ready === true
-    : engineStatus?.generate.ready === true;
+    : mode === "anima"
+      ? engineStatus?.anima.ready === true
+      : engineStatus?.generate.ready === true;
 
   useEffect(() => {
     if (!libraryOpen) return;
@@ -584,7 +587,7 @@ export default function ImageStudioPanel({
     try {
       const response = await fetch(`${bridgeUrl}/api/image-jobs`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId, mode, prompt: prompt.trim(), effectivePrompt, compositionPreset, candidateCount, aspectFormat: selectedFormat.value, width: selectedFormat.width, height: selectedFormat.height, seedMode, seed: seedMode === "random" ? undefined : numericSeed, references: references.map((reference) => ({ file: reference.file, name: reference.name, width: reference.width, height: reference.height, role: reference.role })), tag }),
+        body: JSON.stringify({ projectId, mode, prompt: prompt.trim(), effectivePrompt, compositionPreset, candidateCount, aspectFormat: selectedFormat.value, width: selectedFormat.width, height: selectedFormat.height, seedMode, seed: seedMode === "random" ? undefined : numericSeed, references: mode === "edit" ? references.map((reference) => ({ file: reference.file, name: reference.name, width: reference.width, height: reference.height, role: reference.role })) : [], tag }),
       });
       const payload = (await response.json()) as { job?: ImageJob; error?: string };
       if (!response.ok || !payload.job) throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
@@ -727,7 +730,7 @@ export default function ImageStudioPanel({
                   type="button"
                 >
                   {preview ? <img alt="" src={mediaUrl(bridgeUrl, preview.mediaPath)} /> : <span>{item.status}</span>}
-                  <i>{item.mode === "edit" ? "EDIT · " : ""}{item.id.slice(0, 8)}</i>
+                  <i>{item.mode === "edit" ? "EDIT · " : item.mode === "anima" ? "ANIMA · " : ""}{item.id.slice(0, 8)}</i>
                 </button>
               );
             })}
@@ -812,9 +815,9 @@ export default function ImageStudioPanel({
         </div>
         <div className="composer-body">
           <label className="prompt-field">
-            <span>{mode === "edit" ? "Descrivi la modifica" : "Descrivi l'immagine"}</span>
-            <textarea ref={promptRef} onChange={(event) => setPrompt(event.target.value)} placeholder={mode === "edit" ? "Mantieni il soggetto e cambia sfondo, luce, abito…" : "Soggetto, ambiente, inquadratura, luce e stile…"} rows={2} value={prompt} />
-            <span className="prompt-hint">{mode === "edit" ? "Le reference vengono inviate a Flux Klein nell'ordine mostrato." : "Genera fino a quattro variazioni nello stesso batch."}</span>
+            <span>{mode === "edit" ? "Descrivi la modifica" : mode === "anima" ? "Descrivi l'illustrazione anime" : "Descrivi l'immagine"}</span>
+            <textarea ref={promptRef} onChange={(event) => setPrompt(event.target.value)} placeholder={mode === "edit" ? "Mantieni il soggetto e cambia sfondo, luce, abito…" : mode === "anima" ? "Personaggio, posa, abiti, ambiente, inquadratura, luce e stile anime…" : "Soggetto, ambiente, inquadratura, luce e stile…"} rows={2} value={prompt} />
+            <span className="prompt-hint">{mode === "edit" ? "Le reference vengono inviate a Flux Klein nell'ordine mostrato." : mode === "anima" ? "Usa il profilo Anima configurato in Admin e genera fino a quattro variazioni." : "Genera fino a quattro variazioni nello stesso batch."}</span>
           </label>
 
           <fieldset className="image-composition-presets">
@@ -868,7 +871,7 @@ export default function ImageStudioPanel({
           </details>
 
           <div className="image-control-grid">
-            <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => { setMode("generate"); if (format === IMAGE_EDIT_KEEP_ASPECT_FORMAT) setFormat("1:1"); }} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => { setMode("edit"); if (!references.length) void openImageLibrary(); }} type="button">Edit</button></div></fieldset>
+            <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => { setMode("generate"); if (format === IMAGE_EDIT_KEEP_ASPECT_FORMAT) setFormat("1:1"); }} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => { setMode("edit"); if (!references.length) void openImageLibrary(); }} type="button">Edit</button><button className={mode === "anima" ? "selected" : ""} onClick={() => { setMode("anima"); if (format === IMAGE_EDIT_KEEP_ASPECT_FORMAT) setFormat("1:1"); }} type="button">Anima</button></div></fieldset>
             <label className="select-control">
               <span>Formato</span>
               <select
@@ -956,8 +959,8 @@ export default function ImageStudioPanel({
           <div className={selectedEngineReady ? "image-engine-state ready" : "image-engine-state blocked"}>
             {selectedEngineReady ? "Motore immagini pronto" : engineStatusError ?? "Dipendenze motore mancanti"}
           </div>
-          <div className="preset-note"><span className="fast-badge">{mode === "edit" ? "FLUX KLEIN EDIT" : "IMAGE"}</span>{keepAspectUnavailable ? "Reference 1 senza dimensioni" : `${selectedFormat.width} × ${selectedFormat.height} · ${(selectedFormat.width * selectedFormat.height / 1_000_000).toFixed(1)} MP`} · {selectedComposition.shortLabel}</div>
-          <div className="generation-cta"><div><span>Output</span><strong>{candidateCount} immagin{candidateCount === 1 ? "e" : "i"} · {tag === "untagged" ? "senza tag" : tags.find((item) => item.value === tag)?.label}</strong></div><button disabled={busy === "run" || active(job) || !projectId || !selectedEngineReady || turnaroundFormatMismatch || keepAspectUnavailable} onClick={() => void run()} type="button">{busy === "run" || active(job) ? "Generazione in corso" : turnaroundFormatMismatch ? "Formato 16:9 richiesto" : keepAspectUnavailable ? "Dimensioni reference mancanti" : !selectedEngineReady ? "Motore non pronto" : mode === "edit" ? "Crea " + candidateCount + " edit" : "Genera " + candidateCount + " immagini"}</button></div>
+          <div className="preset-note"><span className="fast-badge">{mode === "edit" ? "FLUX KLEIN EDIT" : mode === "anima" ? "ANIMA" : "IMAGE"}</span>{keepAspectUnavailable ? "Reference 1 senza dimensioni" : `${selectedFormat.width} × ${selectedFormat.height} · ${(selectedFormat.width * selectedFormat.height / 1_000_000).toFixed(1)} MP`} · {selectedComposition.shortLabel}</div>
+          <div className="generation-cta"><div><span>Output</span><strong>{candidateCount} immagin{candidateCount === 1 ? "e" : "i"} · {tag === "untagged" ? "senza tag" : tags.find((item) => item.value === tag)?.label}</strong></div><button disabled={busy === "run" || active(job) || !projectId || !selectedEngineReady || turnaroundFormatMismatch || keepAspectUnavailable} onClick={() => void run()} type="button">{busy === "run" || active(job) ? "Generazione in corso" : turnaroundFormatMismatch ? "Formato 16:9 richiesto" : keepAspectUnavailable ? "Dimensioni reference mancanti" : !selectedEngineReady ? "Motore non pronto" : mode === "edit" ? "Crea " + candidateCount + " edit" : mode === "anima" ? "Genera " + candidateCount + " anime" : "Genera " + candidateCount + " immagini"}</button></div>
         </div>
         {message && <div className="run-message">{message}</div>}
       </section>

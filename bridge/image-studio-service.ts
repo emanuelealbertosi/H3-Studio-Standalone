@@ -22,6 +22,7 @@ import {
 } from "./image-job-repository.js";
 import {
   assertImageDimensions,
+  buildAnimaGeneratePrompt,
   buildFlux2KleinEditPrompt,
   buildKreaGeneratePrompt,
   IMAGE_API_MAX_PIXELS,
@@ -115,7 +116,14 @@ export function normalizeImageRequest(value: unknown) {
   if (!isRecord(value)) throw new Error("Body immagine mancante");
   const projectId = typeof value.projectId === "string" ? value.projectId.trim() : "";
   if (!projectId) throw new Error("Seleziona un progetto");
-  const mode: ImageJobMode = value.mode === "edit" ? "edit" : "generate";
+  const imageMode = value.mode === "edit"
+    ? "edit"
+    : value.mode === "anima"
+      ? "anima"
+      : "generate";
+  // The persisted DB mode remains backward compatible; the engine snapshot
+  // distinguishes Anima jobs from ordinary Krea generations.
+  const mode: ImageJobMode = imageMode === "edit" ? "edit" : "generate";
   const prompt = typeof value.prompt === "string" ? value.prompt.trim() : "";
   if (prompt.length < 3 || prompt.length > 20_000) {
     throw new Error("Il prompt immagine deve contenere da 3 a 20.000 caratteri");
@@ -182,10 +190,10 @@ export function normalizeImageRequest(value: unknown) {
   if (rawReferences.length > IMAGE_EDIT_MAX_REFERENCES) {
     throw new Error("Flux.2 Klein Edit supporta al massimo 4 reference");
   }
-  if (mode === "edit" && rawReferences.length === 0) {
+  if (imageMode === "edit" && rawReferences.length === 0) {
     throw new Error("La modalità Edit richiede almeno una reference");
   }
-  if (mode === "generate" && rawReferences.length > 0) {
+  if (imageMode !== "edit" && rawReferences.length > 0) {
     throw new Error("Le reference si usano in modalità Edit");
   }
   const references = rawReferences.map(normalizeReference);
@@ -196,6 +204,7 @@ export function normalizeImageRequest(value: unknown) {
   return {
     projectId,
     mode,
+    imageMode,
     prompt,
     effectivePrompt,
     compositionPreset,
@@ -279,6 +288,7 @@ export class ImageStudioService {
     private readonly runtimeSettings: RuntimeSettingsStore,
     private readonly generateWorkflowPath: string,
     private readonly editWorkflowPath: string,
+    private readonly animaWorkflowPath: string,
     private readonly progressTracker?: ComfyProgressTracker,
   ) {}
 
@@ -287,13 +297,17 @@ export class ImageStudioService {
     const [settings, workflowTemplate] = await Promise.all([
       this.runtimeSettings.get(),
       readWorkflowTemplate(
-        request.mode === "edit" ? this.editWorkflowPath : this.generateWorkflowPath,
+        request.imageMode === "edit"
+          ? this.editWorkflowPath
+          : request.imageMode === "anima"
+            ? this.animaWorkflowPath
+            : this.generateWorkflowPath,
       ),
     ]);
     const id = randomUUID();
     const baseSeed = request.requestedSeed ?? randomSeed();
     const usedRandomSeeds = new Set<number>();
-    const engine = request.mode === "edit"
+    const engine = request.imageMode === "edit"
       ? {
           kind: "flux2-klein-edit" as const,
           model: settings.imageEdit.model,
@@ -308,7 +322,21 @@ export class ImageStudioService {
           compositionPreset: request.compositionPreset,
           effectivePrompt: request.effectivePrompt,
         }
-      : {
+      : request.imageMode === "anima"
+        ? {
+            kind: "anima" as const,
+            model: settings.anima.model,
+            encoder: settings.anima.encoder,
+            vae: settings.anima.vae,
+            steps: settings.anima.steps,
+            cfg: settings.anima.cfg,
+            sampler: "euler",
+            scheduler: "simple",
+            compositionPreset: request.compositionPreset,
+            effectivePrompt: request.effectivePrompt,
+            loras: settings.anima.loras,
+          }
+        : {
           kind: "krea" as const,
           model: settings.krea.model,
           encoder: settings.krea.encoder,
@@ -332,8 +360,8 @@ export class ImageStudioService {
         usedRandomSeeds.add(seed);
       }
       const filenamePrefix =
-        `images/H3_STUDIO/projects/${request.projectId}/${request.mode}_${id.slice(0, 8)}_c${index}`;
-      const apiPrompt = request.mode === "edit"
+        `images/H3_STUDIO/projects/${request.projectId}/${request.imageMode}_${id.slice(0, 8)}_c${index}`;
+      const apiPrompt = request.imageMode === "edit"
         ? buildFlux2KleinEditPrompt({
             prompt: request.effectivePrompt,
             seed,
@@ -344,7 +372,17 @@ export class ImageStudioService {
             references: request.references,
             template: workflowTemplate,
           })
-        : buildKreaGeneratePrompt({
+        : request.imageMode === "anima"
+          ? buildAnimaGeneratePrompt({
+              prompt: request.effectivePrompt,
+              seed,
+              width: request.width,
+              height: request.height,
+              filenamePrefix,
+              settings: settings.anima,
+              template: workflowTemplate,
+            })
+          : buildKreaGeneratePrompt({
             prompt: request.effectivePrompt,
             seed,
             width: request.width,
@@ -575,6 +613,10 @@ export class ImageStudioService {
         ...settings.imageEdit,
         maxReferences: IMAGE_EDIT_MAX_REFERENCES,
       },
+      anima: {
+        kind: "anima",
+        ...settings.anima,
+      },
       limits: {
         uiTargetMaxPixels: IMAGE_UI_TARGET_MAX_PIXELS,
         apiMaxPixels: IMAGE_API_MAX_PIXELS,
@@ -597,12 +639,14 @@ export class ImageStudioService {
       "VAELoader",
       "CLIPTextEncode",
       "ConditioningZeroOut",
+      "EmptyLatentImage",
       "EmptyFlux2LatentImage",
       "RandomNoise",
       "CFGGuider",
       "KSamplerSelect",
       "Flux2Scheduler",
       "SamplerCustomAdvanced",
+      "KSampler",
       "VAEDecode",
       "SaveImage",
       "LoadImage",
@@ -646,6 +690,33 @@ export class ImageStudioService {
       vae: vaes.includes(settings.krea.vae),
       loras: settings.krea.loras.every((slot) => loras.includes(slot.name)),
     };
+    const animaCoreClasses = [
+      "UNETLoader",
+      "CLIPLoader",
+      "VAELoader",
+      "CLIPTextEncode",
+      "EmptyLatentImage",
+      "KSampler",
+      "VAEDecode",
+      "SaveImage",
+    ];
+    const animaNodeChecks = Object.fromEntries(
+      animaCoreClasses.map((className) => [
+        className,
+        objectInfoContains(
+          nodeInfo[classNames.indexOf(className)],
+          className,
+        ),
+      ]),
+    );
+    const animaChecks = {
+      workflow: existsSync(this.animaWorkflowPath),
+      model: models.includes(settings.anima.model),
+      encoder: encoders.includes(settings.anima.encoder),
+      vae: vaes.includes(settings.anima.vae),
+      loras: settings.anima.loras.every((slot) => loras.includes(slot.name)),
+      nodes: Object.values(animaNodeChecks).every(Boolean),
+    };
     const editChecks = {
       workflow: existsSync(this.editWorkflowPath),
       model: models.includes(settings.imageEdit.model),
@@ -660,7 +731,8 @@ export class ImageStudioService {
     };
     return {
       ready: Object.values(generateChecks).every(Boolean) &&
-        Object.values(editChecks).every(Boolean),
+        Object.values(editChecks).every(Boolean) &&
+        Object.values(animaChecks).every(Boolean),
       generate: {
         ready: Object.values(generateChecks).every(Boolean),
         checks: generateChecks,
@@ -682,6 +754,12 @@ export class ImageStudioService {
         workflow: this.editWorkflowPath,
         referenceLimit: IMAGE_EDIT_MAX_REFERENCES,
       },
+      anima: {
+        ready: Object.values(animaChecks).every(Boolean),
+        checks: { ...animaChecks, nodeClasses: animaNodeChecks },
+        engine: settings.anima,
+        workflow: this.animaWorkflowPath,
+      },
       capabilities: {
         models: [...new Set(models)].sort(),
         textEncoders: [...new Set(encoders)].sort(),
@@ -698,6 +776,7 @@ export class ImageStudioService {
   private present(job: NonNullable<ReturnType<ImageJobRepository["get"]>>) {
     return {
       ...job,
+      mode: job.engine.kind === "anima" ? "anima" : job.mode,
       candidates: job.candidates.map((candidate) => {
         const progress = candidate.promptId
           ? this.progressTracker?.get(candidate.promptId)

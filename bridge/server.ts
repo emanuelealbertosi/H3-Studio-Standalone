@@ -47,6 +47,7 @@ const installSettingsStore = new InstallSettingsStore(config.dataDir, {
   fastWorkflowId: "h3-fast-alibaba-pdd",
   imageWorkflowId: "krea2-character-sheet",
   imageEditWorkflowId: "flux2-klein-edit-core",
+  imageAnimaWorkflowId: "anima-t2i-core",
   ffmpegPath: config.ffmpegPath,
 });
 let installSettings = await installSettingsStore.get();
@@ -113,6 +114,7 @@ const imageStudio = new ImageStudioService(
   runtimeSettings,
   workflowPath(config.workflowOutputDir, installSettings.imageWorkflowId),
   workflowPath(config.workflowOutputDir, installSettings.imageEditWorkflowId),
+  workflowPath(config.workflowOutputDir, installSettings.imageAnimaWorkflowId),
   progressTracker,
 );
 const timelineExport = new TimelineExportService(
@@ -1195,6 +1197,9 @@ async function engineSettingsPayload() {
     imageEditWorkflow: {
       source: workflowPath(config.workflowOutputDir, installSettings.imageEditWorkflowId),
     },
+    animaWorkflow: {
+      source: workflowPath(config.workflowOutputDir, installSettings.imageAnimaWorkflowId),
+    },
     settings,
     defaults: DEFAULT_RUNTIME_SETTINGS,
     capabilities: {
@@ -1324,13 +1329,16 @@ async function saveEngineSettings(
     const currentSettings = await runtimeSettings.get();
     const imageEdit =
       (body as { imageEdit?: unknown }).imageEdit ?? currentSettings.imageEdit;
+    const anima =
+      (body as { anima?: unknown }).anima ?? currentSettings.anima;
     if (
       typeof h3 !== "object" || h3 === null || Array.isArray(h3) ||
       typeof fast !== "object" || fast === null || Array.isArray(fast) ||
       typeof krea !== "object" || krea === null || Array.isArray(krea) ||
-      typeof imageEdit !== "object" || imageEdit === null || Array.isArray(imageEdit)
+      typeof imageEdit !== "object" || imageEdit === null || Array.isArray(imageEdit) ||
+      typeof anima !== "object" || anima === null || Array.isArray(anima)
     ) {
-      return reply.status(400).send({ ok: false, error: "Configurazione H3, FAST o Krea mancante" });
+      return reply.status(400).send({ ok: false, error: "Configurazione H3, FAST, Krea o Anima mancante" });
     }
     const [models, loras, pddFiles, textEncoders, vaes] = await Promise.all([
       comfy.models("diffusion_models"),
@@ -1375,6 +1383,15 @@ async function saveEngineSettings(
     if (!vaes.includes(String((imageEdit as { vae?: unknown }).vae ?? ""))) {
       return reply.status(400).send({ ok: false, error: "VAE Flux.2 Klein Edit non installata" });
     }
+    if (!models.includes(String((anima as { model?: unknown }).model ?? ""))) {
+      return reply.status(400).send({ ok: false, error: "Modello Anima non installato" });
+    }
+    if (!textEncoders.includes(String((anima as { encoder?: unknown }).encoder ?? ""))) {
+      return reply.status(400).send({ ok: false, error: "Text encoder Anima non installato" });
+    }
+    if (!vaes.includes(String((anima as { vae?: unknown }).vae ?? ""))) {
+      return reply.status(400).send({ ok: false, error: "VAE Anima non installata" });
+    }
     const requestedAttention = String(
       (imageEdit as { attentionBackend?: unknown }).attentionBackend ?? "auto",
     );
@@ -1405,12 +1422,13 @@ async function saveEngineSettings(
     const requestedLoras = [
       ...(((h3 as { loras?: unknown }).loras as Array<{ name?: unknown }> | undefined) ?? []),
       ...(((krea as { loras?: unknown }).loras as Array<{ name?: unknown }> | undefined) ?? []),
+      ...(((anima as { loras?: unknown }).loras as Array<{ name?: unknown }> | undefined) ?? []),
     ].map((slot) => String(slot?.name ?? "")).filter(Boolean).concat(fastLoras);
     const missingLora = requestedLoras.find((name) => !loras.includes(name));
     if (missingLora) {
       return reply.status(400).send({ ok: false, error: `LoRA non installato: ${missingLora}` });
     }
-    const settings = await runtimeSettings.update({ ...body, imageEdit });
+    const settings = await runtimeSettings.update({ ...body, imageEdit, anima });
     return { ok: true, settings };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Impostazioni non valide";

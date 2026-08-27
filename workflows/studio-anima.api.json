@@ -1,0 +1,74 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "anima_turboV10.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": { "title": "Anima image model" }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "anima_baseV10_txt.safetensors",
+      "type": "stable_diffusion",
+      "device": "default"
+    },
+    "_meta": { "title": "Anima text encoder" }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "qwen_image_vae.safetensors" },
+    "_meta": { "title": "Anima VAE" }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "A polished anime illustration, expressive character, coherent anatomy, cinematic composition",
+      "clip": ["2", 0]
+    },
+    "_meta": { "title": "Anima prompt" }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "worst quality, low quality, score_1, score_2, score_3, blurry, jpeg artifacts, sepia",
+      "clip": ["2", 0]
+    },
+    "_meta": { "title": "Anima negative prompt" }
+  },
+  "6": {
+    "class_type": "EmptyLatentImage",
+    "inputs": { "width": 1344, "height": 1344, "batch_size": 1 },
+    "_meta": { "title": "Anima canvas" }
+  },
+  "40": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["1", 0],
+      "seed": 1024,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "latent_image": ["6", 0],
+      "denoise": 1
+    },
+    "_meta": { "title": "Anima sampler" }
+  },
+  "41": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["40", 0], "vae": ["3", 0] },
+    "_meta": { "title": "Decode Anima image" }
+  },
+  "42": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["41", 0],
+      "filename_prefix": "images/H3_STUDIO/anima"
+    },
+    "_meta": { "title": "Save Anima image" }
+  }
+}

@@ -67,6 +67,22 @@ video era in modalità T2V, H3 Studio passa automaticamente a Reference. Un
 fallback globale mantiene visibili anche risultati storici privi del vecchio
 legame candidato-progetto.
 
+## Generazione Anima
+
+La terza modalità **Anima**, accanto a Genera ed Edit, usa un workflow
+indipendente basato sui loader core di ComfyUI. Il profilo Admin sceglie
+checkpoint, text encoder, VAE, step, CFG e fino a tre LoRA senza modificare le
+impostazioni H3, Krea o Flux. I preset di composizione e la gestione
+uno-quattro candidati restano gli stessi dello Studio Immagini.
+
+Il default locale è **anima_turboV10.safetensors** con
+**anima_baseV10_txt.safetensors**, **qwen_image_vae.safetensors**,
+Euler/simple, 8 step e CFG 1. Il modello base ufficiale può invece essere
+configurato con 30 step e CFG 4; l'eventuale Turbo LoRA va selezionato
+esplicitamente in Admin. I job Anima sono identificati dallo snapshot del
+motore, mentre il database mantiene la modalità Generate per compatibilità con
+installazioni precedenti.
+
 ## Profilo raccomandato
 
 Il profilo distribuito è **Flux.2 Klein 4B Distilled FP8** con Qwen 3 4B,

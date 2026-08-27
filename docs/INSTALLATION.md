@@ -61,7 +61,7 @@ Il browser mostra un wizard che richiede:
 1. una nuova password Admin di almeno 10 caratteri;
 2. l'URL della ComfyUI, per esempio `http://127.0.0.1:8188`;
 3. la cartella `output` della stessa installazione ComfyUI;
-4. i workflow associati ai ruoli Video, FAST, Krea e Flux Klein Edit;
+4. i workflow associati ai ruoli Video, FAST, Krea, Flux Klein Edit e Anima;
 5. il comando o percorso di FFmpeg.
 
 La password viene derivata con `scrypt`; nel database non viene salvata in
@@ -76,6 +76,7 @@ HTTP-only della durata di 12 ore.
 - `workflows/studio-fast-pdd.api.json`: profilo FAST Alibaba PDD-Acc.
 - `workflows/studio-krea2.api.json`: generazione immagini Krea 2.
 - `workflows/studio-flux2-klein-edit.api.json`: edit Flux.2 Klein 4B Distilled con una-quattro reference.
+- `workflows/studio-anima.api.json`: generazione anime Anima con profilo separato.
 - `workflows/catalog.json`: ruoli e associazioni disponibili.
 - `workflows/dependencies.json`: nodi e modelli richiesti.
 

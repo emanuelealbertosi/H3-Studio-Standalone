@@ -35,7 +35,7 @@ export type ImageJobStatus =
   | "cancelled";
 
 export type ImageEngineSnapshot = {
-  kind: "krea" | "flux2-klein-edit";
+  kind: "krea" | "flux2-klein-edit" | "anima";
   model: string;
   encoder: string;
   vae: string;

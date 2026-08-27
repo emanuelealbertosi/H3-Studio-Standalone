@@ -455,6 +455,7 @@ type EngineAdminResponse = {
   };
   kreaWorkflow: { source: string };
   imageEditWorkflow: { source: string };
+  animaWorkflow: { source: string };
   settings: {
     h3: {
       model: string;
@@ -483,6 +484,14 @@ type EngineAdminResponse = {
       kvCacheEnabled: boolean;
       attentionBackend: "auto" | "pytorch attention" | "comfy kitchen attention";
     };
+    anima: {
+      model: string;
+      encoder: string;
+      vae: string;
+      loras: EngineLoraSlot[];
+      steps: number;
+      cfg: number;
+    };
   };
   capabilities: {
     models: string[];
@@ -496,7 +505,7 @@ type EngineAdminResponse = {
 
 type WorkflowCatalogItem = {
   id: string;
-  role: "video" | "fast" | "image" | "image_edit";
+  role: "video" | "fast" | "image" | "image_edit" | "image_anima";
   name: string;
   description: string;
   file: string;
@@ -509,6 +518,7 @@ type InstallSettings = {
   fastWorkflowId: string;
   imageWorkflowId: string;
   imageEditWorkflowId: string;
+  imageAnimaWorkflowId: string;
   ffmpegPath: string;
 };
 
@@ -2922,7 +2932,7 @@ function SetupWizard({ status }: { status: SetupStatus }) {
 
   const workflowSelect = (role: WorkflowCatalogItem["role"], key: keyof InstallSettings) => (
     <label>
-      <span>Workflow {role === "video" ? "Video" : role === "fast" ? "FAST" : role === "image_edit" ? "Flux Klein Edit" : "Krea"}</span>
+      <span>Workflow {role === "video" ? "Video" : role === "fast" ? "FAST" : role === "image_edit" ? "Flux Klein Edit" : role === "image_anima" ? "Anima" : "Krea"}</span>
       <select
         value={String(settings[key])}
         onChange={(event) => setSettings({ ...settings, [key]: event.target.value })}
@@ -2964,6 +2974,7 @@ function SetupWizard({ status }: { status: SetupStatus }) {
           {workflowSelect("fast", "fastWorkflowId")}
           {workflowSelect("image", "imageWorkflowId")}
           {workflowSelect("image_edit", "imageEditWorkflowId")}
+          {workflowSelect("image_anima", "imageAnimaWorkflowId")}
           <label>
             <span>FFmpeg</span>
             <input onChange={(event) => setSettings({ ...settings, ffmpegPath: event.target.value })} placeholder="ffmpeg oppure percorso completo" value={settings.ffmpegPath} />
@@ -3050,13 +3061,13 @@ function AdminPanel() {
     }
   }
 
-  function loraSlots(engine: "h3" | "fast" | "krea") {
+  function loraSlots(engine: "h3" | "fast" | "krea" | "anima") {
     const current = data?.settings[engine].loras ?? [];
     return Array.from({ length: 3 }, (_, index) => current[index] ?? { name: "", strength: 1 });
   }
 
   function updateLora(
-    engine: "h3" | "fast" | "krea",
+    engine: "h3" | "fast" | "krea" | "anima",
     index: number,
     field: keyof EngineLoraSlot,
     value: string | number,
@@ -3202,6 +3213,13 @@ function AdminPanel() {
         /flux.*2.*klein|klein.*flux|unstable.*f2k|snofs/i,
       )
     : [];
+  const animaModels = data
+    ? compatibleEngineOptions(
+        data.capabilities.models,
+        data.settings.anima.model,
+        /anima/i,
+      )
+    : [];
   const kreaTextEncoders = data
     ? compatibleEngineOptions(
         data.capabilities.textEncoders,
@@ -3216,6 +3234,13 @@ function AdminPanel() {
         /qwen[_-]?3[_-]?(?:4b|8b)|qwen.*(?:4b|8b)/i,
       )
     : [];
+  const animaTextEncoders = data
+    ? compatibleEngineOptions(
+        data.capabilities.textEncoders,
+        data.settings.anima.encoder,
+        /anima|qwen.*(?:06b|0[._-]?6b)/i,
+      )
+    : [];
   const kreaVaes = data
     ? compatibleEngineOptions(
         data.capabilities.vaes,
@@ -3228,6 +3253,13 @@ function AdminPanel() {
         data.capabilities.vaes,
         data.settings.imageEdit.vae,
         /flux.*2.*vae|flux2.*vae/i,
+      )
+    : [];
+  const animaVaes = data
+    ? compatibleEngineOptions(
+        data.capabilities.vaes,
+        data.settings.anima.vae,
+        /qwen.*image.*vae/i,
       )
     : [];
   const selectedFastPair = data
@@ -3303,6 +3335,7 @@ function AdminPanel() {
                   ["fast", "fastWorkflowId", "Workflow FAST"],
                   ["image", "imageWorkflowId", "Workflow Krea"],
                   ["image_edit", "imageEditWorkflowId", "Workflow Flux Klein Edit"],
+                  ["image_anima", "imageAnimaWorkflowId", "Workflow Anima"],
                 ] as const).map(([role, key, label]) => (
                   <label key={key}>
                     <span>{label}</span>
@@ -3574,6 +3607,85 @@ function AdminPanel() {
                       type="number"
                       value={slot.strength}
                       onChange={(event) => updateLora("krea", index, "strength", Number(event.target.value))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="engine-config-card anima-engine-card">
+              <div className="engine-config-heading">
+                <div>
+                  <span>ANIME IMAGE ENGINE</span>
+                  <h3>Anima</h3>
+                </div>
+                <b>{data.settings.anima.loras.filter((slot) => slot.name).length}/3 LoRA</b>
+              </div>
+              <div className="admin-form anima-engine-form">
+                <label>
+                  <span>Modello Anima</span>
+                  <select value={data.settings.anima.model} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, anima: { ...data.settings.anima, model: event.target.value } },
+                  })}>
+                    {animaModels.map((model) => <option key={model} value={model}>{model}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Text encoder</span>
+                  <select value={data.settings.anima.encoder} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, anima: { ...data.settings.anima, encoder: event.target.value } },
+                  })}>
+                    {animaTextEncoders.map((encoder) => <option key={encoder} value={encoder}>{encoder}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>VAE</span>
+                  <select value={data.settings.anima.vae} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, anima: { ...data.settings.anima, vae: event.target.value } },
+                  })}>
+                    {animaVaes.map((vae) => <option key={vae} value={vae}>{vae}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Step Anima</span>
+                  <input min="4" max="40" step="1" type="number" value={data.settings.anima.steps} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, anima: { ...data.settings.anima, steps: Number(event.target.value) } },
+                  })} />
+                </label>
+                <label>
+                  <span>CFG</span>
+                  <input min="0" max="20" step="0.1" type="number" value={data.settings.anima.cfg} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, anima: { ...data.settings.anima, cfg: Number(event.target.value) } },
+                  })} />
+                </label>
+                <p className="image-edit-profile-note">Profilo locale consigliato: anima_turboV10 · 8 step · CFG 1 · Euler/simple. Con il modello base ufficiale puoi usare 30 step / CFG 4 oppure aggiungere il Turbo LoRA dal profilo.</p>
+              </div>
+              <div className="engine-lora-stack">
+                {loraSlots("anima").map((slot, index) => (
+                  <div className="engine-lora-row" key={index}>
+                    <span>{index + 1}</span>
+                    <select
+                      aria-label={`LoRA Anima ${index + 1}`}
+                      value={slot.name}
+                      onChange={(event) => updateLora("anima", index, "name", event.target.value)}
+                    >
+                      <option value="">Nessun LoRA</option>
+                      {data.capabilities.loras.map((lora) => <option key={lora} value={lora}>{lora}</option>)}
+                    </select>
+                    <input
+                      aria-label={`Strength LoRA Anima ${index + 1}`}
+                      disabled={!slot.name}
+                      min="-2"
+                      max="2"
+                      step="0.05"
+                      type="number"
+                      value={slot.strength}
+                      onChange={(event) => updateLora("anima", index, "strength", Number(event.target.value))}
                     />
                   </div>
                 ))}

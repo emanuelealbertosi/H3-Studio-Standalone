@@ -16,6 +16,7 @@ const defaults = {
   fastWorkflowId: "h3-fast-alibaba-pdd",
   imageWorkflowId: "krea2-character-sheet",
   imageEditWorkflowId: "flux2-klein-edit-core",
+  imageAnimaWorkflowId: "anima-t2i-core",
   ffmpegPath: "ffmpeg",
 };
 

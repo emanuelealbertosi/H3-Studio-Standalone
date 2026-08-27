@@ -1,6 +1,7 @@
 import type { ComfyApiNode, ComfyApiPrompt } from "./comfy-client.js";
 import type { ImageJobReferenceInput } from "./image-job-repository.js";
 import type {
+  AnimaEngineSettings,
   ImageEditEngineSettings,
   KreaEngineSettings,
 } from "./runtime-settings.js";
@@ -10,6 +11,8 @@ export const IMAGE_API_MAX_PIXELS = 4_000_000;
 export const IMAGE_UI_TARGET_MAX_PIXELS = 2_000_000;
 const KREA_REBALANCE_WEIGHTS =
   "1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0";
+const ANIMA_NEGATIVE_PROMPT =
+  "worst quality, low quality, score_1, score_2, score_3, blurry, jpeg artifacts, sepia";
 const REFERENCE_ROLE_LABELS: Record<ImageJobReferenceInput["role"], string> = {
   base: "base image",
   subject: "subject",
@@ -153,6 +156,90 @@ export function buildKreaGeneratePrompt(input: {
     "SaveImage",
     { images: ["42", 0], filename_prefix: input.filenamePrefix },
     "Save generated image",
+  );
+  return apiPrompt;
+}
+
+export function buildAnimaGeneratePrompt(input: {
+  prompt: string;
+  seed: number;
+  width: number;
+  height: number;
+  filenamePrefix: string;
+  settings: AnimaEngineSettings;
+  template?: ComfyApiPrompt;
+}): ComfyApiPrompt {
+  assertImageDimensions(input.width, input.height);
+  const apiPrompt: ComfyApiPrompt = cloneTemplate(input.template);
+  // The bundled Anima blueprint is authoritative and deliberately core-only.
+  for (const id of Object.keys(apiPrompt)) delete apiPrompt[id];
+  Object.assign(apiPrompt, {
+    "1": node(
+      "UNETLoader",
+      { unet_name: input.settings.model, weight_dtype: "default" },
+      "Anima image model",
+    ),
+    "2": node(
+      "CLIPLoader",
+      { clip_name: input.settings.encoder, type: "stable_diffusion", device: "default" },
+      "Anima text encoder",
+    ),
+    "3": node("VAELoader", { vae_name: input.settings.vae }, "Anima VAE"),
+    "4": node(
+      "CLIPTextEncode",
+      { text: input.prompt, clip: ["2", 0] },
+      "Anima prompt",
+    ),
+    "5": node(
+      "CLIPTextEncode",
+      { text: ANIMA_NEGATIVE_PROMPT, clip: ["2", 0] },
+      "Anima negative prompt",
+    ),
+    "6": node(
+      "EmptyLatentImage",
+      { width: input.width, height: input.height, batch_size: 1 },
+      "Anima canvas",
+    ),
+  });
+  let modelInput: [string, number] = ["1", 0];
+  input.settings.loras.forEach((lora, index) => {
+    const id = String(20 + index);
+    apiPrompt[id] = node(
+      "LoraLoaderModelOnly",
+      {
+        model: modelInput,
+        lora_name: lora.name,
+        strength_model: lora.strength,
+      },
+      `Anima LoRA ${index + 1}`,
+    );
+    modelInput = [id, 0];
+  });
+  apiPrompt["40"] = node(
+    "KSampler",
+    {
+      model: modelInput,
+      seed: input.seed,
+      steps: input.settings.steps,
+      cfg: input.settings.cfg,
+      sampler_name: "euler",
+      scheduler: "simple",
+      positive: ["4", 0],
+      negative: ["5", 0],
+      latent_image: ["6", 0],
+      denoise: 1,
+    },
+    "Anima sampler",
+  );
+  apiPrompt["41"] = node(
+    "VAEDecode",
+    { samples: ["40", 0], vae: ["3", 0] },
+    "Decode Anima image",
+  );
+  apiPrompt["42"] = node(
+    "SaveImage",
+    { images: ["41", 0], filename_prefix: input.filenamePrefix },
+    "Save Anima image",
   );
   return apiPrompt;
 }

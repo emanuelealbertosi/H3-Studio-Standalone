@@ -103,7 +103,7 @@ video corrispondenti dall'output ComfyUI.
 - `docs/ARCHITECTURE.md`: componenti e flussi tecnici.
 - `docs/GENERATION-MODES.md`: mapping verificato di T2V, I2V, Reference, Keyframes, Continue ed Edit.
 - `docs/CREATIVE-LIBRARY.md`: personaggi, oggetti, reference e sheet Krea 2.
-- `docs/IMAGE-STUDIO.md`: generazione, edit Flux Klein, reference e condivisione immagini fra progetti.
+- `docs/IMAGE-STUDIO.md`: generazione Krea/Anima, edit Flux Klein, reference e condivisione immagini fra progetti.
 - `docs/INSTALLATION.md`: clone, primo avvio, sicurezza e dipendenze ComfyUI.
 - `docs/GITHUB-RELEASE.md`: sanitizzazione, CI e checklist di pubblicazione.
 - `docs/WORKLOG.md`: cronologia sintetica del lavoro.

@@ -34,6 +34,18 @@
         "kvCacheEnabled": false,
         "attentionBackend": "auto"
       }
+    },
+    {
+      "id": "anima-t2i-core",
+      "role": "image_anima",
+      "name": "Anima Turbo Image Generation",
+      "api": "studio-anima.api.json",
+      "defaults": {
+        "steps": 8,
+        "cfg": 1,
+        "sampler": "euler",
+        "scheduler": "simple"
+      }
     }
   ]
 }

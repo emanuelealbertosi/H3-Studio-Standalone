@@ -44,11 +44,21 @@ export type ImageEditEngineSettings = {
     | "comfy kitchen attention";
 };
 
+export type AnimaEngineSettings = {
+  model: string;
+  encoder: string;
+  vae: string;
+  loras: EngineLoraSettings[];
+  steps: number;
+  cfg: number;
+};
+
 export type RuntimeSettings = {
   h3: H3EngineSettings;
   fast: FastEngineSettings;
   krea: KreaEngineSettings;
   imageEdit: ImageEditEngineSettings;
+  anima: AnimaEngineSettings;
 };
 
 export type ResolvedEngineSettings = H3EngineSettings & {
@@ -95,6 +105,14 @@ export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = Object.freeze({
     kvCacheEnabled: false,
     attentionBackend: "auto",
   },
+  anima: {
+    model: "anima_turboV10.safetensors",
+    encoder: "anima_baseV10_txt.safetensors",
+    vae: "qwen_image_vae.safetensors",
+    loras: [],
+    steps: 8,
+    cfg: 1,
+  },
 });
 
 function cloneDefaults(): RuntimeSettings {
@@ -113,6 +131,10 @@ function cloneDefaults(): RuntimeSettings {
     },
     imageEdit: {
       ...DEFAULT_RUNTIME_SETTINGS.imageEdit,
+    },
+    anima: {
+      ...DEFAULT_RUNTIME_SETTINGS.anima,
+      loras: DEFAULT_RUNTIME_SETTINGS.anima.loras.map((slot) => ({ ...slot })),
     },
   };
 }
@@ -168,6 +190,7 @@ function migrateLegacySettings(value: Record<string, unknown>): RuntimeSettings 
     fast: defaults.fast,
     krea: defaults.krea,
     imageEdit: defaults.imageEdit,
+    anima: defaults.anima,
   };
 }
 
@@ -182,6 +205,7 @@ function validateSettings(value: unknown): RuntimeSettings {
   const defaults = cloneDefaults();
   const fast = isRecord(value.fast) ? value.fast : defaults.fast;
   const imageEdit = isRecord(value.imageEdit) ? value.imageEdit : defaults.imageEdit;
+  const anima = isRecord(value.anima) ? value.anima : defaults.anima;
 
   const h3Model = typeof value.h3.model === "string" ? value.h3.model.trim() : "";
   const fastModel = typeof fast.model === "string" ? fast.model.trim() : "";
@@ -196,6 +220,10 @@ function validateSettings(value: unknown): RuntimeSettings {
   const imageEditVae =
     typeof imageEdit.vae === "string" ? imageEdit.vae.trim() : "";
   const imageEditCfg = Number(imageEdit.cfg);
+  const animaModel = typeof anima.model === "string" ? anima.model.trim() : "";
+  const animaEncoder = typeof anima.encoder === "string" ? anima.encoder.trim() : "";
+  const animaVae = typeof anima.vae === "string" ? anima.vae.trim() : "";
+  const animaCfg = Number(anima.cfg);
   const imageEditKvCache =
     imageEdit.kvCacheEnabled === undefined
       ? defaults.imageEdit.kvCacheEnabled
@@ -233,6 +261,15 @@ function validateSettings(value: unknown): RuntimeSettings {
   if (!Number.isFinite(imageEditCfg) || imageEditCfg < 0 || imageEditCfg > 20) {
     throw new Error("Il CFG Flux.2 Klein Edit deve essere compreso fra 0 e 20");
   }
+  if (!animaModel) throw new Error("Seleziona un modello Anima");
+  if (!/anima/i.test(animaModel)) {
+    throw new Error(`Il modello ${animaModel} non sembra compatibile con Anima`);
+  }
+  if (!animaEncoder) throw new Error("Seleziona il text encoder Anima");
+  if (!animaVae) throw new Error("Seleziona la VAE Anima");
+  if (!Number.isFinite(animaCfg) || animaCfg < 0 || animaCfg > 20) {
+    throw new Error("Il CFG Anima deve essere compreso fra 0 e 20");
+  }
   assertPddModelCompatibility(fastModel, pddFile);
 
   return {
@@ -263,6 +300,14 @@ function validateSettings(value: unknown): RuntimeSettings {
       kvCacheEnabled: imageEditKvCache,
       attentionBackend: imageEditAttention,
     },
+    anima: {
+      model: animaModel,
+      encoder: animaEncoder,
+      vae: animaVae,
+      loras: validateLoras(anima.loras, "Anima"),
+      steps: validateStepCount(anima.steps, "Anima"),
+      cfg: animaCfg,
+    },
   };
 }
 
@@ -290,8 +335,12 @@ export class RuntimeSettingsStore {
 
   async update(value: unknown) {
     const current = await this.get();
-    const settings = isRecord(value) && !isRecord(value.imageEdit)
-      ? validateSettings({ ...value, imageEdit: current.imageEdit })
+    const settings = isRecord(value)
+      ? validateSettings({
+          ...value,
+          imageEdit: isRecord(value.imageEdit) ? value.imageEdit : current.imageEdit,
+          anima: isRecord(value.anima) ? value.anima : current.anima,
+        })
       : validateSettings(value);
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const temporaryPath = `${this.filePath}.tmp`;

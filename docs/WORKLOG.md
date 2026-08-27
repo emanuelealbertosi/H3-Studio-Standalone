@@ -233,3 +233,10 @@
 - I video legacy, importati o generati a una risoluzione incompatibile continuano a funzionare con il fallback degli ultimi 22 frame decodificati.
 - La cancellazione di un candidato rimuove anche il relativo cache latent; i path sorgente accettano soltanto UUID di job e indici candidato 1–4.
 - Verificati sintassi Python, regressione Continue, mapping FAST/standard, cancellazione repository e typecheck con Node 24.
+
+## 27 agosto 2026 — Motore immagini Anima
+
+- Aggiunta la modalità Anima accanto a Genera/Edit nello Studio Immagini, mantenendo preset, seed, batch e progetti esistenti.
+- Creato un workflow API core Anima e un profilo Admin separato con checkpoint, encoder, VAE, step, CFG e fino a tre LoRA.
+- Rilevati tramite gli external path i pesi locali Anima; impostato il default Turbo a 8 step/CFG 1 senza LoRA applicati implicitamente.
+- Estesi wizard, catalogo, dipendenze, preflight, persistenza compatibile e test automatici; la modalità chat resta pianificata per un incremento successivo.

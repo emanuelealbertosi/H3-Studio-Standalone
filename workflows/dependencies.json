@@ -87,6 +87,20 @@
       "requiredFor": ["image_edit"]
     },
     {
+      "id": "anima-core",
+      "label": "ComfyUI core Anima",
+      "kind": "custom_node",
+      "requiredClasses": [
+        "UNETLoader",
+        "CLIPLoader",
+        "EmptyLatentImage",
+        "KSampler"
+      ],
+      "url": "https://github.com/Comfy-Org/ComfyUI",
+      "notes": "Aggiorna ComfyUI se il modello Anima non viene riconosciuto dai loader core.",
+      "requiredFor": ["image_anima"]
+    },
+    {
       "id": "h3-face-refine",
       "label": "ComfyUI-H3-FaceRefine",
       "kind": "custom_node",
@@ -243,6 +257,40 @@
       "folder": "ultralytics_bbox",
       "filenames": ["face_yolov8m.pt"],
       "requiredFor": ["face"]
+    },
+    {
+      "id": "anima-model",
+      "label": "Anima diffusion model",
+      "kind": "model",
+      "folder": "diffusion_models",
+      "filenames": [
+        "anima_turboV10.safetensors",
+        "anima-base-v1.0.safetensors"
+      ],
+      "url": "https://huggingface.co/circlestone-labs/Anima",
+      "notes": "È sufficiente uno dei checkpoint elencati; il profilo Admin sceglie quello effettivamente usato.",
+      "requiredFor": ["image_anima"]
+    },
+    {
+      "id": "anima-text-encoder",
+      "label": "Anima / Qwen 0.6B text encoder",
+      "kind": "model",
+      "folder": "text_encoders",
+      "filenames": [
+        "anima_baseV10_txt.safetensors",
+        "qwen_3_06b_base.safetensors"
+      ],
+      "url": "https://huggingface.co/circlestone-labs/Anima",
+      "requiredFor": ["image_anima"]
+    },
+    {
+      "id": "anima-vae",
+      "label": "Qwen Image VAE per Anima",
+      "kind": "model",
+      "folder": "vae",
+      "filenames": ["qwen_image_vae.safetensors"],
+      "url": "https://huggingface.co/circlestone-labs/Anima",
+      "requiredFor": ["image_anima"]
     }
   ]
 }

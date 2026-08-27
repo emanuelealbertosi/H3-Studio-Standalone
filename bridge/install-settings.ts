@@ -30,6 +30,13 @@ export const WORKFLOW_CATALOG = [
     description: "Grafo core ufficiale per edit con una o più reference, espanso dal bridge fino a quattro input.",
     file: "studio-flux2-klein-edit.api.json",
   },
+  {
+    id: "anima-t2i-core",
+    role: "image_anima" as const,
+    name: "Anima Turbo Image Generation",
+    description: "Workflow Anima core con modello, encoder, VAE e fino a tre LoRA configurabili.",
+    file: "studio-anima.api.json",
+  },
 ] as const;
 
 export type InstallSettings = {
@@ -39,6 +46,7 @@ export type InstallSettings = {
   fastWorkflowId: string;
   imageWorkflowId: string;
   imageEditWorkflowId: string;
+  imageAnimaWorkflowId: string;
   ffmpegPath: string;
 };
 
@@ -101,12 +109,16 @@ export class InstallSettingsStore {
       imageEditWorkflowId: String(
         value.imageEditWorkflowId ?? this.defaults.imageEditWorkflowId,
       ),
+      imageAnimaWorkflowId: String(
+        value.imageAnimaWorkflowId ?? this.defaults.imageAnimaWorkflowId,
+      ),
     };
     for (const [key, role] of [
       ["videoWorkflowId", "video"],
       ["fastWorkflowId", "fast"],
       ["imageWorkflowId", "image"],
       ["imageEditWorkflowId", "image_edit"],
+      ["imageAnimaWorkflowId", "image_anima"],
     ] as const) {
       if (!WORKFLOW_CATALOG.some((item) => item.id === selected[key] && item.role === role)) {
         throw new Error(`Workflow ${role} non valido`);
