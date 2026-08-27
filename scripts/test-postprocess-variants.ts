@@ -121,6 +121,12 @@ try {
 
   assert.equal(dimensions(upscalePrompt(originalPrompt, "test/1mp", 1)).inputs.megapixels, 0.98);
   assert.equal(dimensions(upscalePrompt(originalPrompt, "test/2mp", 2)).inputs.megapixels, 1.96);
+  const safeReferenceUpscale = upscalePrompt(originalPrompt, "test/reference-safe", 2);
+  const safeReferenceSampler = Object.values(safeReferenceUpscale).find(
+    (item) => item.class_type === "H3ReferenceMemorySampler",
+  );
+  assert.equal(safeReferenceSampler?.inputs.studio_upscale, true);
+  assert.equal(safeReferenceSampler?.inputs.studio_upscale_refine_steps, 0);
   assert.equal(normalizeUpscaleTarget("2"), 2);
   assert.throws(() => normalizeUpscaleTarget(3), /1 oppure 2/);
 

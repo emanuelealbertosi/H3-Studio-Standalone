@@ -514,6 +514,16 @@ try {
     DEFAULT_RUNTIME_SETTINGS.h3.model,
     "updating Flux Image Edit must not alter the H3 model",
   );
+  await assert.rejects(
+    runtime.update({
+      ...updated,
+      imageEdit: {
+        ...updated.imageEdit,
+        model: "sulphur2Mxfp8_sulphurMxfp8Distil.safetensors",
+      },
+    }),
+    /non è compatibile con Flux\.2 Klein Edit/,
+  );
 
   images.close();
   projects.close();

@@ -59,6 +59,10 @@ export type ResolvedEngineSettings = H3EngineSettings & {
   loraStrength: number;
 };
 
+export function isFlux2KleinModelFilename(value: string) {
+  return /(?:flux.*2.*klein|klein.*flux|unstable.*f2k)/i.test(value);
+}
+
 export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = Object.freeze({
   h3: {
     model: "minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
@@ -204,6 +208,11 @@ function validateSettings(value: unknown): RuntimeSettings {
   if (!encoder) throw new Error("Seleziona il text encoder Krea");
   if (!vae) throw new Error("Seleziona la VAE Krea");
   if (!imageEditModel) throw new Error("Seleziona un modello Flux.2 Klein Edit");
+  if (!isFlux2KleinModelFilename(imageEditModel)) {
+    throw new Error(
+      `Il modello ${imageEditModel} non è compatibile con Flux.2 Klein Edit`,
+    );
+  }
   if (!imageEditEncoder) throw new Error("Seleziona il text encoder Flux.2 Klein Edit");
   if (!imageEditVae) throw new Error("Seleziona la VAE Flux.2 Klein Edit");
   if (!Number.isFinite(imageEditCfg) || imageEditCfg < 0 || imageEditCfg > 20) {

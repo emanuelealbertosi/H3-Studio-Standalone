@@ -95,7 +95,11 @@ export function upscalePrompt(
   sampler.inputs.studio_upscale_model =
     "minimax_h3_latent_upscaler_3d_fp16.safetensors";
   sampler.inputs.studio_upscale_source_ratio = 0.6;
-  sampler.inputs.studio_upscale_refine_steps = 3;
+  // H3 reference/keyframe conditioning contains resolution-dependent video
+  // rows. Reusing the low-resolution guider after the latent is enlarged can
+  // therefore crash the high-resolution refine with a row-shape mismatch.
+  // The learned 3D latent upscale itself is safe and remains enabled.
+  sampler.inputs.studio_upscale_refine_steps = 0;
   sampler.inputs.studio_upscale_precision = "fp16";
   saver.inputs.filename_prefix = filenamePrefix;
   saver.inputs.prepend_source_video = false;

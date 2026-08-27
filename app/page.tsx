@@ -2981,7 +2981,7 @@ function AdminPanel() {
     ? compatibleEngineOptions(
         data.capabilities.models,
         data.settings.imageEdit.model,
-        /flux.*2.*klein|klein|sulphur2|unstable.*f2k/i,
+        /flux.*2.*klein|klein.*flux|unstable.*f2k/i,
       )
     : [];
   const kreaTextEncoders = data
