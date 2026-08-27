@@ -138,6 +138,13 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
                        "from models/pdd_acc. When set, the sampler is locked "
                        "to 8 NFE, Euler, trained PDD sigmas, strengths 1/1 and "
                        "strict on-grid validation."})
+        optional["external_motion_context_length"] = ([
+            "22", "5", "39", "56", "OFF"], {
+                "default": "22",
+                "tooltip": "VIDEO EXTENSION only. Pin this many consecutive "
+                           "tail frames from the external source so clip 1 "
+                           "continues real motion instead of a single still. "
+                           "22 is the near-seamless default."})
         return {
             "required": required,
             "optional": optional,
@@ -179,7 +186,7 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
             studio_upscale_source_ratio=0.60,
             studio_upscale_refine_steps=3,
             studio_upscale_precision="fp16",
-            pdd_acc_file=""):
+            pdd_acc_file="", external_motion_context_length="22"):
         import torch
         import node_helpers
         from comfy_extras import nodes_custom_sampler as ncs
@@ -262,9 +269,13 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
         # both as frame-0 keyframe and encoder memory, while ordinary Picture
         # references remain in the bank. Source audio may still be used as an
         # audio-only reference so soundtrack continuity is not lost.
+        external_motion_enabled = (
+            operation_mode == "VIDEO EXTENSION"
+            and str(external_motion_context_length).upper() != "OFF")
         extension_audio = (
             initial_video_audio
-            if operation_mode == "VIDEO EXTENSION" else None)
+            if operation_mode == "VIDEO EXTENSION"
+            and not external_motion_enabled else None)
         bank_video = (
             None if operation_mode == "VIDEO EXTENSION" else initial_video)
         bank_video_audio = (
@@ -367,6 +378,17 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
         # the same AIO loop and its in-memory previous-shot latent.
         motion_controller = getattr(
             self, "_motion_context_controller", None)
+        if external_motion_enabled and motion_controller is None:
+            # Unlike an in-run multishot boundary, a separate Continue job no
+            # longer owns the source sampler latent. Motion Context therefore
+            # pins a consecutive decoded source tail instead of guessing its
+            # direction from one last-frame still.
+            from .h3_motion_memory import _InRunMotionContext
+            motion_controller = _InRunMotionContext(
+                str(external_motion_context_length),
+                int(external_motion_context_length), 17)
+            motion_controller.set_external(
+                ref_video_0, ref_video_audio_0, audio_vae)
         anchor = start_image[:1] if start_image is not None else None
         if anchor is not None:
             suffix = (

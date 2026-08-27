@@ -9,6 +9,15 @@ const samplerPath = fileURLToPath(
   ),
 );
 const source = await readFile(samplerPath, "utf8");
+const motionSource = await readFile(
+  fileURLToPath(
+    new URL(
+      "../comfyui_nodes/ComfyUI-H3-Multishot/h3_motion_memory.py",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 assert.match(
   source,
@@ -29,6 +38,21 @@ assert.match(
   source,
   /trim_boundary[\s\S]*operation_mode == "VIDEO EXTENSION"[\s\S]*images = images\[1:\]/,
   "the duplicate boundary frame must be trimmed like internal multishot shots",
+);
+assert.match(
+  source,
+  /external_motion_context_length="22"/,
+  "external Continue must default to a 22-frame temporal context",
+);
+assert.match(
+  source,
+  /motion_controller\.set_external\([\s\S]*ref_video_0/,
+  "the external source must seed Motion Context on clip 1",
+);
+assert.match(
+  motionSource,
+  /"context_frames": self\.external_frames/,
+  "Motion Context must receive consecutive decoded source frames",
 );
 
 console.log("Video continuation boundary regression passed.");

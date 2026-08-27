@@ -17,8 +17,23 @@ class _InRunMotionContext:
         self.audio_context_length = int(audio_context_length)
         self.crossfade_frames = max(0, int(crossfade_frames))
         self.previous_latent = None
+        self.external_frames = None
+        self.external_audio = None
+        self.external_audio_vae = None
         self._motion_node = None
         self._trim_node = None
+
+    def set_external(self, frames, audio=None, audio_vae=None):
+        """Seed clip 1 from a decoded external source tail.
+
+        Internal multishot boundaries use ``previous_latent`` and remain the
+        lossless preferred path. A separate Continue job only has decoded
+        frames/audio, so Motion Context re-encodes their tail once instead of
+        guessing motion from a single still.
+        """
+        self.external_frames = frames
+        self.external_audio = audio
+        self.external_audio_vae = audio_vae
 
     @staticmethod
     def _node(node_name):
@@ -36,7 +51,30 @@ class _InRunMotionContext:
 
     def apply(self, conditioning, video_vae, latent, shot_index):
         if shot_index == 0:
-            return conditioning, 0
+            if self.external_frames is None:
+                return conditioning, 0
+            if self._motion_node is None:
+                self._motion_node = self._node("MiniMaxH3MotionContext")
+            kwargs = {
+                "conditioning": conditioning,
+                "vae": video_vae,
+                "latent": latent,
+                "context_length": self.context_length,
+                "audio_context_length": self.audio_context_length,
+                "context_frames": self.external_frames,
+            }
+            if (self.external_audio is not None
+                    and self.external_audio_vae is not None):
+                kwargs["audio_vae"] = self.external_audio_vae
+                kwargs["context_audio"] = self.external_audio
+            conditioned, trim_frames = self._motion_node.apply(**kwargs)
+            print(
+                "[H3ReferenceMotionMemory] clip 1: external pixel motion "
+                "context video=%s frames, audio=%d frames, trim=%d."
+                % (self.context_length, self.audio_context_length,
+                   int(trim_frames)),
+                flush=True)
+            return conditioned, int(trim_frames)
         if self.previous_latent is None:
             raise RuntimeError(
                 "H3 AIO Motion Memory has no previous AV latent for clip %d."

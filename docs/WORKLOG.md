@@ -7,6 +7,7 @@
 - Eliminato dal segmento di continuazione il frame di confine duplicato, come già avviene tra gli shot Multishot, conservando l'audio sorgente come riferimento solo-audio.
 - Aggiunto `test:continuation` per bloccare regressioni di questi tre invarianti.
 - Il Composer ora ripara in modo deterministico il difetto Gemma in cui il paragrafo `Continuity Bible` chiude prematuramente `description` e il successivo `[Shot 1]` viene emesso come stringa JSON senza chiave; aggiunto un test isolato che verifica riparazione e no-op sui JSON validi.
+- Il Continue separato ora usa automaticamente 22 frame consecutivi della coda MP4 tramite H3 Motion Context, inclusa la coda audio: il last-frame keyframe resta come ancora, ma la direzione del movimento non viene più indovinata da una singola immagine. Gli shot interni continuano invece a preferire il latent AV nativo senza ricodifica.
 
 ## 25 agosto 2026
 
