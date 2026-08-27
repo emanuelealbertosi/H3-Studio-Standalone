@@ -15,7 +15,7 @@ Il prodotto organizza prompt, personaggi, asset, candidati e continuazioni. Comf
 
 Fase attuale: **Milestone 4 — montaggio locale, Continue/Edit e workflow multimodali**.
 
-La UI è disponibile localmente con `npm run dev` usando Node 22 o superiore. Il workflow ComfyUI stabile non viene modificato: il bridge usa una copia UI e un export API dedicati nella cartella `workflows`.
+La UI è disponibile localmente con `npm run dev` usando Node 22.16.0 o superiore. Il workflow ComfyUI stabile non viene modificato: il bridge usa una copia UI e un export API dedicati nella cartella `workflows`.
 
 I job sono persistiti in `data/h3-studio.sqlite`. I video restano negli output di ComfyUI; il database conserva metadati, promptId, seed, impostazioni e snapshot del workflow API.
 
@@ -64,8 +64,10 @@ oppure assegnata alla singola clip della timeline. Lineage, target e stato del
 post-process sono persistiti nel database e recuperati dopo il riavvio del
 bridge. Ogni Upscale richiede una conferma esplicita con target e avviso
 tempo/VRAM; un controllo di contratto blocca la coda se browser e bridge non
-sono aggiornati alla stessa versione. Le didascalie terminali mostrano inoltre
-il tempo trascorso, comprensivo dell'attesa in coda.
+sono aggiornati alla stessa versione. Se il bridge è precedente, il dialog
+resta visibile, spiega l'incompatibilità e disabilita la conferma senza inviare
+nulla a ComfyUI. Le didascalie terminali mostrano inoltre il tempo trascorso,
+comprensivo dell'attesa in coda.
 
 Durante generazione, Face o Upscale, il pulsante **Interrompi** elimina dalla
 coda i prompt del job e ferma il prompt attivo soltanto se non risultano altri
@@ -102,7 +104,7 @@ Il contratto completo Image Studio si verifica con `npm run test:images`.
 
 ## Avvio rapido
 
-1. Installa Node.js 22 o superiore e prepara una ComfyUI funzionante.
+1. Installa Node.js 22.16.0 o superiore e prepara una ComfyUI funzionante.
 2. Clona il repository ed esegui una volta `INSTALL_COMFY_DEPENDENCIES.bat`.
 3. Avvia `START_H3_STUDIO.bat`.
 4. Al primo avvio crea la password Admin e configura URL, cartella output e workflow.
@@ -111,7 +113,10 @@ Il contratto completo Image Studio si verifica con `npm run test:images`.
 Il launcher installa automaticamente le dipendenze npm quando mancano e avvia
 bridge e interfaccia in due console separate. I workflow pronti, il manifest
 delle dipendenze e il nodo H3 Studio esteso sono inclusi; modelli e media
-rimangono esterni al repository.
+rimangono esterni al repository. Prima dell'avvio controlla l'endpoint bridge
+configurato (predefinito `127.0.0.1:8787`): termina soltanto un bridge H3 Studio
+appartenente alla stessa cartella del progetto e interrompe l'avvio se il
+listener è estraneo o non verificabile.
 
 L'accesso Admin è protetto dalla password creata nel wizard. Prima di esporre
 l'app direttamente a Internet va aggiunta autenticazione anche alle API utente;

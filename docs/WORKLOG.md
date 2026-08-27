@@ -207,3 +207,11 @@
 - Esposto `processingSeconds` per candidati e varianti terminali usando i timestamp persistiti; footer, versioni e cronologia mostrano il tempo comprensivo della coda.
 - Protetti i timestamp terminali da aggiornamenti tardivi e aggiunti test di regressione per durata storica, lineage timeline e immutabilità dello stato concluso.
 - Rinominato il tag immagini `Sfondo` in `Paesaggio` e la voce di navigazione `Personaggi` in `Assets`; i valori persistiti e il ruolo reference `Sfondo` restano invariati per compatibilità.
+
+## 27 agosto 2026 — Bridge precedente e recupero tempi
+
+- Individuata la causa dei tempi mancanti e del click Upscale 2 MP apparentemente inerte: un bridge locale precedente era sopravvissuto al riavvio sulla porta `8787`, quindi non esponeva `postprocessContract: 2` né `processingSeconds`.
+- Reso fail-closed il launcher: termina soltanto il processo Node che esegue `bridge/server.ts` nella stessa `ProjectRoot`; un listener estraneo, ambiguo o cambiato durante la verifica blocca l'avvio senza essere terminato.
+- Il dialog Upscale ora si apre anche con un backend precedente, mostra l'errore di contratto e disabilita la conferma, così il problema non appare più come un click ignorato e non raggiunge la coda ComfyUI.
+- Aggiunto `repair:processing-times`: dry-run predefinito, apply consentito solo con `--bridge-stopped`, backup SQLite verificato, controllo dei percorsi reali nell'output ComfyUI e aggiornamenti condizionali dei soli candidati idonei.
+- Sei tempi legacy risultano ricostruibili dal file MP4; un job importato ha un output precedente alla creazione del candidato e viene escluso dalla riparazione anziché ricevere una durata inventata.

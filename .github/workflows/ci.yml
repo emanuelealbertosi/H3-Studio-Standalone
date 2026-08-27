@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 22.16.0
           cache: npm
       - run: npm ci
       - run: npm run sanitize:workflows
@@ -21,6 +21,7 @@ jobs:
       - run: npm run test:setup
       - run: npm run test:projects
       - run: npm run test:postprocess
+      - run: npm run test:repair-processing-times
       - run: npm run test:images
       - run: npm run test:fast
       - run: npm run test:cancel

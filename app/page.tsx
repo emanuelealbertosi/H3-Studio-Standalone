@@ -295,6 +295,11 @@ function formatProcessingTime(value: number | null | undefined) {
   return `${seconds}s`;
 }
 
+function formatProcessingTimeLabel(value: number | null | undefined) {
+  const formatted = formatProcessingTime(value);
+  return formatted ? `Tempo ${formatted}` : null;
+}
+
 type EngineLoraSlot = {
   name: string;
   strength: number;
@@ -1051,7 +1056,7 @@ function HistoryPanel({
               variant.sourceCandidateIndex === selectedCandidate?.index &&
               variant.status === "ready" && variant.output,
           );
-          const selectedCandidateTime = formatProcessingTime(
+          const selectedCandidateTime = formatProcessingTimeLabel(
             selectedCandidate?.processingSeconds,
           );
           return (
@@ -1094,7 +1099,7 @@ function HistoryPanel({
                     Seed {job.request.seedMode === "fixed" ? "bloccato" : job.request.seedMode === "base" ? "base +1" : "random"}
                   </span>
                   <span>{job.candidates.length} candidat{job.candidates.length === 1 ? "o" : "i"}</span>
-                  {selectedCandidateTime && <span>Render {selectedCandidateTime}</span>}
+                  {selectedCandidateTime && <span>{selectedCandidateTime}</span>}
                 </div>
                 <div className="history-footer">
                   <code>{job.id.slice(0, 8)}</code>
@@ -1109,19 +1114,22 @@ function HistoryPanel({
                     >
                       + Timeline
                     </button>
-                    {selectedVariants.map((variant) => (
-                      <button
-                        disabled={!timelineId}
-                        key={variant.id}
-                        onClick={() => selectedCandidate && void addJobToProject(job, selectedCandidate, variant)}
-                        type="button"
-                      >
-                        + {variantLabel(variant.kind, variant.targetMegapixels)}
-                        {formatProcessingTime(variant.processingSeconds)
-                          ? ` · ${formatProcessingTime(variant.processingSeconds)}`
-                          : ""}
-                      </button>
-                    ))}
+                    {selectedVariants.map((variant) => {
+                      const variantProcessingTime = formatProcessingTimeLabel(
+                        variant.processingSeconds,
+                      );
+                      return (
+                        <button
+                          disabled={!timelineId}
+                          key={variant.id}
+                          onClick={() => selectedCandidate && void addJobToProject(job, selectedCandidate, variant)}
+                          type="button"
+                        >
+                          + {variantLabel(variant.kind, variant.targetMegapixels)}
+                          {variantProcessingTime ? ` · ${variantProcessingTime}` : ""}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -3911,7 +3919,6 @@ function StudioApp() {
 
   function requireUpdatedPostprocessContract() {
     if (postprocessContract >= 2) return true;
-    setPendingUpscaleRequest(null);
     setRunMessage("Bridge non aggiornato: riavvia H3 Studio");
     return false;
   }
@@ -3925,7 +3932,6 @@ function StudioApp() {
       setRunMessage("Apri prima un job completato");
       return;
     }
-    if (!requireUpdatedPostprocessContract()) return;
     upscaleTriggerRef.current = trigger;
     setPendingUpscaleRequest({
       jobId: currentJobId,
@@ -4768,9 +4774,12 @@ function StudioApp() {
                 const activePostprocess = variants.find(
                   (variant) => variant.status !== "ready" && variant.status !== "failed",
                 );
+                const candidateProcessingTime = formatProcessingTimeLabel(
+                  candidate.processingSeconds,
+                );
                 const terminalProcessingTime =
                   isReady || isFailed
-                    ? formatProcessingTime(
+                    ? formatProcessingTimeLabel(
                         activeVariant
                           ? activeVariant.processingSeconds
                           : candidate.processingSeconds,
@@ -4864,34 +4873,39 @@ function StudioApp() {
                               type="button"
                             >
                               Originale
-                              {formatProcessingTime(candidate.processingSeconds)
-                                ? ` · ${formatProcessingTime(candidate.processingSeconds)}`
-                                : ""}
+                              {candidateProcessingTime ? ` · ${candidateProcessingTime}` : ""}
                             </button>
-                            {readyVariants.map((variant) => (
-                              <button
-                                className={candidate.activeVariantId === variant.id ? "active" : ""}
-                                key={variant.id}
-                                onClick={() => setCandidates((current) => current.map((item) =>
-                                  item.id === candidate.id ? { ...item, activeVariantId: variant.id } : item,
-                                ))}
-                                type="button"
-                              >
-                                {variantLabel(variant.kind, variant.targetMegapixels)}
-                                {formatProcessingTime(variant.processingSeconds)
-                                  ? ` · ${formatProcessingTime(variant.processingSeconds)}`
-                                  : ""}
-                              </button>
-                            ))}
+                            {readyVariants.map((variant) => {
+                              const variantProcessingTime = formatProcessingTimeLabel(
+                                variant.processingSeconds,
+                              );
+                              return (
+                                <button
+                                  className={candidate.activeVariantId === variant.id ? "active" : ""}
+                                  key={variant.id}
+                                  onClick={() => setCandidates((current) => current.map((item) =>
+                                    item.id === candidate.id ? { ...item, activeVariantId: variant.id } : item,
+                                  ))}
+                                  type="button"
+                                >
+                                  {variantLabel(variant.kind, variant.targetMegapixels)}
+                                  {variantProcessingTime ? ` · ${variantProcessingTime}` : ""}
+                                </button>
+                              );
+                            })}
                           </div>
-                          {variants.filter((variant) => variant.status !== "ready").map((variant) => (
-                            <span className={`variant-status ${variant.status}`} key={variant.id}>
-                              {variantLabel(variant.kind, variant.targetMegapixels)} · {variant.phaseLabel ?? variant.error ?? variant.status}
-                              {variant.status === "failed" && formatProcessingTime(variant.processingSeconds)
-                                ? ` · ${formatProcessingTime(variant.processingSeconds)}`
-                                : ""}
-                            </span>
-                          ))}
+                          {variants.filter((variant) => variant.status !== "ready").map((variant) => {
+                            const failedProcessingTime =
+                              variant.status === "failed"
+                                ? formatProcessingTimeLabel(variant.processingSeconds)
+                                : null;
+                            return (
+                              <span className={`variant-status ${variant.status}`} key={variant.id}>
+                                {variantLabel(variant.kind, variant.targetMegapixels)} · {variant.phaseLabel ?? variant.error ?? variant.status}
+                                {failedProcessingTime ? ` · ${failedProcessingTime}` : ""}
+                              </span>
+                            );
+                          })}
                           <div className="postprocess-source">
                             <span>Sorgente Face</span>
                             <strong>
@@ -5011,8 +5025,15 @@ function StudioApp() {
             className="upscale-confirm-dialog"
             onKeyDown={(event) => {
               if (event.key !== "Tab") return;
-              const first = upscaleCancelRef.current;
-              const last = upscaleConfirmRef.current;
+              const focusableControls = [
+                upscaleCancelRef.current,
+                upscaleConfirmRef.current,
+              ].filter(
+                (control): control is HTMLButtonElement =>
+                  Boolean(control && !control.disabled),
+              );
+              const first = focusableControls[0];
+              const last = focusableControls[focusableControls.length - 1];
               if (!first || !last) return;
               if (event.shiftKey && document.activeElement === first) {
                 event.preventDefault();
@@ -5054,6 +5075,19 @@ function StudioApp() {
                   : "L’upscale può richiedere diversi minuti e usa VRAM aggiuntiva. Evita altre elaborazioni GPU durante il render."}
               </p>
             </div>
+            {postprocessContract < 2 && (
+              <div
+                className="upscale-confirm-bridge-alert"
+                id="upscale-confirm-bridge-alert"
+                role="alert"
+              >
+                <strong>Upscale non disponibile</strong>
+                <p>
+                  Bridge non aggiornato: riavvia H3 Studio, quindi riapri questa
+                  conferma.
+                </p>
+              </div>
+            )}
             <footer className="upscale-confirm-actions">
               <button
                 onClick={() => setPendingUpscaleRequest(null)}
@@ -5064,6 +5098,7 @@ function StudioApp() {
               </button>
               <button
                 className="confirm"
+                disabled={postprocessContract < 2}
                 onClick={confirmCandidateUpscale}
                 ref={upscaleConfirmRef}
                 type="button"

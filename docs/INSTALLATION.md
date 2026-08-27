@@ -6,10 +6,13 @@ workflow. Stato locale, password, database, log e media non vengono versionati.
 ## Requisiti
 
 - Windows 10/11.
-- Node.js 22 o superiore.
+- Node.js 22.16.0 o superiore.
 - ComfyUI già funzionante e raggiungibile via HTTP.
 - FFmpeg nel `PATH` oppure il suo percorso configurato nell'Admin.
 - I modelli MiniMax H3, Krea e Flux.2 Klein scelti dall’Admin nelle cartelle ComfyUI corrette.
+
+La versione minima 22.16.0 è necessaria anche per il backup SQLite consistente
+usato dallo strumento di riparazione dei tempi storici.
 
 ## Avvio
 
@@ -34,6 +37,22 @@ Per installare anche i `requirements.txt` con il Python della portable:
 La modalità predefinita è conservativa: per i requisiti Python si può usare
 anche ComfyUI Manager. Il secondo launcher esegue `npm install` soltanto se le
 dipendenze web non sono presenti, poi apre `http://localhost:3000`.
+
+### Protezione dal bridge precedente
+
+Prima di avviare il bridge, `START_H3_STUDIO.bat` legge anche
+`H3_BRIDGE_HOST` e `H3_BRIDGE_PORT` da `.env`, quindi verifica il listener
+dell'endpoint configurato (predefinito `127.0.0.1:8787`). Se trova un processo
+Node la cui command line punta esattamente a `bridge/server.ts` nella stessa
+`ProjectRoot`, termina soltanto quel bridge precedente e attende che la porta
+si liberi. Se il listener appartiene a un altro programma, non è verificabile
+oppure cambia durante il controllo, il launcher interrompe l'avvio senza
+terminare processi estranei.
+
+Questa protezione evita che un frontend aggiornato continui a parlare con un
+bridge rimasto attivo da una versione precedente. In quel caso potevano
+mancare il contratto Upscale 2 MP e `processingSeconds`; ora il dialog Upscale
+rimane visibile con un errore esplicito e non accoda nulla a ComfyUI.
 
 ## Primo avvio
 
@@ -86,3 +105,29 @@ Completare il primo avvio da localhost. Solo dopo, per Tailscale impostare
 Prima di esporre l'app a utenti non fidati va aggiunta autenticazione anche alle
 API di generazione: la password attuale protegge intenzionalmente la sola area
 Admin.
+
+## Riparazione dei tempi storici
+
+Un bridge legacy poteva riscrivere il timestamp terminale dei candidati durante
+il polling, rendendo inattendibile il tempo mostrato. Il comando seguente
+analizza soltanto i candidati `ready` e, per impostazione predefinita, esegue un
+dry-run senza modificare il database:
+
+```powershell
+npm run repair:processing-times -- --database "data\h3-studio.sqlite" --comfy-output "<cartella-output-comfy>"
+```
+
+Per applicare le sole correzioni proposte, arrestare prima il bridge e
+confermarlo esplicitamente:
+
+```powershell
+npm run repair:processing-times -- --database "data\h3-studio.sqlite" --comfy-output "<cartella-output-comfy>" --apply --bridge-stopped
+```
+
+Prima di modificare `candidates.updated_at`, l'apply crea e verifica un backup
+SQLite consistente. Il tool accetta soltanto file reali confinati nella
+cartella output indicata, ricontrolla stato e timestamp dopo il backup e salta
+record mancanti, concorrenti o non ricostruibili invece di stimarne la durata.
+Per evitare falsi positivi dovuti alla normale finalizzazione del file o alla
+precisione NTFS, considera corrotto soltanto un `updated_at` che superi di oltre
+5 minuti il `LastWriteTimeUtc` dell'output.

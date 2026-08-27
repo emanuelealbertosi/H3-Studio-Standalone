@@ -30,7 +30,7 @@ e documentazione, ma non password, database, media generati o pesi dei modelli.
    ```
 
 La CI inclusa ripete sanitizzazione, typecheck, test principali e build su
-Windows con Node.js 22.
+Windows con Node.js 22.16.0 o superiore.
 
 ## Cosa riceve chi clona
 
