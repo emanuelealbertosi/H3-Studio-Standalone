@@ -5014,6 +5014,33 @@ function StudioApp() {
     }
   }
 
+  async function regenerateVideo(candidateId?: number) {
+    if (!currentJobId || isRunning) return;
+    setIsRunning(true);
+    setRunMessage(candidateId === undefined
+      ? "Rigenerazione batch con nuovi seed…"
+      : `Rigenerazione candidato ${candidateId} con un nuovo seed…`);
+    try {
+      const response = await fetch(`${bridgeUrl}/api/jobs/${currentJobId}/regenerate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(candidateId === undefined ? {} : { candidateIndex: candidateId }),
+      });
+      const payload = (await response.json()) as { job?: RemoteJob; error?: string };
+      if (!response.ok || !payload.job) {
+        throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      }
+      setProjectJobs((current) => [payload.job!, ...current.filter((item) => item.id !== payload.job!.id)]);
+      openJob(payload.job);
+      setRunMessage(candidateId === undefined
+        ? `Nuovo batch ${payload.job.id.slice(0, 8)} avviato con seed nuovi`
+        : `Nuovo candidato ${payload.job.id.slice(0, 8)} avviato con un seed nuovo`);
+    } catch (error) {
+      setIsRunning(false);
+      setRunMessage(error instanceof Error ? error.message : "Rigenerazione video non avviata");
+    }
+  }
+
   function requireUpdatedPostprocessContract() {
     if (postprocessContract >= 2) return true;
     setRunMessage("Bridge non aggiornato: riavvia H3 Studio");
@@ -5934,6 +5961,9 @@ function StudioApp() {
                     <button onClick={() => controlCandidateVideos("restart")} type="button">↺ Da capo</button>
                   </div>
                 )}
+                {currentJobId && !isRunning && candidates.some((candidate) => candidate.status === "ready" || candidate.status === "failed") && (
+                  <button className="regenerate-button" onClick={() => void regenerateVideo()} type="button">↻ Rigenera batch</button>
+                )}
                 <div className="queue-status">
                   <span className={isRunning ? "pulse" : ""} />
                   {isRunning ? "Coda attiva" : "Coda pronta"}
@@ -6201,6 +6231,9 @@ function StudioApp() {
                               type="button"
                             >
                               Edita
+                            </button>
+                            <button className="regenerate-action" disabled={isRunning} onClick={() => void regenerateVideo(candidate.id)} type="button">
+                              ↻ Rigenera con nuovo seed
                             </button>
                           </div>
                         </div>

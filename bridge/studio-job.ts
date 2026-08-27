@@ -471,6 +471,7 @@ export function prepareStudioJob(
   rawRequest: unknown,
   runtimeSettings: RuntimeSettings,
   jobId = randomUUID(),
+  excludedSeeds: ReadonlySet<number> = new Set(),
 ) {
   const request = normalizeRequest(rawRequest);
   const resolvedEngine = resolveEngineSettings(request, runtimeSettings);
@@ -518,7 +519,7 @@ export function prepareStudioJob(
     } else {
       do {
         candidateSeed = randomSeed();
-      } while (randomSeeds.has(candidateSeed));
+      } while (randomSeeds.has(candidateSeed) || excludedSeeds.has(candidateSeed));
       randomSeeds.add(candidateSeed);
     }
     const filenamePrefix = `video/H3_STUDIO/${jobId}/candidate_${index}`;
@@ -655,7 +656,11 @@ export class StudioJobService {
     private readonly jobs: JobRepository,
   ) {}
 
-  async prepare(rawRequest: unknown) {
+  async prepare(
+    rawRequest: unknown,
+    excludedSeeds: ReadonlySet<number> = new Set(),
+    runtimeOverride?: RuntimeSettings,
+  ) {
     const wantsFast = isRecord(rawRequest) &&
       rawRequest.qualityMode !== "min" &&
       rawRequest.qualityMode !== "med" &&
@@ -683,7 +688,7 @@ export class StudioJobService {
       wantsFast
         ? this.fastWorkflowStore.loadApiPrompt()
         : this.workflowStore.loadApiPrompt(),
-      this.runtimeSettings.get(),
+      runtimeOverride ?? this.runtimeSettings.get(),
     ]);
     if (wantsFast) {
       const installedModels = await this.comfy.models("diffusion_models");
@@ -694,12 +699,68 @@ export class StudioJobService {
       }
     }
     return {
-      prepared: prepareStudioJob(sourcePrompt, rawRequest, runtimeSettings),
+      prepared: prepareStudioJob(
+        sourcePrompt,
+        rawRequest,
+        runtimeSettings,
+        randomUUID(),
+        excludedSeeds,
+      ),
     };
   }
 
   async submit(rawRequest: unknown) {
     const { prepared } = await this.prepare(rawRequest);
+    return this.submitPrepared(prepared);
+  }
+
+  async regenerate(jobId: string, candidateIndex?: number) {
+    const original = this.jobs.get(jobId);
+    if (!original) throw new Error("Job video da rigenerare non trovato");
+    if (
+      candidateIndex !== undefined &&
+      !original.candidates.some((candidate) => candidate.index === candidateIndex)
+    ) {
+      throw new Error("Candidato video da rigenerare non trovato");
+    }
+    const candidateCount = candidateIndex === undefined
+      ? original.request.candidateCount
+      : 1;
+    const currentSettings = await this.runtimeSettings.get();
+    const preservedSettings: RuntimeSettings = original.engine.profile === "fast"
+      ? {
+          ...currentSettings,
+          fast: {
+            model: original.engine.model,
+            pddFile: original.engine.pddFile ?? currentSettings.fast.pddFile,
+            loras: original.engine.loras,
+            steps: 8,
+          },
+        }
+      : {
+          ...currentSettings,
+          h3: {
+            model: original.engine.model,
+            loras: original.engine.loras,
+            steps: original.engine.steps,
+          },
+        };
+    const { prepared } = await this.prepare(
+      {
+        ...original.request,
+        candidateCount,
+        seedMode: "random",
+        seed: undefined,
+      },
+      new Set(original.candidates.map((candidate) => candidate.seed)),
+      preservedSettings,
+    );
+    return this.submitPrepared(prepared);
+  }
+
+  private async submitPrepared(
+    prepared: ReturnType<typeof prepareStudioJob>,
+  ) {
     this.jobs.createPrepared(prepared, prepared.engineSettings);
     let submittedCount = 0;
 

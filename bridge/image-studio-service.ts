@@ -29,7 +29,7 @@ import {
   IMAGE_EDIT_MAX_REFERENCES,
   IMAGE_UI_TARGET_MAX_PIXELS,
 } from "./image-workflow-builder.js";
-import type { RuntimeSettingsStore } from "./runtime-settings.js";
+import type { RuntimeSettings, RuntimeSettingsStore } from "./runtime-settings.js";
 import type { ComfyProgressTracker } from "./comfy-progress.js";
 
 const MAX_SEED = 9_007_199_254_740_000;
@@ -292,10 +292,14 @@ export class ImageStudioService {
     private readonly progressTracker?: ComfyProgressTracker,
   ) {}
 
-  async prepare(value: unknown): Promise<PreparedImageJob> {
+  async prepare(
+    value: unknown,
+    excludedSeeds: ReadonlySet<number> = new Set(),
+    runtimeOverride?: RuntimeSettings,
+  ): Promise<PreparedImageJob> {
     const request = normalizeImageRequest(value);
     const [settings, workflowTemplate] = await Promise.all([
-      this.runtimeSettings.get(),
+      runtimeOverride ?? this.runtimeSettings.get(),
       readWorkflowTemplate(
         request.imageMode === "edit"
           ? this.editWorkflowPath
@@ -356,7 +360,7 @@ export class ImageStudioService {
       else if (request.seedMode === "base") seed = (baseSeed + offset) % MAX_SEED;
       else {
         do seed = randomSeed();
-        while (usedRandomSeeds.has(seed));
+        while (usedRandomSeeds.has(seed) || excludedSeeds.has(seed));
         usedRandomSeeds.add(seed);
       }
       const filenamePrefix =
@@ -432,6 +436,78 @@ export class ImageStudioService {
 
   async submit(value: unknown) {
     const prepared = await this.prepare(value);
+    return this.submitPrepared(prepared);
+  }
+
+  async regenerate(jobId: string, candidateIndex?: number) {
+    const original = this.repository.get(jobId);
+    if (!original) throw new Error("Job immagine da rigenerare non trovato");
+    const sourceCandidate = candidateIndex === undefined
+      ? original.candidates[0]
+      : original.candidates.find((candidate) => candidate.index === candidateIndex);
+    if (!sourceCandidate) throw new Error("Candidato immagine da rigenerare non trovato");
+    const originLink = sourceCandidate.projectLinks.find(
+      (link) => link.projectId === original.originProjectId,
+    );
+    const mode = original.engine.kind === "anima" ? "anima" : original.mode;
+    const currentSettings = await this.runtimeSettings.get();
+    const preservedSettings: RuntimeSettings = original.engine.kind === "anima"
+      ? {
+          ...currentSettings,
+          anima: {
+            model: original.engine.model,
+            encoder: original.engine.encoder,
+            vae: original.engine.vae,
+            steps: original.engine.steps,
+            cfg: original.engine.cfg,
+            loras: original.engine.loras ?? [],
+          },
+        }
+      : original.engine.kind === "flux2-klein-edit"
+        ? {
+            ...currentSettings,
+            imageEdit: {
+              model: original.engine.model,
+              encoder: original.engine.encoder,
+              vae: original.engine.vae,
+              steps: original.engine.steps,
+              cfg: original.engine.cfg,
+              kvCacheEnabled: original.engine.kvCacheEnabled ?? currentSettings.imageEdit.kvCacheEnabled,
+              attentionBackend: original.engine.attentionBackend ?? currentSettings.imageEdit.attentionBackend,
+            },
+          }
+        : {
+            ...currentSettings,
+            krea: {
+              model: original.engine.model,
+              encoder: original.engine.encoder,
+              vae: original.engine.vae,
+              steps: original.engine.steps,
+              loras: original.engine.loras ?? [],
+            },
+          };
+    const prepared = await this.prepare(
+      {
+        projectId: original.originProjectId,
+        mode,
+        prompt: original.prompt,
+        effectivePrompt: original.effectivePrompt,
+        compositionPreset: original.compositionPreset,
+        candidateCount: candidateIndex === undefined ? original.candidateCount : 1,
+        aspectFormat: original.aspectFormat,
+        width: original.width,
+        height: original.height,
+        seedMode: "random",
+        references: mode === "edit" ? original.references : [],
+        tag: originLink?.tag ?? "untagged",
+      },
+      new Set(original.candidates.map((candidate) => candidate.seed)),
+      preservedSettings,
+    );
+    return this.submitPrepared(prepared);
+  }
+
+  private async submitPrepared(prepared: PreparedImageJob) {
     this.repository.createPrepared(prepared);
     for (const candidate of prepared.candidates) {
       try {

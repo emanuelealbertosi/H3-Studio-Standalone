@@ -240,3 +240,9 @@
 - Creato un workflow API core Anima e un profilo Admin separato con checkpoint, encoder, VAE, step, CFG e fino a tre LoRA.
 - Rilevati tramite gli external path i pesi locali Anima; impostato il default Turbo a 8 step/CFG 1 senza LoRA applicati implicitamente.
 - Estesi wizard, catalogo, dipendenze, preflight, persistenza compatibile e test automatici; la modalità chat resta pianificata per un incremento successivo.
+
+## 27 agosto 2026 — Rigenera candidato e batch
+
+- Aggiunta l'azione Rigenera a ogni video e immagine completata, inclusi Generate, Edit e Anima.
+- Aggiunta Rigenera batch, che conserva il numero originale di candidati (uno-quattro) e tutte le impostazioni persistite.
+- La rigenerazione crea un nuovo job non distruttivo e garantisce seed diversi da quelli del batch sorgente; l'originale resta nel progetto.

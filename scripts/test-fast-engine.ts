@@ -69,6 +69,33 @@ const baseRequest = {
   seed: 12345,
 };
 
+const originalRandom = Math.random;
+try {
+  const collisionSeed = Math.floor(0.5 * 9_007_199_254_740_000);
+  const randomValues = [0.1, 0.5, 0.6];
+  Math.random = () => randomValues.shift() ?? 0.7;
+  const regenerated = prepareStudioJob(
+    source,
+    {
+      ...baseRequest,
+      seedMode: "random",
+      seed: undefined,
+      qualityMode: "min",
+      turboEnabled: false,
+    },
+    structuredClone(DEFAULT_RUNTIME_SETTINGS),
+    "00000000-0000-4000-8000-000000000099",
+    new Set([collisionSeed]),
+  );
+  assert.notEqual(regenerated.candidates[0].seed, collisionSeed);
+  assert.equal(
+    regenerated.candidates[0].seed,
+    Math.floor(0.6 * 9_007_199_254_740_000),
+  );
+} finally {
+  Math.random = originalRandom;
+}
+
 const fast = prepareStudioJob(
   source,
   { ...baseRequest, qualityMode: "fast", turboEnabled: true },

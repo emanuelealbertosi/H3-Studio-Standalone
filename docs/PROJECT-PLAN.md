@@ -384,6 +384,7 @@ Legenda: `[x]` completato e verificato; `[~]` parziale o presente solo a livello
 - [x] Selettore Video/Immagini nello Studio e layout candidati/composer coerente.
 - [x] Generazione Krea 2 generica con uno-quattro candidati e seed riproducibili.
 - [x] Generazione Anima con workflow core e profilo Admin indipendente (modello, encoder, VAE, step, CFG e tre LoRA).
+- [x] Rigenerazione rapida per singolo candidato o intero batch, su video e immagini, con impostazioni conservate e seed nuovi.
 - [x] Edit Flux.2 Klein 4B Distilled con una-quattro reference ordinate.
 - [x] Ruoli Base/Soggetto/Stile/Posa/Sfondo tradotti nella mappa reference del prompt.
 - [x] Tag Personaggio/Oggetto/Paesaggio per candidato e per progetto.

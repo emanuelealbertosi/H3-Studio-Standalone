@@ -1001,6 +1001,17 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
+.regenerate-button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(215, 255, 82, 0.32);
+  border-radius: 8px;
+  background: rgba(215, 255, 82, 0.07);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 800;
+}
+
 .stop-run-button:hover:not(:disabled) {
   border-color: #ff7777;
   background: rgba(154, 34, 41, 0.48);
@@ -1381,6 +1392,13 @@ a:focus-visible {
 
 .candidate-primary-actions {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.candidate-primary-actions .regenerate-action,
+.image-primary-actions .regenerate-action {
+  grid-column: 1 / -1;
+  border-color: rgba(215, 255, 82, 0.25);
+  color: var(--accent);
 }
 
 .postprocess-source {

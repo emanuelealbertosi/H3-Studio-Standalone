@@ -60,7 +60,13 @@ try {
   assert.match(imageStudioSource, /IMAGE_COMPOSITION_PRESETS\.map/);
   assert.match(imageStudioSource, /type ImageMode = "generate" \| "edit" \| "anima"/);
   assert.match(imageStudioSource, />Anima<\/button>/);
+  assert.match(imageStudioSource, /api\/image-jobs\/\$\{job\.id\}\/regenerate/);
+  assert.match(imageStudioSource, /Rigenera con nuovo seed/);
   assert.match(pageSource, /ANIME IMAGE ENGINE/);
+  assert.match(pageSource, /api\/jobs\/\$\{currentJobId\}\/regenerate/);
+  assert.match(pageSource, /Rigenera batch/);
+  assert.match(serverSource, /\/api\/jobs\/:jobId\/regenerate/);
+  assert.match(serverSource, /\/api\/image-jobs\/:jobId\/regenerate/);
   assert.match(imageStudioSource, /Mantieni proporzioni · Reference 1/);
   assert.match(imageStudioSource, /imageEditKeepAspectDimensions/);
   assert.match(
@@ -223,8 +229,14 @@ try {
   assert(firstProject && secondProject);
 
   const prepareRuntime = new RuntimeSettingsStore(temporaryDir);
+  let queuedImage = 0;
   const imageService = new ImageStudioService(
-    {} as never,
+    {
+      queuePrompt: async () => ({
+        promptId: `regenerated-image-${++queuedImage}`,
+        queueNumber: queuedImage,
+      }),
+    } as never,
     images,
     prepareRuntime,
     path.join(process.cwd(), "workflows", "studio-krea2.api.json"),
@@ -289,8 +301,35 @@ try {
   assert.equal(storedComposition.aspectFormat, "16:9");
   assert.equal(storedComposition.width, 1792);
   assert.equal(storedComposition.height, 1008);
+  await prepareRuntime.update({
+    ...DEFAULT_RUNTIME_SETTINGS,
+    krea: {
+      ...DEFAULT_RUNTIME_SETTINGS.krea,
+      model: "different-krea-after-original.safetensors",
+      steps: 12,
+    },
+  });
+  const regeneratedComposition = await imageService.regenerate(
+    preparedComposition.id,
+    1,
+  );
+  assert.equal(regeneratedComposition.candidateCount, 1);
+  assert.equal(regeneratedComposition.mode, "generate");
+  assert.notEqual(regeneratedComposition.candidates[0].seed, 99);
+  assert.equal(regeneratedComposition.prompt, storedComposition.prompt);
+  assert.equal(
+    regeneratedComposition.engine.model,
+    storedComposition.engine.model,
+    "regeneration must preserve the original engine snapshot",
+  );
+  assert.equal(regeneratedComposition.engine.steps, storedComposition.engine.steps);
+  assert.equal(
+    regeneratedComposition.compositionPreset,
+    storedComposition.compositionPreset,
+  );
   const compositionCleanup = new DatabaseSync(jobs.databasePath);
   compositionCleanup.exec("PRAGMA foreign_keys = ON");
+  compositionCleanup.prepare("DELETE FROM image_jobs WHERE id = ?").run(regeneratedComposition.id);
   compositionCleanup.prepare("DELETE FROM image_jobs WHERE id = ?").run(preparedComposition.id);
   compositionCleanup.close();
   assert.equal(images.get(preparedComposition.id), null);

@@ -418,6 +418,31 @@ app.post("/api/jobs", async (request, reply) => {
   }
 });
 
+app.post<{
+  Params: { jobId: string };
+  Body: { candidateIndex?: number };
+}>("/api/jobs/:jobId/regenerate", async (request, reply) => {
+  try {
+    const rawIndex = request.body?.candidateIndex;
+    const candidateIndex = rawIndex === undefined ? undefined : Number(rawIndex);
+    if (
+      candidateIndex !== undefined &&
+      (!Number.isInteger(candidateIndex) || candidateIndex < 1 || candidateIndex > 4)
+    ) {
+      return reply.status(400).send({ ok: false, error: "Candidato video non valido" });
+    }
+    const job = await studioJobs.regenerate(request.params.jobId, candidateIndex);
+    return reply.status(202).send({
+      ok: true,
+      job: { ...job, variants: [] },
+      scope: candidateIndex === undefined ? "batch" : "candidate",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Rigenerazione video fallita";
+    return reply.status(400).send({ ok: false, error: message });
+  }
+});
+
 app.get<{ Params: { jobId: string } }>("/api/jobs/:jobId", async (request, reply) => {
   const job = await studioJobs.get(request.params.jobId);
   if (!job) return reply.status(404).send({ ok: false, error: "Job non trovato" });
@@ -479,6 +504,31 @@ app.post("/api/image-jobs", async (request, reply) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invio immagine fallito";
     app.log.error(error, "Invio job immagine H3 Studio fallito");
+    return reply.status(400).send({ ok: false, error: message });
+  }
+});
+
+app.post<{
+  Params: { jobId: string };
+  Body: { candidateIndex?: number };
+}>("/api/image-jobs/:jobId/regenerate", async (request, reply) => {
+  try {
+    const rawIndex = request.body?.candidateIndex;
+    const candidateIndex = rawIndex === undefined ? undefined : Number(rawIndex);
+    if (
+      candidateIndex !== undefined &&
+      (!Number.isInteger(candidateIndex) || candidateIndex < 1 || candidateIndex > 4)
+    ) {
+      return reply.status(400).send({ ok: false, error: "Candidato immagine non valido" });
+    }
+    const job = await imageStudio.regenerate(request.params.jobId, candidateIndex);
+    return reply.status(202).send({
+      ok: true,
+      job,
+      scope: candidateIndex === undefined ? "batch" : "candidate",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Rigenerazione immagine fallita";
     return reply.status(400).send({ ok: false, error: message });
   }
 });
