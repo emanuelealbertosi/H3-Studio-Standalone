@@ -143,4 +143,19 @@ assert.match(page, /aria-selected="false"/);
 assert.match(css, /\.mention-thumbnail\s*\{[^}]*width:\s*54px[^}]*height:\s*46px/s);
 assert.match(css, /\.mention-thumbnail img,[\s\S]*?object-fit:\s*cover/s);
 
+const h3ModelSelect = page.match(/<span>Modello H3<\/span>[\s\S]*?<\/select>/);
+assert.ok(h3ModelSelect, "H3 model select should be present");
+assert.match(h3ModelSelect[0], /h3Models\.map/);
+assert.doesNotMatch(h3ModelSelect[0], /settings\.imageEdit/);
+const kreaModelSelect = page.match(/<span>Modello Krea<\/span>[\s\S]*?<\/select>/);
+assert.ok(kreaModelSelect, "Krea model select should be present");
+assert.match(kreaModelSelect[0], /kreaModels\.map/);
+const fluxModelSelect = page.match(/<span>Modello Flux\.2 Klein<\/span>[\s\S]*?<\/select>/);
+assert.ok(fluxModelSelect, "Flux model select should be present");
+assert.match(fluxModelSelect[0], /imageEditModels\.map/);
+assert.match(page, /data\.settings\.krea\.encoder,[\s\S]*?qwen\.\*\(\?:vl\|vision\)/);
+assert.match(page, /data\.settings\.krea\.vae,[\s\S]*?qwen\.\*image\.\*vae/);
+assert.match(page, /data\.settings\.imageEdit\.encoder,[\s\S]*?qwen\[_-\]\?3/);
+assert.match(page, /data\.settings\.imageEdit\.vae,[\s\S]*?flux\.\*2\.\*vae/);
+
 console.log("Preview layout, image turnaround and Assets handoff UI: OK");

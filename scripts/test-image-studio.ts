@@ -509,6 +509,11 @@ try {
   });
   assert.equal(updated.imageEdit.kvCacheEnabled, true);
   assert.equal(updated.imageEdit.attentionBackend, "pytorch attention");
+  assert.equal(
+    updated.h3.model,
+    DEFAULT_RUNTIME_SETTINGS.h3.model,
+    "updating Flux Image Edit must not alter the H3 model",
+  );
 
   images.close();
   projects.close();

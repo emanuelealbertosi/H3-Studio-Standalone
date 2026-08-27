@@ -404,10 +404,9 @@ function compatibleEngineOptions(
   pattern: RegExp,
 ) {
   const compatible = values.filter((value) => pattern.test(value));
-  if (current && values.includes(current) && !compatible.includes(current)) {
-    compatible.unshift(current);
-  }
-  return compatible.length > 0 ? compatible : values;
+  const options = compatible.length > 0 ? [...compatible] : [...values];
+  if (current && !options.includes(current)) options.unshift(current);
+  return options;
 }
 
 type EngineAdminResponse = {
@@ -2921,6 +2920,55 @@ function AdminPanel() {
   }
 
   const fastModels = data?.capabilities.models.filter(isOfficialFastPddModel) ?? [];
+  const h3Models = data
+    ? compatibleEngineOptions(
+        data.capabilities.models,
+        data.settings.h3.model,
+        /h3|fl2va|ref2va/i,
+      )
+    : [];
+  const kreaModels = data
+    ? compatibleEngineOptions(
+        data.capabilities.models,
+        data.settings.krea.model,
+        /krea2|krea.*(?:turbo|redmix)/i,
+      )
+    : [];
+  const imageEditModels = data
+    ? compatibleEngineOptions(
+        data.capabilities.models,
+        data.settings.imageEdit.model,
+        /flux.*2.*klein|klein|sulphur2|unstable.*f2k/i,
+      )
+    : [];
+  const kreaTextEncoders = data
+    ? compatibleEngineOptions(
+        data.capabilities.textEncoders,
+        data.settings.krea.encoder,
+        /qwen.*(?:vl|vision)/i,
+      )
+    : [];
+  const imageEditTextEncoders = data
+    ? compatibleEngineOptions(
+        data.capabilities.textEncoders,
+        data.settings.imageEdit.encoder,
+        /qwen[_-]?3[_-]?(?:4b|8b)|qwen.*(?:4b|8b)/i,
+      )
+    : [];
+  const kreaVaes = data
+    ? compatibleEngineOptions(
+        data.capabilities.vaes,
+        data.settings.krea.vae,
+        /qwen.*image.*vae/i,
+      )
+    : [];
+  const imageEditVaes = data
+    ? compatibleEngineOptions(
+        data.capabilities.vaes,
+        data.settings.imageEdit.vae,
+        /flux.*2.*vae|flux2.*vae/i,
+      )
+    : [];
   const selectedFastPair = data
     ? fastPddPairForModel(data.settings.fast.model)
     : null;
@@ -3079,7 +3127,7 @@ function AdminPanel() {
                       },
                     })}
                   >
-                    {compatibleEngineOptions(data.capabilities.models, data.settings.imageEdit.model, /flux.*2.*klein|klein.*(?:4b|9b)/i).map((model) => <option key={model} value={model}>{model}</option>)}
+                    {h3Models.map((model) => <option key={model} value={model}>{model}</option>)}
                   </select>
                 </label>
                 <div className="engine-fixed-recipe">
@@ -3208,7 +3256,7 @@ function AdminPanel() {
                     ...data,
                     settings: { ...data.settings, krea: { ...data.settings.krea, model: event.target.value } },
                   })}>
-                    {data.capabilities.models.map((model) => <option key={model} value={model}>{model}</option>)}
+                    {kreaModels.map((model) => <option key={model} value={model}>{model}</option>)}
                   </select>
                 </label>
                 <label>
@@ -3217,7 +3265,7 @@ function AdminPanel() {
                     ...data,
                     settings: { ...data.settings, krea: { ...data.settings.krea, encoder: event.target.value } },
                   })}>
-                    {compatibleEngineOptions(data.capabilities.textEncoders, data.settings.imageEdit.encoder, /qwen[_-]?3.*4b/i).map((encoder) => <option key={encoder} value={encoder}>{encoder}</option>)}
+                    {kreaTextEncoders.map((encoder) => <option key={encoder} value={encoder}>{encoder}</option>)}
                   </select>
                 </label>
                 <label>
@@ -3226,7 +3274,7 @@ function AdminPanel() {
                     ...data,
                     settings: { ...data.settings, krea: { ...data.settings.krea, vae: event.target.value } },
                   })}>
-                    {compatibleEngineOptions(data.capabilities.vaes, data.settings.imageEdit.vae, /flux2[-_]?vae/i).map((vae) => <option key={vae} value={vae}>{vae}</option>)}
+                    {kreaVaes.map((vae) => <option key={vae} value={vae}>{vae}</option>)}
                   </select>
                 </label>
                 <label>
@@ -3286,7 +3334,7 @@ function AdminPanel() {
                     ...data,
                     settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, model: event.target.value } },
                   })}>
-                    {data.capabilities.models.map((model) => <option key={model} value={model}>{model}</option>)}
+                    {imageEditModels.map((model) => <option key={model} value={model}>{model}</option>)}
                   </select>
                 </label>
                 <label>
@@ -3295,7 +3343,7 @@ function AdminPanel() {
                     ...data,
                     settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, encoder: event.target.value } },
                   })}>
-                    {data.capabilities.textEncoders.map((encoder) => <option key={encoder} value={encoder}>{encoder}</option>)}
+                    {imageEditTextEncoders.map((encoder) => <option key={encoder} value={encoder}>{encoder}</option>)}
                   </select>
                 </label>
                 <label>
@@ -3304,7 +3352,7 @@ function AdminPanel() {
                     ...data,
                     settings: { ...data.settings, imageEdit: { ...data.settings.imageEdit, vae: event.target.value } },
                   })}>
-                    {data.capabilities.vaes.map((vae) => <option key={vae} value={vae}>{vae}</option>)}
+                    {imageEditVaes.map((vae) => <option key={vae} value={vae}>{vae}</option>)}
                   </select>
                 </label>
                 <label>
