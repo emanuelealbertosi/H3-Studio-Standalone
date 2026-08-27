@@ -10,6 +10,8 @@ workflow. Stato locale, password, database, log e media non vengono versionati.
 - ComfyUI già funzionante e raggiungibile via HTTP.
 - FFmpeg nel `PATH` oppure il suo percorso configurato nell'Admin.
 - I modelli MiniMax H3, Krea e Flux.2 Klein scelti dall’Admin nelle cartelle ComfyUI corrette.
+- Per la Chat: un GGUF Gemma 4 con il relativo `mmproj` nella cartella `llm`
+  visibile a ComfyUI e un `llama-server` recente con supporto MTMD/Vision.
 
 La versione minima 22.16.0 è necessaria anche per il backup SQLite consistente
 usato dallo strumento di riparazione dei tempi storici.
@@ -88,6 +90,16 @@ Il pacchetto esteso `comfyui_nodes/ComfyUI-H3-Multishot` è necessario: il
 repository H3 Multishot originale da solo non contiene autoprompter AIO, motion
 memory e router Studio. Provenienza e commit base sono documentati nel file
 `H3-STUDIO-NOTICE.md` della cartella.
+
+Il pacchetto incluso `comfyui_nodes/H3-Studio-Gemma4-Chat` non richiede il
+servizio LM Studio. Su Windows rileva automaticamente il `llama-server.exe`
+più recente installato fra i backend locali di LM Studio e lo avvia soltanto
+durante la conversazione, in ascolto su una porta loopback casuale. In
+alternativa si può copiare una distribuzione completa di llama.cpp nella
+sottocartella `runtime` del nodo (eseguibile e DLL adiacenti) oppure impostare
+la variabile di ambiente `H3_CHAT_LLAMA_SERVER` nel processo che avvia ComfyUI.
+Il server effimero viene terminato prima di Video, Image, Face e Upscale, quindi
+LM Studio non deve essere aperto e il modello non rimane in VRAM durante i render.
 
 ## Dati esclusi da Git
 

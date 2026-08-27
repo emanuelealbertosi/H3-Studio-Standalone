@@ -53,12 +53,24 @@ export type AnimaEngineSettings = {
   cfg: number;
 };
 
+export type ChatEngineSettings = {
+  model: string;
+  projector: string;
+  nCtx: number;
+  nGpuLayers: number;
+  nThreads: number;
+  maxNewTokens: number;
+  temperature: number;
+  topP: number;
+};
+
 export type RuntimeSettings = {
   h3: H3EngineSettings;
   fast: FastEngineSettings;
   krea: KreaEngineSettings;
   imageEdit: ImageEditEngineSettings;
   anima: AnimaEngineSettings;
+  chat: ChatEngineSettings;
 };
 
 export type ResolvedEngineSettings = H3EngineSettings & {
@@ -117,6 +129,16 @@ export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = Object.freeze({
     steps: 8,
     cfg: 1,
   },
+  chat: {
+    model: "huihui-ai\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-Q4_K.gguf",
+    projector: "huihui-ai\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF\\mmproj-model-bf16.gguf",
+    nCtx: 16_384,
+    nGpuLayers: -1,
+    nThreads: 8,
+    maxNewTokens: 1_536,
+    temperature: 0.35,
+    topP: 0.9,
+  },
 });
 
 function cloneDefaults(): RuntimeSettings {
@@ -140,6 +162,7 @@ function cloneDefaults(): RuntimeSettings {
       ...DEFAULT_RUNTIME_SETTINGS.anima,
       loras: DEFAULT_RUNTIME_SETTINGS.anima.loras.map((slot) => ({ ...slot })),
     },
+    chat: { ...DEFAULT_RUNTIME_SETTINGS.chat },
   };
 }
 
@@ -195,6 +218,7 @@ function migrateLegacySettings(value: Record<string, unknown>): RuntimeSettings 
     krea: defaults.krea,
     imageEdit: defaults.imageEdit,
     anima: defaults.anima,
+    chat: defaults.chat,
   };
 }
 
@@ -210,6 +234,7 @@ function validateSettings(value: unknown): RuntimeSettings {
   const fast = isRecord(value.fast) ? value.fast : defaults.fast;
   const imageEdit = isRecord(value.imageEdit) ? value.imageEdit : defaults.imageEdit;
   const anima = isRecord(value.anima) ? value.anima : defaults.anima;
+  const chat = isRecord(value.chat) ? value.chat : defaults.chat;
 
   const h3Model = typeof value.h3.model === "string" ? value.h3.model.trim() : "";
   const fastModel = typeof fast.model === "string" ? fast.model.trim() : "";
@@ -228,6 +253,14 @@ function validateSettings(value: unknown): RuntimeSettings {
   const animaEncoder = typeof anima.encoder === "string" ? anima.encoder.trim() : "";
   const animaVae = typeof anima.vae === "string" ? anima.vae.trim() : "";
   const animaCfg = Number(anima.cfg);
+  const chatModel = typeof chat.model === "string" ? chat.model.trim() : "";
+  const chatProjector = typeof chat.projector === "string" ? chat.projector.trim() : "";
+  const chatNCtx = Number(chat.nCtx);
+  const chatNGpuLayers = Number(chat.nGpuLayers);
+  const chatNThreads = Number(chat.nThreads);
+  const chatMaxNewTokens = Number(chat.maxNewTokens);
+  const chatTemperature = Number(chat.temperature);
+  const chatTopP = Number(chat.topP);
   const imageEditKvCache =
     imageEdit.kvCacheEnabled === undefined
       ? defaults.imageEdit.kvCacheEnabled
@@ -274,6 +307,30 @@ function validateSettings(value: unknown): RuntimeSettings {
   if (!Number.isFinite(animaCfg) || animaCfg < 0 || animaCfg > 20) {
     throw new Error("Il CFG Anima deve essere compreso fra 0 e 20");
   }
+  if (!chatModel || !/gemma.*\.gguf$/i.test(chatModel) || /mmproj/i.test(chatModel)) {
+    throw new Error("Seleziona un modello Gemma GGUF valido per la Chat");
+  }
+  if (!chatProjector || !/mmproj.*\.gguf$/i.test(chatProjector)) {
+    throw new Error("Seleziona il projector mmproj GGUF per la Chat vision");
+  }
+  if (!Number.isInteger(chatNCtx) || chatNCtx < 2_048 || chatNCtx > 262_144) {
+    throw new Error("Il contesto Chat deve essere compreso fra 2.048 e 262.144 token");
+  }
+  if (!Number.isInteger(chatNGpuLayers) || chatNGpuLayers < -1 || chatNGpuLayers > 200) {
+    throw new Error("I layer GPU Chat devono essere compresi fra -1 e 200");
+  }
+  if (!Number.isInteger(chatNThreads) || chatNThreads < 1 || chatNThreads > 128) {
+    throw new Error("I thread Chat devono essere compresi fra 1 e 128");
+  }
+  if (!Number.isInteger(chatMaxNewTokens) || chatMaxNewTokens < 128 || chatMaxNewTokens > 8_192) {
+    throw new Error("I token di risposta Chat devono essere compresi fra 128 e 8.192");
+  }
+  if (!Number.isFinite(chatTemperature) || chatTemperature < 0 || chatTemperature > 2) {
+    throw new Error("La temperature Chat deve essere compresa fra 0 e 2");
+  }
+  if (!Number.isFinite(chatTopP) || chatTopP <= 0 || chatTopP > 1) {
+    throw new Error("Top P Chat deve essere maggiore di 0 e non superiore a 1");
+  }
   assertPddModelCompatibility(fastModel, pddFile);
 
   return {
@@ -312,6 +369,16 @@ function validateSettings(value: unknown): RuntimeSettings {
       steps: validateStepCount(anima.steps, "Anima"),
       cfg: animaCfg,
     },
+    chat: {
+      model: chatModel,
+      projector: chatProjector,
+      nCtx: chatNCtx,
+      nGpuLayers: chatNGpuLayers,
+      nThreads: chatNThreads,
+      maxNewTokens: chatMaxNewTokens,
+      temperature: chatTemperature,
+      topP: chatTopP,
+    },
   };
 }
 
@@ -344,6 +411,7 @@ export class RuntimeSettingsStore {
           ...value,
           imageEdit: isRecord(value.imageEdit) ? value.imageEdit : current.imageEdit,
           anima: isRecord(value.anima) ? value.anima : current.anima,
+          chat: isRecord(value.chat) ? value.chat : current.chat,
         })
       : validateSettings(value);
     await mkdir(path.dirname(this.filePath), { recursive: true });

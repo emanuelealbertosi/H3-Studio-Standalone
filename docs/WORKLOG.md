@@ -1,5 +1,14 @@
 # Worklog
 
+## 27 agosto 2026 — Chat Gemma 4 Vision per progetto
+
+- Aggiunta la voce Chat sopra lo Studio con conversazioni SQLite indipendenti per progetto, cronologia, pulizia e composer responsive.
+- Collegata la Libreria con pulsante `+`, trigger `@`, miniature e fino a otto allegati; Gemma analizza direttamente fino a quattro immagini.
+- Implementato il routing strutturato verso Video H3, generazione Krea, edit Flux.2 Klein e Anima; i video Chat usano sempre 10s, FAST 8-step, 0,5 MP e un candidato.
+- Aggiunto un profilo Admin separato per modello Gemma, projector, contesto, layer GPU, thread e sampling, senza contaminare i modelli H3 o Flux.
+- Creato e installato il nodo `H3StudioGemma4VisionChat`: rileva il runtime llama.cpp locale, avvia un server MTMD loopback effimero e lo termina prima di ogni render.
+- Verificati end-to-end testo, JSON strutturato, lettura Vision di una schermata e rilascio del modello; aggiunto `test:chat` alla CI.
+
 ## 27 agosto 2026 — Continue allineato al Multishot
 
 - Corretto `VIDEO EXTENSION`: il video sorgente non viene più reinserito per intero nel reference bank, dove poteva essere reinterpretato o riprodotto invece di continuato.

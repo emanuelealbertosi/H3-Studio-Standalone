@@ -471,4 +471,27 @@ export const JOB_DATABASE_MIGRATIONS = [
        ON external_media(origin_project_id, updated_at DESC)`,
     ],
   },
+  {
+    version: 18,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS chat_threads (
+        project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS chat_messages (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES chat_threads(project_id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+        content TEXT NOT NULL,
+        attachments_json TEXT NOT NULL DEFAULT '[]',
+        action_json TEXT,
+        status TEXT NOT NULL DEFAULT 'ready' CHECK (status IN ('pending', 'ready', 'failed')),
+        error TEXT,
+        created_at TEXT NOT NULL
+      ) STRICT`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_messages_project_created
+       ON chat_messages(project_id, created_at)`,
+    ],
+  },
 ] as const;

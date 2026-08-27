@@ -62,10 +62,10 @@ export class ComfyClient {
 
   private async requestJson<T>(
     path: string,
-    init: { method?: "GET" | "POST"; body?: unknown } = {},
+    init: { method?: "GET" | "POST"; body?: unknown; timeoutMs?: number } = {},
   ): Promise<T> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? this.timeoutMs);
 
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
@@ -138,6 +138,32 @@ export class ComfyClient {
         error: errorMessage(error),
       };
     }
+  }
+
+  async chatStatus() {
+    return this.requestJson<{
+      ok: boolean;
+      ready: boolean;
+      loaded: boolean;
+      runtimeVersion?: string | null;
+      error?: string | null;
+      models: string[];
+      projectors: string[];
+    }>("/h3_studio/chat/status");
+  }
+
+  async chatGenerate(body: unknown) {
+    return this.requestJson<{ ok: boolean; text?: string; model?: string; error?: string }>(
+      "/h3_studio/chat",
+      { method: "POST", body, timeoutMs: 15 * 60_000 },
+    );
+  }
+
+  async chatUnload() {
+    return this.requestJson<{ ok: boolean; loaded: boolean }>(
+      "/h3_studio/chat/unload",
+      { method: "POST", timeoutMs: 120_000 },
+    );
   }
 
   async history(maxItems = 50): Promise<ComfyHistory> {

@@ -28,6 +28,8 @@ import {
   type ImageProjectTag,
 } from "./image-job-repository.js";
 import { ImageStudioService } from "./image-studio-service.js";
+import { ChatRepository } from "./chat-repository.js";
+import { ChatService } from "./chat-service.js";
 import {
   InstallSettingsStore,
   WORKFLOW_CATALOG,
@@ -129,6 +131,14 @@ const studioJobs = new StudioJobService(
   runtimeSettings,
   progressTracker,
   jobRepository,
+);
+const chatRepository = new ChatRepository(jobRepository.databasePath);
+const chat = new ChatService(
+  comfy,
+  chatRepository,
+  runtimeSettings,
+  studioJobs,
+  imageStudio,
 );
 const recoveredCandidates = await studioJobs.recover();
 const postprocess = new PostprocessService(
@@ -409,6 +419,7 @@ app.post("/api/jobs/dry-run", async (request, reply) => {
 
 app.post("/api/jobs", async (request, reply) => {
   try {
+    await comfy.chatUnload().catch(() => undefined);
     const job = await studioJobs.submit(request.body);
     return reply.status(202).send({ ok: true, job });
   } catch (error) {
@@ -423,6 +434,7 @@ app.post<{
   Body: { candidateIndex?: number };
 }>("/api/jobs/:jobId/regenerate", async (request, reply) => {
   try {
+    await comfy.chatUnload().catch(() => undefined);
     const rawIndex = request.body?.candidateIndex;
     const candidateIndex = rawIndex === undefined ? undefined : Number(rawIndex);
     if (
@@ -499,6 +511,7 @@ app.post("/api/image-jobs/dry-run", async (request, reply) => {
 
 app.post("/api/image-jobs", async (request, reply) => {
   try {
+    await comfy.chatUnload().catch(() => undefined);
     const job = await imageStudio.submit(request.body);
     return reply.status(202).send({ ok: true, job });
   } catch (error) {
@@ -508,11 +521,50 @@ app.post("/api/image-jobs", async (request, reply) => {
   }
 });
 
+app.get("/api/chat/status", async () => ({ ok: true, chat: await chat.status() }));
+
+app.get<{ Params: { projectId: string } }>(
+  "/api/chat/:projectId",
+  async (request, reply) => {
+    try {
+      return { ok: true, messages: chat.list(request.params.projectId) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Chat non disponibile";
+      return reply.status(400).send({ ok: false, error: message });
+    }
+  },
+);
+
+app.post<{
+  Params: { projectId: string };
+  Body: { content?: unknown; attachments?: unknown };
+}>("/api/chat/:projectId/messages", async (request, reply) => {
+  try {
+    return { ok: true, ...(await chat.send(request.params.projectId, request.body ?? {})) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Messaggio Chat fallito";
+    return reply.status(400).send({ ok: false, error: message });
+  }
+});
+
+app.delete<{ Params: { projectId: string } }>(
+  "/api/chat/:projectId",
+  async (request, reply) => {
+    try {
+      return { ok: true, ...chat.clear(request.params.projectId) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Chat non cancellata";
+      return reply.status(400).send({ ok: false, error: message });
+    }
+  },
+);
+
 app.post<{
   Params: { jobId: string };
   Body: { candidateIndex?: number };
 }>("/api/image-jobs/:jobId/regenerate", async (request, reply) => {
   try {
+    await comfy.chatUnload().catch(() => undefined);
     const rawIndex = request.body?.candidateIndex;
     const candidateIndex = rawIndex === undefined ? undefined : Number(rawIndex);
     if (
@@ -658,6 +710,7 @@ app.post<{
   };
 }>("/api/jobs/:jobId/candidates/:candidateIndex/variants", async (request, reply) => {
   try {
+    await comfy.chatUnload().catch(() => undefined);
     const variant = await postprocess.create(
       request.params.jobId,
       Number(request.params.candidateIndex),
@@ -1216,13 +1269,15 @@ app.get<{
 });
 
 async function engineSettingsPayload() {
-  const [settings, models, loras, pddFiles, textEncoders, vaes, workflow, fastWorkflow, fastRuntime, imageAttentionBackends] = await Promise.all([
+  const [settings, models, loras, pddFiles, textEncoders, vaes, llmFiles, chatRuntime, workflow, fastWorkflow, fastRuntime, imageAttentionBackends] = await Promise.all([
     runtimeSettings.get(),
     comfy.models("diffusion_models"),
     comfy.models("loras"),
     comfy.modelFiles("pdd_acc").catch((): string[] => []),
     comfy.modelFiles("text_encoders"),
     comfy.modelFiles("vae"),
+    comfy.modelFiles("llm").catch((): string[] => []),
+    comfy.chatStatus().catch(() => null),
     workflowStore.status(),
     fastWorkflowStore.status(),
     fastRuntimeStatus(),
@@ -1258,6 +1313,14 @@ async function engineSettingsPayload() {
       pddFiles: [...new Set(pddFiles)].sort(),
       textEncoders: [...new Set(textEncoders)].sort(),
       vaes: [...new Set(vaes)].sort(),
+      chatModels: [...new Set(chatRuntime?.models ?? llmFiles.filter((file) => /gemma.*\.gguf$/i.test(file) && !/mmproj/i.test(file)))].sort(),
+      chatProjectors: [...new Set(chatRuntime?.projectors ?? llmFiles.filter((file) => /mmproj.*\.gguf$/i.test(file)))].sort(),
+      chatRuntime: chatRuntime ? {
+        ready: chatRuntime.ready,
+        loaded: chatRuntime.loaded,
+        version: chatRuntime.runtimeVersion ?? null,
+        error: chatRuntime.error ?? null,
+      } : { ready: false, loaded: false, version: null, error: "Nodo H3 Studio Chat non caricato: riavvia ComfyUI" },
       imageAttentionBackends,
       stepRange: { min: 4, max: 40 },
     },
@@ -1381,21 +1444,25 @@ async function saveEngineSettings(
       (body as { imageEdit?: unknown }).imageEdit ?? currentSettings.imageEdit;
     const anima =
       (body as { anima?: unknown }).anima ?? currentSettings.anima;
+    const chatSettings =
+      (body as { chat?: unknown }).chat ?? currentSettings.chat;
     if (
       typeof h3 !== "object" || h3 === null || Array.isArray(h3) ||
       typeof fast !== "object" || fast === null || Array.isArray(fast) ||
       typeof krea !== "object" || krea === null || Array.isArray(krea) ||
       typeof imageEdit !== "object" || imageEdit === null || Array.isArray(imageEdit) ||
       typeof anima !== "object" || anima === null || Array.isArray(anima)
+      || typeof chatSettings !== "object" || chatSettings === null || Array.isArray(chatSettings)
     ) {
-      return reply.status(400).send({ ok: false, error: "Configurazione H3, FAST, Krea o Anima mancante" });
+      return reply.status(400).send({ ok: false, error: "Configurazione H3, FAST, Krea, Anima o Chat mancante" });
     }
-    const [models, loras, pddFiles, textEncoders, vaes] = await Promise.all([
+    const [models, loras, pddFiles, textEncoders, vaes, llmFiles] = await Promise.all([
       comfy.models("diffusion_models"),
       comfy.models("loras"),
       comfy.modelFiles("pdd_acc").catch((): string[] => []),
       comfy.modelFiles("text_encoders"),
       comfy.modelFiles("vae"),
+      comfy.modelFiles("llm").catch((): string[] => []),
     ]);
     if (!models.includes(String((h3 as { model?: unknown }).model ?? ""))) {
       return reply.status(400).send({ ok: false, error: "Modello H3 non installato" });
@@ -1442,6 +1509,12 @@ async function saveEngineSettings(
     if (!vaes.includes(String((anima as { vae?: unknown }).vae ?? ""))) {
       return reply.status(400).send({ ok: false, error: "VAE Anima non installata" });
     }
+    if (!llmFiles.includes(String((chatSettings as { model?: unknown }).model ?? ""))) {
+      return reply.status(400).send({ ok: false, error: "Modello Gemma Chat non installato" });
+    }
+    if (!llmFiles.includes(String((chatSettings as { projector?: unknown }).projector ?? ""))) {
+      return reply.status(400).send({ ok: false, error: "Projector mmproj Chat non installato" });
+    }
     const requestedAttention = String(
       (imageEdit as { attentionBackend?: unknown }).attentionBackend ?? "auto",
     );
@@ -1478,7 +1551,7 @@ async function saveEngineSettings(
     if (missingLora) {
       return reply.status(400).send({ ok: false, error: `LoRA non installato: ${missingLora}` });
     }
-    const settings = await runtimeSettings.update({ ...body, imageEdit, anima });
+    const settings = await runtimeSettings.update({ ...body, imageEdit, anima, chat: chatSettings });
     return { ok: true, settings };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Impostazioni non valide";
@@ -1496,6 +1569,7 @@ app.addHook("onClose", async () => {
   progressTracker.stop();
   adminAuth.close();
   imageJobRepository.close();
+  chatRepository.close();
   variantRepository.close();
   projectRepository.close();
   jobRepository.close();

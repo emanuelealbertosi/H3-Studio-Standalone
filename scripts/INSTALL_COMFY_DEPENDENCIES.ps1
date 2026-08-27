@@ -45,6 +45,24 @@ if (Test-Path -LiteralPath $targetH3 -PathType Container) {
 Copy-Item -Path (Join-Path $bundledH3 "*") -Destination $targetH3 -Recurse -Force
 Write-Host "Installato H3 Studio node pack -> $targetH3" -ForegroundColor Green
 
+$bundledChat = Join-Path $projectRoot "comfyui_nodes\H3-Studio-Gemma4-Chat"
+$targetChat = Join-Path $customNodes "H3-Studio-Gemma4-Chat"
+if (-not (Test-Path -LiteralPath (Join-Path $bundledChat "__init__.py") -PathType Leaf)) {
+  throw "Pacchetto Chat H3 Studio incluso non trovato: $bundledChat"
+}
+if (Test-Path -LiteralPath $targetChat -PathType Container) {
+  $backupRoot = Join-Path $customNodes "_h3_studio_backups"
+  New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
+  $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+  $archive = Join-Path $backupRoot ("H3-Studio-Gemma4-Chat-" + $stamp + ".zip")
+  Compress-Archive -LiteralPath $targetChat -DestinationPath $archive -CompressionLevel Fastest
+  Write-Host "Backup nodo Chat esistente: $archive" -ForegroundColor Yellow
+} else {
+  New-Item -ItemType Directory -Force -Path $targetChat | Out-Null
+}
+Copy-Item -Path (Join-Path $bundledChat "*") -Destination $targetChat -Recurse -Force
+Write-Host "Installato H3 Studio Gemma 4 Chat -> $targetChat" -ForegroundColor Green
+
 $installedRepos = [System.Collections.Generic.List[string]]::new()
 
 function Install-GitRepository {

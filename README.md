@@ -11,6 +11,14 @@ Vedi [LICENSE](LICENSE) e le note nelle rispettive cartelle.
 
 Il prodotto organizza prompt, personaggi, asset, candidati e continuazioni. ComfyUI rimane il motore di rendering; H3 Studio gestisce progetti, coda, confronto, crediti e riproducibilità.
 
+La voce **Chat** aggiunge un assistente Gemma 4 Vision locale e separato per
+progetto. Può conversare, analizzare fino a quattro immagini della Libreria e,
+su richiesta esplicita, avviare Video H3, immagini Krea, edit Flux.2 Klein o
+immagini Anima. I video avviati dalla Chat usano il profilo rapido controllato
+dal server: 10 secondi, un candidato, 0,5 MP e FAST 8-step. Il modello resta
+caricato fra i messaggi, ma viene scaricato automaticamente prima di ogni render
+per restituire VRAM a ComfyUI.
+
 ## Stato
 
 Fase attuale: **Milestone 4 — montaggio locale, Continue/Edit e workflow multimodali**.
@@ -104,6 +112,7 @@ video corrispondenti dall'output ComfyUI.
 - `docs/GENERATION-MODES.md`: mapping verificato di T2V, I2V, Reference, Keyframes, Continue ed Edit.
 - `docs/CREATIVE-LIBRARY.md`: personaggi, oggetti, reference e sheet Krea 2.
 - `docs/IMAGE-STUDIO.md`: generazione Krea/Anima, edit Flux Klein, reference e condivisione immagini fra progetti.
+- `docs/CHAT.md`: assistente Gemma 4 Vision, allegati, azioni e runtime locale.
 - `docs/INSTALLATION.md`: clone, primo avvio, sicurezza e dipendenze ComfyUI.
 - `docs/GITHUB-RELEASE.md`: sanitizzazione, CI e checklist di pubblicazione.
 - `docs/WORKLOG.md`: cronologia sintetica del lavoro.
@@ -112,6 +121,7 @@ Test locali principali: `npm run test:projects`, `npm run test:export`,
 `npm run test:library`, `npm run test:external`, `npm run test:krea-contract` e `npm run test:fast`.
 Il bootstrap e l'autenticazione locale si verificano con `npm run test:setup`.
 Il contratto completo Image Studio si verifica con `npm run test:images`.
+Il contratto della Chat locale si verifica con `npm run test:chat`.
 
 ## Avvio rapido
 

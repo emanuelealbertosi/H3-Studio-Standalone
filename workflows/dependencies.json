@@ -18,6 +18,14 @@
       "requiredFor": ["video", "fast"]
     },
     {
+      "id": "h3-studio-chat-node",
+      "label": "H3 Studio Gemma 4 Vision Chat (incluso)",
+      "kind": "custom_node",
+      "requiredClasses": ["H3StudioGemma4VisionChat"],
+      "notes": "Nodo locale incluso in comfyui_nodes/. Avvia un llama-server effimero solo durante la conversazione e lo chiude prima dei render. Rileva automaticamente il runtime llama.cpp di LM Studio oppure H3_CHAT_LLAMA_SERVER; riavvia ComfyUI dopo l'installazione.",
+      "requiredFor": ["chat"]
+    },
+    {
       "id": "fantastic-h3-media",
       "label": "Fantastic MiniMax H3 Prompt Builder",
       "kind": "custom_node",
@@ -197,7 +205,18 @@
       "filenames": [
         "huihui-ai\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-Q4_K.gguf"
       ],
-      "requiredFor": ["video", "fast"]
+      "requiredFor": ["video", "fast", "chat"]
+    },
+    {
+      "id": "h3-chat-mmproj",
+      "label": "Gemma 4 Vision projector",
+      "kind": "model",
+      "folder": "llm",
+      "filenames": [
+        "huihui-ai\\Huihui-gemma-4-12B-it-qat-q4_0-unquantized-abliterated-GGUF\\mmproj-model-bf16.gguf"
+      ],
+      "notes": "Deve appartenere allo stesso repository del GGUF selezionato nella sezione Chat dell'Admin.",
+      "requiredFor": ["chat"]
     },
     {
       "id": "krea-model",

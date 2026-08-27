@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import ImageStudioPanel, {
   type ImageStudioIncomingReference,
 } from "./image-studio-panel";
+import ChatPanel from "./chat-panel";
 import {
   compatiblePddFilesForModel,
   fastPddPairForModel,
@@ -492,6 +493,16 @@ type EngineAdminResponse = {
       steps: number;
       cfg: number;
     };
+    chat: {
+      model: string;
+      projector: string;
+      nCtx: number;
+      nGpuLayers: number;
+      nThreads: number;
+      maxNewTokens: number;
+      temperature: number;
+      topP: number;
+    };
   };
   capabilities: {
     models: string[];
@@ -499,6 +510,9 @@ type EngineAdminResponse = {
     pddFiles: string[];
     textEncoders: string[];
     vaes: string[];
+    chatModels: string[];
+    chatProjectors: string[];
+    chatRuntime: { ready: boolean; loaded: boolean; version: string | null; error: string | null };
     imageAttentionBackends: string[];
   };
 };
@@ -3771,6 +3785,49 @@ function AdminPanel() {
                 <p className="image-edit-profile-note">Profilo consigliato: Klein 4B usa Qwen 3 4B; Klein 9B e SNOFS usano Qwen 3 8B. Il selettore abbina automaticamente l’encoder · Flux2 VAE · 4 step / CFG 1.</p>
               </div>
             </article>
+
+            <article className="engine-config-card chat-engine-card">
+              <div className="engine-config-heading">
+                <div>
+                  <span>LOCAL AI</span>
+                  <h3>Gemma 4 Vision Chat</h3>
+                </div>
+                <b className={data.capabilities.chatRuntime.ready ? "admin-ready" : "admin-warning"}>
+                  {data.capabilities.chatRuntime.ready ? data.capabilities.chatRuntime.loaded ? "CARICATO" : "PRONTO" : "SETUP"}
+                </b>
+              </div>
+              <div className="admin-form image-edit-engine-form">
+                <label>
+                  <span>Modello Gemma GGUF</span>
+                  <select value={data.settings.chat.model} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, chat: { ...data.settings.chat, model: event.target.value } },
+                  })}>
+                    {compatibleEngineOptions(data.capabilities.chatModels, data.settings.chat.model, /gemma.*\.gguf$/i).map((model) => <option key={model} value={model}>{model}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Projector vision mmproj</span>
+                  <select value={data.settings.chat.projector} onChange={(event) => setData({
+                    ...data,
+                    settings: { ...data.settings, chat: { ...data.settings.chat, projector: event.target.value } },
+                  })}>
+                    {compatibleEngineOptions(data.capabilities.chatProjectors, data.settings.chat.projector, /mmproj.*\.gguf$/i).map((model) => <option key={model} value={model}>{model}</option>)}
+                  </select>
+                </label>
+                <label><span>Contesto</span><input min="2048" max="262144" step="1024" type="number" value={data.settings.chat.nCtx} onChange={(event) => setData({ ...data, settings: { ...data.settings, chat: { ...data.settings.chat, nCtx: Number(event.target.value) } } })} /></label>
+                <label><span>Layer GPU (-1 = tutti)</span><input min="-1" max="200" step="1" type="number" value={data.settings.chat.nGpuLayers} onChange={(event) => setData({ ...data, settings: { ...data.settings, chat: { ...data.settings.chat, nGpuLayers: Number(event.target.value) } } })} /></label>
+                <label><span>Thread CPU</span><input min="1" max="128" step="1" type="number" value={data.settings.chat.nThreads} onChange={(event) => setData({ ...data, settings: { ...data.settings, chat: { ...data.settings.chat, nThreads: Number(event.target.value) } } })} /></label>
+                <label><span>Token risposta</span><input min="128" max="8192" step="128" type="number" value={data.settings.chat.maxNewTokens} onChange={(event) => setData({ ...data, settings: { ...data.settings, chat: { ...data.settings.chat, maxNewTokens: Number(event.target.value) } } })} /></label>
+                <label><span>Temperature</span><input min="0" max="2" step="0.05" type="number" value={data.settings.chat.temperature} onChange={(event) => setData({ ...data, settings: { ...data.settings, chat: { ...data.settings.chat, temperature: Number(event.target.value) } } })} /></label>
+                <label><span>Top P</span><input min="0.01" max="1" step="0.01" type="number" value={data.settings.chat.topP} onChange={(event) => setData({ ...data, settings: { ...data.settings, chat: { ...data.settings.chat, topP: Number(event.target.value) } } })} /></label>
+                <p className="image-edit-profile-note">
+                  {data.capabilities.chatRuntime.ready
+                    ? `llama.cpp ${data.capabilities.chatRuntime.version ?? "rilevato"} · il modello resta in cache durante la conversazione e viene scaricato automaticamente prima dei render.`
+                    : `Runtime non pronto: ${data.capabilities.chatRuntime.error ?? "installa il nodo incluso e riavvia ComfyUI"}`}
+                </p>
+              </div>
+            </article>
           </div>
 
           <div className="admin-footer">
@@ -3798,7 +3855,7 @@ function AdminPanel() {
 }
 
 function StudioApp() {
-  const [activeView, setActiveView] = useState<"studio" | "projects" | "montages" | "characters" | "library" | "admin">("studio");
+  const [activeView, setActiveView] = useState<"chat" | "studio" | "projects" | "montages" | "characters" | "library" | "admin">("studio");
   const [studioMediaMode, setStudioMediaMode] = useState<"video" | "image">("video");
   const [imageResetToken, setImageResetToken] = useState(0);
   const [imageStudioHandoff, setImageStudioHandoff] = useState<{
@@ -5212,6 +5269,10 @@ function StudioApp() {
           H3
         </a>
         <nav className="rail-nav">
+          <button className={`rail-item ${activeView === "chat" ? "active" : ""}`} onClick={() => setActiveView("chat")} type="button">
+            <span className="rail-icon">✦</span>
+            Chat
+          </button>
           <button className={`rail-item ${activeView === "studio" ? "active" : ""}`} onClick={() => setActiveView("studio")} type="button">
             <span className="rail-icon">◆</span>
             Studio
@@ -5282,7 +5343,9 @@ function StudioApp() {
                   ? "Media riutilizzabili"
                 : activeView === "characters"
                   ? "Immagini riutilizzabili"
-                  : `Progetto / ${studioProject?.name ?? "Caricamento…"}`}
+                  : activeView === "chat"
+                    ? `Conversazione / ${studioProject?.name ?? "Caricamento…"}`
+                    : `Progetto / ${studioProject?.name ?? "Caricamento…"}`}
             </div>
             <h1>
               {activeView === "admin"
@@ -5295,16 +5358,18 @@ function StudioApp() {
                     ? "Libreria"
                   : activeView === "characters"
                     ? "Assets"
-                  : studioMediaMode === "image" ? "Immagine 01" : "Shot 01"}
+                  : activeView === "chat"
+                    ? "Chat"
+                    : studioMediaMode === "image" ? "Immagine 01" : "Shot 01"}
             </h1>
           </div>
           <div className="topbar-actions">
-            {activeView === "studio" && (
+            {(activeView === "studio" || activeView === "chat") && (
               <div className="topbar-project-switcher">
-                <div className="studio-media-toggle" aria-label="Tipo di generazione">
+                {activeView === "studio" && <div className="studio-media-toggle" aria-label="Tipo di generazione">
                   <button className={studioMediaMode === "video" ? "active" : ""} onClick={() => setStudioMediaMode("video")} type="button">▶ Video</button>
                   <button className={studioMediaMode === "image" ? "active" : ""} onClick={() => setStudioMediaMode("image")} type="button">▧ Immagini</button>
-                </div>
+                </div>}
                 <label>
                   <span>Progetto</span>
                   <select value={studioProjectId} onChange={(event) => {
@@ -5316,13 +5381,13 @@ function StudioApp() {
                     ))}
                   </select>
                 </label>
-                <button onClick={() => {
+                {activeView === "studio" && <button onClick={() => {
                   if (studioMediaMode === "video") beginNewGeneration(studioProjectId);
                   else {
                     setImageStudioHandoff(null);
                     setImageResetToken((current) => current + 1);
                   }
-                }} type="button">{studioMediaMode === "video" ? "Nuovo shot" : "Nuova immagine"}</button>
+                }} type="button">{studioMediaMode === "video" ? "Nuovo shot" : "Nuova immagine"}</button>}
                 <button onClick={() => void createStudioProject()} title="Crea un nuovo progetto" type="button">＋</button>
               </div>
             )}
@@ -5373,6 +5438,14 @@ function StudioApp() {
                 setMontageTarget({ projectId, timelineId });
                 setActiveView("montages");
               }}
+            />
+          ) : activeView === "chat" ? (
+            <ChatPanel
+              bridgeUrl={bridgeUrl}
+              onOpenStudio={(kind) => { setStudioMediaMode(kind); setActiveView("studio"); }}
+              projectId={studioProjectId}
+              projectName={studioProject?.name}
+              projects={studioProjects}
             />
           ) : (
           <>
