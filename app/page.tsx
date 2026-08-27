@@ -3506,18 +3506,29 @@ function StudioApp() {
     const loaded = mediaAssets.flatMap((asset) => {
       if (!asset.mention || seen.has(asset.mention)) return [];
       seen.add(asset.mention);
-      return [{ kind: "loaded" as const, label: asset.mention, detail: asset.caption ?? asset.name, asset }];
+      return [{
+        kind: "loaded" as const,
+        label: asset.mention,
+        detail: asset.caption ?? asset.name,
+        previewKind: asset.kind,
+        previewPath: mediaPreviewPath(asset),
+        asset,
+      }];
     });
     const library = mediaLibraryAssets.map((asset) => ({
       kind: "library" as const,
       label: mentionBase(asset.name),
       detail: `${asset.kind === "character" ? "Personaggio" : "Oggetto"} · ${asset.referenceCount} reference`,
+      previewKind: "picture" as const,
+      previewPath: asset.hero?.mediaPath,
       asset,
     }));
     const images = mediaGeneratedImages.map((item) => ({
       kind: "image" as const,
       label: mentionBase(`immagine_${item.job.id.slice(0, 8)}_${item.candidate.index}`),
       detail: `${item.job.originProjectName ?? "Immagine generata"} · candidato ${item.candidate.index}`,
+      previewKind: "picture" as const,
+      previewPath: item.candidate.output.mediaPath,
       ...item,
     }));
     const videos = mediaRecentJobs.flatMap((job) =>
@@ -3527,6 +3538,8 @@ function StudioApp() {
           kind: "video" as const,
           label: mentionBase(`video_${job.id.slice(0, 8)}_${candidate.index}`),
           detail: `${job.projectName ?? "Senza progetto"} · ${job.request.durationSeconds}s`,
+          previewKind: "video" as const,
+          previewPath: candidate.output!.mediaPath,
           job,
           candidate,
         })),
@@ -4887,11 +4900,22 @@ function StudioApp() {
                           else if (item.kind === "library") void addLibraryAsset(item.asset);
                           else addRecentVideo(item.job, item.candidate);
                         }}
+                        aria-selected="false"
                         role="option"
                         type="button"
                       >
-                        <span>{item.kind === "loaded" ? "●" : item.kind === "image" ? "▨" : item.kind === "library" ? "▧" : "▶"}</span>
-                        <div><strong>@{item.label}</strong><small>{item.detail}</small></div>
+                        <div className="mention-thumbnail" aria-hidden="true">
+                          {item.previewKind === "picture" && item.previewPath ? (
+                            <img alt="" src={`${bridgeUrl}${item.previewPath}`} />
+                          ) : item.previewKind === "video" && item.previewPath ? (
+                            <video muted playsInline preload="metadata" src={`${bridgeUrl}${item.previewPath}#t=0.1`} />
+                          ) : item.previewKind === "audio" ? (
+                            <span>♪</span>
+                          ) : (
+                            <span>{item.kind === "library" ? "◇" : "●"}</span>
+                          )}
+                        </div>
+                        <div className="mention-copy"><strong>@{item.label}</strong><small>{item.detail}</small></div>
                         <i>{item.kind === "loaded" ? "Caricato" : item.kind === "image" ? "Immagine" : item.kind === "library" ? "Libreria" : "Video"}</i>
                       </button>
                     ))

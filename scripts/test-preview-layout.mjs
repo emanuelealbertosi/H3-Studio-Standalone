@@ -135,5 +135,12 @@ assert.match(css, /\.media-asset-actions\s*\{[^}]*display:\s*flex/s);
 assert.match(css, /\.image-reference-order\s*\{[^}]*grid-template-columns:\s*1\.7fr 1fr 1fr 1fr/s);
 assert.match(page, /className="media-asset-actions"/);
 assert.match(imageStudio, /className="media-library-picker media-library-modal image-library-modal"/);
+assert.match(page, /className="mention-thumbnail"/);
+assert.match(page, /item\.previewKind === "picture"/);
+assert.match(page, /item\.previewKind === "video"/);
+assert.match(page, /item\.previewPath\}#t=0\.1/);
+assert.match(page, /aria-selected="false"/);
+assert.match(css, /\.mention-thumbnail\s*\{[^}]*width:\s*54px[^}]*height:\s*46px/s);
+assert.match(css, /\.mention-thumbnail img,[\s\S]*?object-fit:\s*cover/s);
 
 console.log("Preview layout, image turnaround and Assets handoff UI: OK");

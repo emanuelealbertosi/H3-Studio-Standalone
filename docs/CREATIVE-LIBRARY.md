@@ -44,6 +44,11 @@ prompt il token H3 esatto (`<Picture 1>`, `<Video 1>` o `<Audio 1>`) nella posiz
 del cursore. Le reference di Image Edit espongono lo stesso comando usando la
 forma testuale `reference image N`, adatta al prompt Flux Klein.
 
+Digitando `@`, ogni proposta mostra anche la miniatura dell’immagine o un frame
+del video. Per l’audio viene mostrata un’icona dedicata; gli asset storici privi di
+hero mantengono un segnaposto. In questo modo alias simili possono essere distinti
+visivamente prima di inserirli.
+
 ## Uso dei video
 
 Ogni video nella **Libreria** espone **Manda a Studio**. Il comando apre lo

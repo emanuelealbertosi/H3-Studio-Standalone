@@ -3020,9 +3020,9 @@ a:focus-visible {
 
 .mention-menu > button {
   width: 100%;
-  min-height: 43px;
+  min-height: 62px;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   border: 0;
@@ -3035,8 +3035,26 @@ a:focus-visible {
 
 .mention-menu > button:hover,
 .mention-menu > button:focus-visible { background: rgba(215, 255, 82, 0.08); }
-.mention-menu > button > span { color: var(--accent); text-align: center; }
 .mention-menu > button > div { min-width: 0; display: grid; gap: 2px; }
+.mention-thumbnail {
+  width: 54px;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  place-items: center;
+  background: #070809;
+  color: var(--accent);
+}
+.mention-thumbnail img,
+.mention-thumbnail video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.mention-thumbnail span { font-size: 18px; text-align: center; }
+.mention-copy { align-content: center; }
 .mention-menu > button strong,
 .mention-menu > button small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mention-menu > button strong { font-size: 10px; }
