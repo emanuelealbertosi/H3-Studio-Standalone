@@ -191,3 +191,13 @@
 - Scelto come default il profilo core 4B Distilled FP8 a quattro step/CFG 1; il vecchio Multi Input Compact 9B/5-reference resta solo un riferimento perché più pesante e meno portabile.
 - Corrette condivisione isolata per candidato, annotation input/output, polling fra progetti, ripristino dei draft edit, thumbnail upload e routing automatico alle azioni Video.
 - Aggiunti guida Image Studio, manifest modelli, workflow API sanitizzato, test di regressione e job CI dedicato.
+
+## 27 agosto 2026 — Upscale 1/2 MP e Face sulla variante attiva
+
+- Aggiunti target Upscale 1 MP (0,98 interno) e 2 MP (1,96 interno), mostrati soltanto quando aumentano realmente la risoluzione del candidato.
+- Resa reale la sorgente selezionata: Face può partire dall'originale o da un Upscale pronto e usa il relativo file video/audio senza rieseguire l'upscale.
+- Persistiti `source_variant_id` e `target_megapixels` nella migrazione SQLite v16, con backfill delle varianti legacy a 1 MP.
+- Propagati lineage e target nelle timeline, nella cronologia e nelle etichette delle versioni; l'originale resta immutabile.
+- Bloccate lato server sorgenti di altro job/candidato, non pronte, non Upscale e target non superiori alla sorgente.
+- Aggiunti test dedicati per prompt 0,98/1,96 MP, catena Upscale→Face, audio del parent, migrazione, validazioni e cambio variante in timeline; CI Windows aggiornata.
+- Verificati typecheck, repository, export, Image Studio, Krea, FAST, cancellazione, restart, sanitizzazione e build Vinext. Resta il test GPU manuale di 2 MP e sincronizzazione A/V.

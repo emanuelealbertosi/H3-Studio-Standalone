@@ -6,6 +6,7 @@ import type { JobRepository } from "./job-repository.js";
 import {
   CandidateVariantRepository,
   type CandidateVariantKind,
+  type UpscaleTargetMegapixels,
 } from "./candidate-variant-repository.js";
 import { findVideoOutput, type MediaOutput } from "./studio-job.js";
 
@@ -15,6 +16,35 @@ function clone<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+const WORKFLOW_TARGET_MEGAPIXELS: Record<UpscaleTargetMegapixels, number> = {
+  1: 0.98,
+  2: 1.96,
+};
+
+export function normalizeUpscaleTarget(value: unknown): UpscaleTargetMegapixels {
+  const target = Number(value);
+  if (target !== 1 && target !== 2) {
+    throw new Error("targetMegapixels deve essere 1 oppure 2");
+  }
+  return target;
+}
+
+export function workflowMegapixelsForTarget(target: UpscaleTargetMegapixels) {
+  return WORKFLOW_TARGET_MEGAPIXELS[target];
+}
+
+function optionalSourceVariantId(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || value.length > 80) {
+    throw new Error("sourceVariantId non valido");
+  }
+  return value;
+}
+
+function sourceMegapixels(value: number) {
+  return value >= 0.98 ? 1 : value;
 }
 
 async function requireNode(
@@ -50,16 +80,17 @@ function absoluteOutputPath(root: string, output: MediaOutput) {
   return target;
 }
 
-function upscalePrompt(
+export function upscalePrompt(
   original: ComfyApiPrompt,
   filenamePrefix: string,
+  targetMegapixels: UpscaleTargetMegapixels,
 ) {
   const prompt = clone(original);
   const sampler = node(prompt, "H3ReferenceMemorySampler");
   const saver = node(prompt, "H3SaveContinuation");
   const dimensions = node(prompt, "H3AspectMegapixelSize");
   dimensions.inputs.size_mode = "megapixels + format";
-  dimensions.inputs.megapixels = 0.98;
+  dimensions.inputs.megapixels = workflowMegapixelsForTarget(targetMegapixels);
   sampler.inputs.studio_upscale = true;
   sampler.inputs.studio_upscale_model =
     "minimax_h3_latent_upscaler_3d_fp16.safetensors";
@@ -75,7 +106,7 @@ function copiedInputs(original: ComfyApiPrompt, classType: string) {
   return clone(node(original, classType).inputs);
 }
 
-function facePrompt(input: {
+export function facePrompt(input: {
   original: ComfyApiPrompt;
   sourcePath: string;
   prompt: string;
@@ -185,24 +216,77 @@ export class PostprocessService {
     private readonly comfyOutputDir: string,
   ) {}
 
-  async create(jobId: string, candidateIndex: number, rawKind: unknown) {
-    const kind = rawKind === "face" || rawKind === "upscale" || rawKind === "face_upscale"
+  async create(
+    jobId: string,
+    candidateIndex: number,
+    rawKind: unknown,
+    rawSourceVariantId?: unknown,
+    rawTargetMegapixels?: unknown,
+  ) {
+    const requestedKind = rawKind === "face" || rawKind === "upscale" || rawKind === "face_upscale"
       ? rawKind as CandidateVariantKind
       : null;
-    if (!kind) throw new Error("Variante richiesta non valida");
+    if (!requestedKind) throw new Error("Variante richiesta non valida");
     const source = this.jobs.candidateSnapshot(jobId, candidateIndex);
     if (!source?.job || source.candidate.status !== "ready" || !source.candidate.output) {
       throw new Error("Il candidato originale deve essere completato");
     }
 
-    if (kind === "face" || kind === "face_upscale") {
+    const sourceVariantId = optionalSourceVariantId(rawSourceVariantId);
+    const parentVariant = sourceVariantId ? this.variants.get(sourceVariantId) : null;
+    if (sourceVariantId && !parentVariant) {
+      throw new Error("Variante sorgente non trovata");
+    }
+    if (
+      parentVariant
+      && (
+        parentVariant.sourceJobId !== jobId
+        || parentVariant.sourceCandidateIndex !== candidateIndex
+      )
+    ) {
+      throw new Error("La variante sorgente non appartiene al candidato richiesto");
+    }
+    if (parentVariant && (parentVariant.status !== "ready" || !parentVariant.output)) {
+      throw new Error("La variante sorgente deve essere completata");
+    }
+    if (parentVariant && requestedKind !== "face") {
+      throw new Error("Solo Face può essere applicato a una variante già elaborata");
+    }
+    if (parentVariant && parentVariant.kind !== "upscale") {
+      throw new Error("Face può essere applicato soltanto a una variante Upscale pronta");
+    }
+
+    const requestedTarget = rawTargetMegapixels === undefined
+      || rawTargetMegapixels === null
+      || rawTargetMegapixels === ""
+      ? null
+      : normalizeUpscaleTarget(rawTargetMegapixels);
+    const needsUpscale = requestedKind === "upscale" || requestedKind === "face_upscale";
+    const targetMegapixels = needsUpscale
+      ? requestedTarget ?? 1
+      : parentVariant?.targetMegapixels ?? null;
+    if (
+      needsUpscale
+      && targetMegapixels !== null
+      && targetMegapixels <= sourceMegapixels(source.job.request.megapixels)
+    ) {
+      throw new Error(
+        `Upscale ${targetMegapixels} MP non disponibile: la risoluzione deve essere superiore alla sorgente`,
+      );
+    }
+    const kind: CandidateVariantKind = requestedKind === "face"
+      && parentVariant?.targetMegapixels
+      ? "face_upscale"
+      : requestedKind;
+
+    if (requestedKind === "face" || requestedKind === "face_upscale") {
       await requireNode(
         this.comfy,
         "H3FaceTrackCrop",
         "Face Refiner installato ma non ancora caricato: riavvia ComfyUI.",
       );
     }
-    if (kind === "upscale" || kind === "face_upscale") {
+    if (requestedKind === "upscale" || requestedKind === "face_upscale") {
       const [, samplerInfo] = await Promise.all([
         requireNode(
           this.comfy,
@@ -231,12 +315,19 @@ export class PostprocessService {
 
     const temporaryId = randomUUID();
     const basePrefix = `video/H3_STUDIO/${jobId}/candidate_${candidateIndex}/variants/${temporaryId}`;
-    const stage = kind === "face" ? "face" : "upscale";
+    const stage = requestedKind === "face" ? "face" : "upscale";
     const prompt = stage === "upscale"
-      ? upscalePrompt(source.candidate.apiPrompt, `${basePrefix}_upscale`)
+      ? upscalePrompt(
+          source.candidate.apiPrompt,
+          `${basePrefix}_upscale`,
+          targetMegapixels!,
+        )
       : facePrompt({
           original: source.candidate.apiPrompt,
-          sourcePath: absoluteOutputPath(this.comfyOutputDir, source.candidate.output),
+          sourcePath: absoluteOutputPath(
+            this.comfyOutputDir,
+            parentVariant?.output ?? source.candidate.output,
+          ),
           prompt: source.job.request.prompt,
           seed: source.candidate.seed,
           filenamePrefix: `${basePrefix}_face`,
@@ -246,6 +337,8 @@ export class PostprocessService {
     const record = this.variants.create({
       sourceJobId: jobId,
       sourceCandidateIndex: candidateIndex,
+      sourceVariantId,
+      targetMegapixels,
       kind,
       stage,
       prompt,

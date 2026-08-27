@@ -552,13 +552,19 @@ app.delete<{
 
 app.post<{
   Params: { jobId: string; candidateIndex: string };
-  Body: { kind?: string };
+  Body: {
+    kind?: string;
+    sourceVariantId?: string | null;
+    targetMegapixels?: number;
+  };
 }>("/api/jobs/:jobId/candidates/:candidateIndex/variants", async (request, reply) => {
   try {
     const variant = await postprocess.create(
       request.params.jobId,
       Number(request.params.candidateIndex),
       request.body?.kind,
+      request.body?.sourceVariantId,
+      request.body?.targetMegapixels,
     );
     return reply.status(202).send({ ok: true, variant });
   } catch (error) {

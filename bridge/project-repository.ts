@@ -13,6 +13,7 @@ type ClipRow = {
   id: string; project_id: string; timeline_id: string; source_job_id: string;
   source_candidate_index: number; source_variant_id: string | null;
   variant_kind: "face" | "upscale" | "face_upscale" | null;
+  variant_target_megapixels: 1 | 2 | null;
   position: number; label: string; created_at: string;
   seed: string; source_duration: number; trim_start: number; trim_end: number | null;
   volume: number; output_filename: string; output_subfolder: string | null;
@@ -45,6 +46,8 @@ function mapClip(row: ClipRow) {
     id: row.id, projectId: row.project_id, timelineId: row.timeline_id,
     sourceJobId: row.source_job_id, sourceCandidateIndex: row.source_candidate_index,
     sourceVariantId: row.source_variant_id, variantKind: row.variant_kind ?? "original",
+    targetMegapixels: row.variant_target_megapixels
+      ?? (row.variant_kind === "upscale" || row.variant_kind === "face_upscale" ? 1 : null),
     position: row.position, label: row.label, createdAt: row.created_at,
     seed: Number(row.seed), sourceDuration: row.source_duration,
     trimStart: row.trim_start, trimEnd: row.trim_end ?? row.source_duration,
@@ -130,6 +133,7 @@ export class ProjectRepository {
       `SELECT project_clips.id, project_clips.project_id, project_clips.timeline_id,
        project_clips.source_job_id, project_clips.source_candidate_index, project_clips.position,
        project_clips.source_variant_id, candidate_variants.kind AS variant_kind,
+       candidate_variants.target_megapixels AS variant_target_megapixels,
        project_clips.label, project_clips.created_at, project_clips.trim_start,
        project_clips.trim_end, project_clips.volume, candidates.seed,
        COALESCE(candidate_variants.output_filename, candidates.output_filename) AS output_filename,
@@ -292,19 +296,24 @@ export class ProjectRepository {
   }
   private clipVariants(jobId: string, candidateIndex: number) {
     const rows = this.database.prepare(
-      `SELECT id, kind, output_filename, output_subfolder, output_type, output_format
+      `SELECT id, kind, source_variant_id, target_megapixels,
+              output_filename, output_subfolder, output_type, output_format
        FROM candidate_variants
        WHERE source_job_id = ? AND source_candidate_index = ?
          AND status = 'ready' AND output_filename IS NOT NULL
        ORDER BY created_at DESC`,
     ).all(jobId, candidateIndex) as unknown as Array<{
       id: string; kind: "face" | "upscale" | "face_upscale";
+      source_variant_id: string | null; target_megapixels: 1 | 2 | null;
       output_filename: string; output_subfolder: string | null;
       output_type: MediaOutput["type"]; output_format: string | null;
     }>;
     return rows.map((row) => ({
       id: row.id,
       kind: row.kind,
+      sourceVariantId: row.source_variant_id,
+      targetMegapixels: row.target_megapixels
+        ?? (row.kind === "upscale" || row.kind === "face_upscale" ? 1 : null),
       output: mediaFromClip({
         output_filename: row.output_filename,
         output_subfolder: row.output_subfolder,

@@ -18,11 +18,14 @@ type CandidateStatus =
   | "failed";
 
 type VariantKind = "face" | "upscale" | "face_upscale";
+type UpscaleTargetMegapixels = 1 | 2;
 type CandidateVariant = {
   id: string;
   sourceCandidateIndex: number;
+  sourceVariantId?: string | null;
   kind: VariantKind;
   stage: "face" | "upscale";
+  targetMegapixels?: UpscaleTargetMegapixels | null;
   status: CandidateStatus | "prepared";
   phaseLabel?: string;
   progress?: number | null;
@@ -479,15 +482,57 @@ type ProjectClip = {
   variants: Array<{
     id: string;
     kind: VariantKind;
+    targetMegapixels?: UpscaleTargetMegapixels | null;
     output: { mediaPath: string; filename: string };
   }>;
 };
 
-function variantLabel(kind: VariantKind | "original") {
+function variantLabel(
+  kind: VariantKind | "original",
+  targetMegapixels?: number | null,
+) {
+  const target = targetMegapixels === 2 ? "2 MP" : "1 MP";
   if (kind === "face") return "Face";
-  if (kind === "upscale") return "Upscale 1 MP";
-  if (kind === "face_upscale") return "Face + 1 MP";
+  if (kind === "upscale") return `Upscale ${target}`;
+  if (kind === "face_upscale") return `Face + ${target}`;
   return "Originale";
+}
+
+const upscaleTargets = [1, 2] as const satisfies readonly UpscaleTargetMegapixels[];
+
+function canonicalVideoMegapixels(value: number) {
+  if (Math.abs(value - 0.98) < 0.03) return 1;
+  if (Math.abs(value - 1.96) < 0.05) return 2;
+  return value;
+}
+
+function candidateVersionMegapixels(
+  originalMegapixels: number,
+  activeVariant: CandidateVariant | undefined,
+  variants: CandidateVariant[],
+  visited = new Set<string>(),
+): number {
+  if (!activeVariant) return canonicalVideoMegapixels(originalMegapixels);
+  if (typeof activeVariant.targetMegapixels === "number") {
+    return canonicalVideoMegapixels(activeVariant.targetMegapixels);
+  }
+  if (visited.has(activeVariant.id)) {
+    return canonicalVideoMegapixels(originalMegapixels);
+  }
+  visited.add(activeVariant.id);
+  if (activeVariant.sourceVariantId) {
+    return candidateVersionMegapixels(
+      originalMegapixels,
+      variants.find((variant) => variant.id === activeVariant.sourceVariantId),
+      variants,
+      visited,
+    );
+  }
+  // Le varianti storiche non avevano metadati: l'upscale legacy era sempre 1 MP.
+  if (activeVariant.kind === "upscale" || activeVariant.kind === "face_upscale") {
+    return 1;
+  }
+  return canonicalVideoMegapixels(originalMegapixels);
 }
 
 type CandidateDeletionResult = {
@@ -732,7 +777,7 @@ function HistoryPanel({
         jobId: job.id,
         candidateIndex: candidate.index,
         variantId: variant?.id ?? null,
-        label: `Candidato ${candidate.index} · ${variant ? variantLabel(variant.kind) : "Originale"} · ${job.id.slice(0, 8)}`,
+        label: `Candidato ${candidate.index} · ${variant ? variantLabel(variant.kind, variant.targetMegapixels) : "Originale"} · ${job.id.slice(0, 8)}`,
       });
       setMessage("Clip aggiunta alla timeline");
     } catch (error) {
@@ -1039,7 +1084,7 @@ function HistoryPanel({
                         onClick={() => selectedCandidate && void addJobToProject(job, selectedCandidate, variant)}
                         type="button"
                       >
-                        + {variantLabel(variant.kind)}
+                        + {variantLabel(variant.kind, variant.targetMegapixels)}
                       </button>
                     ))}
                   </div>
@@ -1179,9 +1224,9 @@ function MontagesPanel({
         jobId: job.id,
         candidateIndex: candidate.index,
         variantId: variant?.id ?? null,
-        label: `Candidato ${candidate.index} · ${variant ? variantLabel(variant.kind) : "Originale"} · ${job.id.slice(0, 8)}`,
+        label: `Candidato ${candidate.index} · ${variant ? variantLabel(variant.kind, variant.targetMegapixels) : "Originale"} · ${job.id.slice(0, 8)}`,
       });
-      setMessage(`${variant ? variantLabel(variant.kind) : "Originale"} aggiunta a “${timeline?.name ?? "montaggio"}”`);
+      setMessage(`${variant ? variantLabel(variant.kind, variant.targetMegapixels) : "Originale"} aggiunta a “${timeline?.name ?? "montaggio"}”`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Aggiunta clip fallita");
     } finally {
@@ -1364,7 +1409,7 @@ function MontagesPanel({
                         >
                           <option value="original">Originale</option>
                           {variants.map(variant => (
-                            <option key={variant.id} value={variant.id}>{variantLabel(variant.kind)}</option>
+                            <option key={variant.id} value={variant.id}>{variantLabel(variant.kind, variant.targetMegapixels)}</option>
                           ))}
                         </select>
                       </label>
@@ -1453,7 +1498,7 @@ function MontagesPanel({
                     >
                       <option value="original">Originale</option>
                       {clip.variants.map((variant) => (
-                        <option key={variant.id} value={variant.id}>{variantLabel(variant.kind)}</option>
+                        <option key={variant.id} value={variant.id}>{variantLabel(variant.kind, variant.targetMegapixels)}</option>
                       ))}
                     </select></label>
                     <label>Da <input min="0" max={clip.trimEnd - 0.05} step="0.05" type="number" value={clip.trimStart} onChange={event => patchClip(clip.id, { trimStart: Number(event.target.value) })} onBlur={() => void saveClip(clip)} /></label>
@@ -2931,6 +2976,7 @@ function StudioApp() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [currentJobMegapixels, setCurrentJobMegapixels] = useState<Megapixels>(0.5);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [candidates, setCandidates] = useState(initialCandidates);
   const [connection, setConnection] = useState<{
@@ -3124,6 +3170,7 @@ function StudioApp() {
     setCandidateCount(job.request.candidateCount);
     setDuration(job.request.durationSeconds);
     setMegapixels(job.request.megapixels);
+    setCurrentJobMegapixels(job.request.megapixels);
     setAspectFormat(job.request.aspectFormat);
     setMode(uiModeByGeneration[job.request.generationMode] ?? "t2v");
     setSeedMode(
@@ -3448,6 +3495,7 @@ function StudioApp() {
           : candidate;
       }));
       setCurrentJobId(payload.job.id);
+      setCurrentJobMegapixels(megapixels);
       setActiveJobId(payload.job.id);
       setRunMessage(`Job ${payload.job.id.slice(0, 8)} inviato a ComfyUI`);
       setComposerExpanded(false);
@@ -3788,19 +3836,35 @@ function StudioApp() {
     }
   }
 
-  async function runCandidateVariant(candidateId: number, kind: VariantKind) {
+  async function runCandidateVariant(
+    candidateId: number,
+    kind: VariantKind,
+    options: {
+      sourceVariantId?: string;
+      targetMegapixels?: UpscaleTargetMegapixels;
+    } = {},
+  ) {
     if (!currentJobId) {
       setRunMessage("Apri prima un job completato");
       return;
     }
-    setRunMessage(`Avvio ${variantLabel(kind)} sul candidato ${candidateId}…`);
+    const requestedLabel = variantLabel(kind, options.targetMegapixels);
+    setRunMessage(`Avvio ${requestedLabel} sul candidato ${candidateId}…`);
     try {
       const response = await fetch(
         `${bridgeUrl}/api/jobs/${currentJobId}/candidates/${candidateId}/variants`,
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ kind }),
+          body: JSON.stringify({
+            kind,
+            ...(options.sourceVariantId
+              ? { sourceVariantId: options.sourceVariantId }
+              : {}),
+            ...(options.targetMegapixels
+              ? { targetMegapixels: options.targetMegapixels }
+              : {}),
+          }),
         },
       );
       const payload = (await response.json()) as {
@@ -3815,14 +3879,13 @@ function StudioApp() {
           ? {
               ...candidate,
               variants: [payload.variant!, ...(candidate.variants ?? [])],
-              activeVariantId: payload.variant!.id,
             }
           : candidate,
       ));
       setActiveJobId(currentJobId);
       setIsRunning(true);
       setRunMessage(
-        `${variantLabel(kind)} in coda · l’originale resta disponibile`,
+        `${variantLabel(payload.variant.kind, payload.variant.targetMegapixels)} in coda · la versione selezionata resta disponibile`,
       );
     } catch (error) {
       setRunMessage(error instanceof Error ? error.message : "Post-process non avviato");
@@ -4548,15 +4611,32 @@ function StudioApp() {
                 const isReady = candidate.status === "ready";
                 const isFailed = candidate.status === "failed";
                 const isSelected = selected === candidate.id;
-                const activeVariant = (candidate.variants ?? []).find(
+                const variants = candidate.variants ?? [];
+                const readyVariants = variants.filter(
+                  (variant) => variant.status === "ready",
+                );
+                const activeVariant = readyVariants.find(
                   (variant) =>
-                    variant.id === candidate.activeVariantId && variant.status === "ready",
+                    variant.id === candidate.activeVariantId,
                 );
                 const displayMediaPath = activeVariant?.output?.mediaPath ?? candidate.mediaPath;
-                const variantBusy = (candidate.variants ?? []).some(
+                const activeMegapixels = candidateVersionMegapixels(
+                  currentJobMegapixels,
+                  activeVariant,
+                  variants,
+                );
+                const availableUpscaleTargets = upscaleTargets.filter(
+                  (target) => target > activeMegapixels,
+                );
+                const canUseActiveAsFaceSource =
+                  !activeVariant || activeVariant.kind === "upscale";
+                const faceSourceLabel = activeVariant
+                  ? variantLabel(activeVariant.kind, activeVariant.targetMegapixels)
+                  : "Originale";
+                const variantBusy = variants.some(
                   (variant) => variant.status !== "ready" && variant.status !== "failed",
                 );
-                const activePostprocess = (candidate.variants ?? []).find(
+                const activePostprocess = variants.find(
                   (variant) => variant.status !== "ready" && variant.status !== "failed",
                 );
                 return (
@@ -4570,7 +4650,7 @@ function StudioApp() {
                       {activePostprocess && (
                         <div className="variant-run-banner" role="status">
                           <span className="pulse" />
-                          <strong>{variantLabel(activePostprocess.kind)}</strong>
+                          <strong>{variantLabel(activePostprocess.kind, activePostprocess.targetMegapixels)}</strong>
                           <small>
                             {activePostprocess.phaseLabel ?? "Post-process in corso"}
                             {typeof activePostprocess.progress === "number"
@@ -4629,7 +4709,7 @@ function StudioApp() {
                         <strong>Candidato {candidate.id}</strong>
                         <span>
                           {activeVariant
-                            ? `${variantLabel(activeVariant.kind)} · Seed ${candidate.seed}`
+                            ? `${variantLabel(activeVariant.kind, activeVariant.targetMegapixels)} · Seed ${candidate.seed}`
                             : candidate.seed
                               ? `Originale · Seed ${candidate.seed}`
                               : "Seed al lancio"}
@@ -4637,9 +4717,9 @@ function StudioApp() {
                       </div>
                       {isReady ? (
                         <div className="candidate-actions candidate-variant-actions">
-                          <div className="variant-switch" aria-label="Versione video">
+                          <div className="variant-switch" aria-label="Versione video e sorgente post-process">
                             <button
-                              className={!candidate.activeVariantId ? "active" : ""}
+                              className={!activeVariant ? "active" : ""}
                               onClick={() => setCandidates((current) => current.map((item) =>
                                 item.id === candidate.id ? { ...item, activeVariantId: null } : item,
                               ))}
@@ -4647,7 +4727,7 @@ function StudioApp() {
                             >
                               Originale
                             </button>
-                            {(candidate.variants ?? []).filter((variant) => variant.status === "ready").map((variant) => (
+                            {readyVariants.map((variant) => (
                               <button
                                 className={candidate.activeVariantId === variant.id ? "active" : ""}
                                 key={variant.id}
@@ -4656,19 +4736,62 @@ function StudioApp() {
                                 ))}
                                 type="button"
                               >
-                                {variantLabel(variant.kind)}
+                                {variantLabel(variant.kind, variant.targetMegapixels)}
                               </button>
                             ))}
                           </div>
-                          {(candidate.variants ?? []).filter((variant) => variant.status !== "ready").map((variant) => (
+                          {variants.filter((variant) => variant.status !== "ready").map((variant) => (
                             <span className={`variant-status ${variant.status}`} key={variant.id}>
-                              {variantLabel(variant.kind)} · {variant.phaseLabel ?? variant.error ?? variant.status}
+                              {variantLabel(variant.kind, variant.targetMegapixels)} · {variant.phaseLabel ?? variant.error ?? variant.status}
                             </span>
                           ))}
+                          <div className="postprocess-source">
+                            <span>Sorgente Face</span>
+                            <strong>
+                              {canUseActiveAsFaceSource
+                                ? `${faceSourceLabel} · ${activeMegapixels} MP`
+                                : "Seleziona Originale o Upscale"}
+                            </strong>
+                          </div>
                           <div className="postprocess-actions">
-                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "face")} title="Rifinitura del volto sul video corrente" type="button">Face</button>
-                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "upscale")} title="Rigenera lo stesso seed con latent upscaler fino a circa 1 MP" type="button">Upscale 1 MP</button>
-                            <button disabled={variantBusy} onClick={() => void runCandidateVariant(candidate.id, "face_upscale")} title="Latent render a 1 MP seguito da Face Refiner" type="button">Face + 1 MP</button>
+                            <button
+                              disabled={variantBusy || !canUseActiveAsFaceSource}
+                              onClick={() => void runCandidateVariant(
+                                candidate.id,
+                                "face",
+                                activeVariant ? { sourceVariantId: activeVariant.id } : {},
+                              )}
+                              title={
+                                canUseActiveAsFaceSource
+                                  ? `Applica Face Refiner a ${faceSourceLabel}`
+                                  : "Face può partire solo da Originale o da una variante Upscale"
+                              }
+                              type="button"
+                            >
+                              Face
+                            </button>
+                            {availableUpscaleTargets.map((target) => (
+                              <button
+                                disabled={variantBusy}
+                                key={target}
+                                onClick={() => void runCandidateVariant(
+                                  candidate.id,
+                                  "upscale",
+                                  { targetMegapixels: target },
+                                )}
+                                title={
+                                  target === 2
+                                    ? "Crea direttamente dall’originale una variante a 2 MP · più lento e molto più pesante in VRAM"
+                                    : "Crea direttamente dall’originale una variante a 1 MP"
+                                }
+                                type="button"
+                              >
+                                Upscale {target} MP
+                              </button>
+                            ))}
+                            {availableUpscaleTargets.length === 0 && (
+                              <span className="upscale-limit">Upscale: target massimo raggiunto</span>
+                            )}
                           </div>
                           <div className="candidate-primary-actions">
                             <button

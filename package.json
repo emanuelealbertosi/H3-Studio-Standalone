@@ -29,6 +29,7 @@
     "test:cancel": "tsx scripts/test-comfy-cancel.ts",
     "test:restart": "node scripts/test-bridge-restart.mjs",
     "test:preview-layout": "node scripts/test-preview-layout.mjs",
+    "test:postprocess": "tsx scripts/test-postprocess-variants.ts",
     "test:setup": "tsx scripts/test-setup-auth.ts",
     "sanitize:workflows": "tsx scripts/sanitize-bundled-workflows.ts",
     "typecheck": "tsc --noEmit --pretty false",

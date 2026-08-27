@@ -399,13 +399,13 @@ Legenda: `[x]` completato e verificato; `[~]` parziale o presente solo a livello
 - [x] `ComfyUI-H3-FaceRefine`, `ComfyUI-H3-NativeAudioLock` e `face_yolov8m.pt` installati; attivazione al prossimo riavvio ComfyUI.
 - [~] Dipendenze FaceRefine verificate; InsightFace usa attualmente ONNX CPU, scelta conservativa per non sostituire il runtime mentre ComfyUI è attiva.
 - [~] Workflow API FaceRefine rettangolare/per-frame costruito e validato staticamente; manca il test GPU dopo il riavvio ComfyUI.
-- [~] Latent Upscaler 3D integrato nel sampler con target esplicito 0,98 MP e validato staticamente; manca il nuovo test GPU dopo il riavvio ComfyUI.
-- [x] Modello dati immutabile `CandidateVariant`: originale, face, upscale, face+upscale.
+- [~] Latent Upscaler 3D integrato nel sampler con target espliciti 0,98 e 1,96 MP, validazione source < target e test statici; manca il test GPU a 2 MP.
+- [x] Modello dati immutabile `CandidateVariant`: originale, face, upscale e face+upscale con lineage e target MP persistiti.
 - [~] Servizio derivati persistente con coda, progressi, recupero, errori indipendenti e cancellazione sicura; retry ed ETA calibrata restano da aggiungere.
 - [x] Pulsanti per clip/candidato e selezione esplicita della variante inviata a Studio o timeline.
 - [x] Render timeline `Originale` o con il derivato scelto per ciascuna clip.
 - [x] Cancellazione candidato dalla scheda o dalla Libreria con rimozione atomica da tutti i montaggi, varianti e file output.
-- [ ] Verifica dell'ordine consigliato face→upscale e confronto qualità/tempo con upscale→face.
+- [~] Ordine supportato fissato a upscale→face, con Face applicato al file Upscale pronto senza rigenerarlo; manca il confronto GPU qualità/tempo a 1 e 2 MP. Face→upscale è escluso perché perderebbe il ritocco tornando al latent originale.
 
 ### Milestone 9 — Produzione e cloud opzionale
 

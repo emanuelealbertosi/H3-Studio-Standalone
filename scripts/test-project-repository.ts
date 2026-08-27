@@ -40,11 +40,26 @@ try {
     .prepare(
       `INSERT INTO candidate_variants(
         id, source_job_id, source_candidate_index, kind, stage, status,
-        api_prompt_json, filename_prefix, output_filename, output_subfolder,
+        target_megapixels, api_prompt_json, filename_prefix, output_filename, output_subfolder,
         output_type, output_format, created_at, updated_at
       ) VALUES (
         'test-variant', 'test-job', 1, 'upscale', 'upscale', 'ready',
-        '{}', 'test/upscale', 'candidate_1_upscale.mp4', '',
+        2, '{}', 'test/upscale', 'candidate_1_upscale.mp4', '',
+        'output', 'video/mp4', ?, ?
+      )`,
+    )
+    .run(now, now);
+  database
+    .prepare(
+      `INSERT INTO candidate_variants(
+        id, source_job_id, source_candidate_index, source_variant_id,
+        target_megapixels, kind, stage, status, api_prompt_json,
+        filename_prefix, output_filename, output_subfolder,
+        output_type, output_format, created_at, updated_at
+      ) VALUES (
+        'test-face-upscale', 'test-job', 1, 'test-variant',
+        2, 'face_upscale', 'face', 'ready', '{}',
+        'test/face-upscale', 'candidate_1_face_upscale.mp4', '',
         'output', 'video/mp4', ?, ?
       )`,
     )
@@ -98,7 +113,13 @@ try {
     });
     assert.equal(switched?.clips[0].sourceVariantId, "test-variant");
     assert.equal(switched?.clips[0].variantKind, "upscale");
+    assert.equal(switched?.clips[0].targetMegapixels, 2);
     assert.equal(switched?.clips[0].output.filename, "candidate_1_upscale.mp4");
+    const chained = switched?.clips[0].variants.find(
+      (variant) => variant.id === "test-face-upscale",
+    );
+    assert.equal(chained?.sourceVariantId, "test-variant");
+    assert.equal(chained?.targetMegapixels, 2);
     const trimmed = projects.updateClip(switched!.clips[0].id, {
       trimStart: 0.5,
       trimEnd: 3.5,
@@ -135,7 +156,11 @@ try {
     assert.equal(deleted.removedClips, 3);
     assert.deepEqual(
       deleted.files.map((file) => file.filename).sort(),
-      ["candidate_1.mp4", "candidate_1_upscale.mp4"],
+      [
+        "candidate_1.mp4",
+        "candidate_1_face_upscale.mp4",
+        "candidate_1_upscale.mp4",
+      ],
     );
     assert.equal(projects.get(first.id)?.clips.length, 0);
     assert.equal(projects.get(second.id)?.clips.length, 0);

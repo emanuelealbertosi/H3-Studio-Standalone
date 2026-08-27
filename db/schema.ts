@@ -429,4 +429,21 @@ export const JOB_DATABASE_MIGRATIONS = [
        ON project_image_links(project_id, updated_at DESC)`,
     ],
   },
+  {
+    version: 16,
+    statements: [
+      `ALTER TABLE candidate_variants
+       ADD COLUMN source_variant_id TEXT
+       REFERENCES candidate_variants(id) ON DELETE SET NULL`,
+      `ALTER TABLE candidate_variants
+       ADD COLUMN target_megapixels INTEGER
+       CHECK (target_megapixels IS NULL OR target_megapixels IN (1, 2))`,
+      `UPDATE candidate_variants
+       SET target_megapixels = 1
+       WHERE kind IN ('upscale', 'face_upscale')`,
+      `CREATE INDEX IF NOT EXISTS idx_candidate_variants_parent
+       ON candidate_variants(source_variant_id)
+       WHERE source_variant_id IS NOT NULL`,
+    ],
+  },
 ] as const;

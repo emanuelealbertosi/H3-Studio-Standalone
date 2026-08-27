@@ -52,13 +52,17 @@ singolarmente con altri progetti. Il profilo Flux predefinito è il 4B
 Distilled FP8 a quattro step e CFG 1; workflow, modello, encoder, VAE, cache e
 attention backend sono gestiti dall’Admin.
 
-Ogni candidato completato espone inoltre tre derivati non distruttivi: **Face**,
-**Upscale 1 MP** e **Face + 1 MP**. L'upscale rigenera lo stesso seed con il
-Latent Upscaler 3D verso 0,98 MP; non è un semplice resize del file MP4.
-L'originale rimane sempre disponibile; la
-versione attiva può essere usata per Continue/Edit oppure assegnata alla singola
-clip della timeline. Lo stato del post-process è persistito nel database e viene
-recuperato dopo il riavvio del bridge.
+Ogni candidato completato espone derivati non distruttivi **Face**, **Upscale
+1 MP** e **Upscale 2 MP**. I target compaiono soltanto quando superano la
+risoluzione della sorgente: un originale da 0,98 MP propone quindi solo 2 MP.
+L'upscale rigenera lo stesso seed con il Latent Upscaler 3D verso 0,98 o 1,96
+MP; non è un semplice resize del file MP4. Selezionando un Upscale pronto e
+premendo Face si ottiene una vera catena **Upscale → Face**, senza rieseguire
+l'upscale e conservando l'audio della variante scelta. L'originale rimane
+sempre disponibile; la versione attiva può essere usata per Continue/Edit
+oppure assegnata alla singola clip della timeline. Lineage, target e stato del
+post-process sono persistiti nel database e recuperati dopo il riavvio del
+bridge.
 
 Durante generazione, Face o Upscale, il pulsante **Interrompi** elimina dalla
 coda i prompt del job e ferma il prompt attivo soltanto se non risultano altri

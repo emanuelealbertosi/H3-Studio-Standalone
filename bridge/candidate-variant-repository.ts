@@ -5,6 +5,7 @@ import type { MediaOutput } from "./studio-job.js";
 
 export type CandidateVariantKind = "face" | "upscale" | "face_upscale";
 export type CandidateVariantStage = "face" | "upscale";
+export type UpscaleTargetMegapixels = 1 | 2;
 export type CandidateVariantStatus =
   | "prepared"
   | "submitted"
@@ -17,6 +18,8 @@ type VariantRow = {
   id: string;
   source_job_id: string;
   source_candidate_index: number;
+  source_variant_id: string | null;
+  target_megapixels: UpscaleTargetMegapixels | null;
   kind: CandidateVariantKind;
   stage: CandidateVariantStage;
   status: CandidateVariantStatus;
@@ -55,10 +58,14 @@ function media(
 }
 
 function mapRow(row: VariantRow) {
+  const targetMegapixels = row.target_megapixels
+    ?? (row.kind === "upscale" || row.kind === "face_upscale" ? 1 : null);
   return {
     id: row.id,
     sourceJobId: row.source_job_id,
     sourceCandidateIndex: row.source_candidate_index,
+    sourceVariantId: row.source_variant_id,
+    targetMegapixels,
     kind: row.kind,
     stage: row.stage,
     status: row.status,
@@ -96,6 +103,8 @@ export class CandidateVariantRepository {
   create(input: {
     sourceJobId: string;
     sourceCandidateIndex: number;
+    sourceVariantId?: string | null;
+    targetMegapixels?: UpscaleTargetMegapixels | null;
     kind: CandidateVariantKind;
     stage: CandidateVariantStage;
     prompt: ComfyApiPrompt;
@@ -105,13 +114,16 @@ export class CandidateVariantRepository {
     const now = new Date().toISOString();
     this.database.prepare(
       `INSERT INTO candidate_variants(
-        id, source_job_id, source_candidate_index, kind, stage, status,
+        id, source_job_id, source_candidate_index, source_variant_id,
+        target_megapixels, kind, stage, status,
         api_prompt_json, filename_prefix, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?)`,
     ).run(
       id,
       input.sourceJobId,
       input.sourceCandidateIndex,
+      input.sourceVariantId ?? null,
+      input.targetMegapixels ?? null,
       input.kind,
       input.stage,
       JSON.stringify(input.prompt),
