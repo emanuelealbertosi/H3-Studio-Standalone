@@ -186,7 +186,7 @@
 - Unificati Studio Video e Studio Immagini nello stesso progetto con selettore dedicato, batch da uno-quattro candidati e composer coerente.
 - Aggiunti Generate Krea 2 ed Edit Flux.2 Klein 4B Distilled con massimo quattro reference, ruoli espliciti, formati sotto 2 MP e seed Random/Base/Bloccato.
 - Persistiti job, candidati, prompt API, output, reference ordinate e collegamenti per-candidato molti-a-molti fra progetti nella migrazione SQLite v15.
-- Aggiunti tag Personaggio/Oggetto/Sfondo per progetto, riuso immediato dell’output come base edit, download, scelta, cancellazione, stop e recupero dopo riavvio.
+- Aggiunti tag Personaggio/Oggetto/Paesaggio per progetto, riuso immediato dell’output come base edit, download, scelta, cancellazione, stop e recupero dopo riavvio.
 - Collegati realmente i blueprint workflow selezionati nell’Admin; modello, encoder, VAE, step, CFG, attention e Flux KV Cache sono configurabili con preflight live.
 - Scelto come default il profilo core 4B Distilled FP8 a quattro step/CFG 1; il vecchio Multi Input Compact 9B/5-reference resta solo un riferimento perché più pesante e meno portabile.
 - Corrette condivisione isolata per candidato, annotation input/output, polling fra progetti, ripristino dei draft edit, thumbnail upload e routing automatico alle azioni Video.
@@ -206,3 +206,4 @@
 - Aggiunto un dialog accessibile di conferma obbligatoria per ogni Upscale, con target, sorgente, avviso tempo/VRAM, Escape, focus trap e layout mobile.
 - Esposto `processingSeconds` per candidati e varianti terminali usando i timestamp persistiti; footer, versioni e cronologia mostrano il tempo comprensivo della coda.
 - Protetti i timestamp terminali da aggiornamenti tardivi e aggiunti test di regressione per durata storica, lineage timeline e immutabilità dello stato concluso.
+- Rinominato il tag immagini `Sfondo` in `Paesaggio` e la voce di navigazione `Personaggi` in `Assets`; i valori persistiti e il ruolo reference `Sfondo` restano invariati per compatibilità.

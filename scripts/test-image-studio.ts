@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -32,6 +32,20 @@ function reference(index: number): ImageJobReferenceInput {
 }
 
 try {
+  const [imageStudioSource, pageSource] = await Promise.all([
+    readFile(path.join(process.cwd(), "app", "image-studio-panel.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "app", "page.tsx"), "utf8"),
+  ]);
+  assert.match(
+    imageStudioSource,
+    /const tags:[\s\S]*?value: "background", label: "Paesaggio"[\s\S]*?\];/,
+  );
+  assert.match(
+    imageStudioSource,
+    /const roles:[\s\S]*?value: "background", label: "Sfondo"[\s\S]*?\];/,
+  );
+  assert.match(pageSource, /<span className="rail-icon">◉<\/span>\s*Assets/);
+
   const jobs = new JobRepository(temporaryDir);
   const projects = new ProjectRepository(jobs.databasePath);
   const images = new ImageJobRepository(jobs.databasePath);

@@ -385,7 +385,7 @@ Legenda: `[x]` completato e verificato; `[~]` parziale o presente solo a livello
 - [x] Generazione Krea 2 generica con uno-quattro candidati e seed riproducibili.
 - [x] Edit Flux.2 Klein 4B Distilled con una-quattro reference ordinate.
 - [x] Ruoli Base/Soggetto/Stile/Posa/Sfondo tradotti nella mappa reference del prompt.
-- [x] Tag Personaggio/Oggetto/Sfondo per candidato e per progetto.
+- [x] Tag Personaggio/Oggetto/Paesaggio per candidato e per progetto.
 - [x] Condivisione molti-a-molti delle singole immagini senza esporre il resto del batch.
 - [x] Persistenza SQLite, recupero polling, scelta, cancellazione e riuso output come reference.
 - [x] Workflow, modello, encoder, VAE, step, CFG, attention e KV Cache configurabili nell’Admin.

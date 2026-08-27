@@ -92,7 +92,7 @@ const tags: Array<{ value: ImageTag; label: string }> = [
   { value: "untagged", label: "Senza tag" },
   { value: "character", label: "Personaggio" },
   { value: "object", label: "Oggetto" },
-  { value: "background", label: "Sfondo" },
+  { value: "background", label: "Paesaggio" },
 ];
 
 const roles: Array<{ value: ReferenceRole; label: string }> = [

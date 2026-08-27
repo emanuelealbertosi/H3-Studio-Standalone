@@ -39,7 +39,7 @@ workflow H3 standard senza forzare il motore FAST. Modello, file PDD e fino a
 tre LoRA creativi del FAST si configurano nell'Admin separatamente dallo stack
 H3 standard.
 
-Il tab **Personaggi/Libreria** gestisce ora personaggi e oggetti persistenti,
+Il tab **Assets/Libreria** gestisce ora personaggi e oggetti persistenti,
 reference multiple tramite drag-and-drop e character/object sheet con Krea 2.
 Il pulsante **Usa nel video** trasferisce le immagini alla modalità H3 Reference
 e compila automaticamente i ruoli Picture.
@@ -47,7 +47,7 @@ e compila automaticamente i ruoli Picture.
 Lo **Studio Immagini** condivide progetti e layout con lo Studio Video. Genera
 da uno a quattro candidati con Krea 2 oppure esegue edit Flux.2 Klein con un
 massimo di quattro reference ordinate. Ogni candidato può essere taggato come
-Personaggio, Oggetto o Sfondo, riusato come reference e condiviso
+Personaggio, Oggetto o Paesaggio, riusato come reference e condiviso
 singolarmente con altri progetti. Il profilo Flux predefinito è il 4B
 Distilled FP8 a quattro step e CFG 1; workflow, modello, encoder, VAE, cache e
 attention backend sono gestiti dall’Admin.

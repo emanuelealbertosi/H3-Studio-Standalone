@@ -16,7 +16,7 @@ directory input/output di ComfyUI e sono serviti dal bridge senza duplicarli.
 
 ## Uso
 
-1. Aprire **Personaggi** oppure **Libreria** dalla barra laterale.
+1. Aprire **Assets** oppure **Libreria** dalla barra laterale.
 2. Creare un record scegliendo Personaggio o Oggetto.
 3. Compilare i dettagli invarianti: volto, capelli, corporatura e abito per un
    personaggio; forma, materiali, colori e proporzioni per un oggetto.

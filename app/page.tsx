@@ -4110,7 +4110,7 @@ function StudioApp() {
             type="button"
           >
             <span className="rail-icon">◉</span>
-            Personaggi
+            Assets
           </button>
           <button
             className={`rail-item ${activeView === "library" ? "active" : ""}`}

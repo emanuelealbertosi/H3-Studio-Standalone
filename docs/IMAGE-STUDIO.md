@@ -13,7 +13,7 @@ separata.
 - I preset 1:1, 16:9, 9:16, 4:3 e 3:4 restano sotto circa 1,8 megapixel e usano
   dimensioni multiple di 16.
 
-I tag Personaggio, Oggetto e Sfondo sono metadati del progetto: servono a
+I tag Personaggio, Oggetto e Paesaggio sono metadati del progetto: servono a
 classificare e riusare l’immagine, ma non cambiano da soli il render.
 
 ## Reference Flux.2 Klein
