@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [rawCss, rawPage] = await Promise.all([
+const [rawCss, rawPage, rawImageStudio] = await Promise.all([
   readFile("app/globals.css", "utf8"),
   readFile("app/page.tsx", "utf8"),
+  readFile("app/image-studio-panel.tsx", "utf8"),
 ]);
 const normalizeNewlines = (value) => value.replace(/\r\n?/g, "\n");
 const css = normalizeNewlines(rawCss);
 const page = normalizeNewlines(rawPage);
+const imageStudio = normalizeNewlines(rawImageStudio);
 
 assert.match(css, /\.candidate-footer\s*\{[^}]*flex-direction:\s*column/s);
 assert.match(
@@ -82,4 +84,43 @@ assert.match(css, /\.upscale-confirm-bridge-alert\s*\{[^}]*border:/s);
 assert.match(css, /\.upscale-confirm-actions button:disabled\s*\{[^}]*cursor:\s*not-allowed/s);
 assert.match(css, /@media\s*\(max-width:\s*480px\)[^{]*\{[^}]*\.upscale-confirm-backdrop/s);
 
-console.log("Preview card responsive layout: OK");
+assert.match(imageStudio, /const TURNAROUND_FORMAT = "16:9" as const/);
+const selectCompositionPattern =
+  /function selectCompositionPreset\([\s\S]*?\n  }\n\n  async function run/;
+const selectCompositionBlock = imageStudio.match(selectCompositionPattern);
+assert.ok(selectCompositionBlock, "turnaround preset selection should be present");
+assert.match(selectCompositionBlock[0], /preset === "character-turnaround"/);
+assert.match(selectCompositionBlock[0], /setFormat\(TURNAROUND_FORMAT\)/);
+assert.match(imageStudio, />1 foglio = 4 viste complete<\/strong>/);
+assert.match(imageStudio, /Formato impostato su 16:9 per il turnaround\./);
+assert.match(imageStudio, /className="image-turnaround-warning"[\s\S]*?role="alert"/);
+assert.match(imageStudio, />\s*Ripristina 16:9\s*<\/button>/);
+assert.match(imageStudio, /aria-invalid=\{turnaroundFormatMismatch \|\| undefined\}/);
+assert.match(
+  imageStudio,
+  /disabled=\{[^}]*!selectedEngineReady \|\| turnaroundFormatMismatch\}/,
+);
+const imageRunPattern = /async function run\(\)[\s\S]*?\n  }\n\n  async function refresh/;
+const imageRunBlock = imageStudio.match(imageRunPattern);
+assert.ok(imageRunBlock, "image submit handler should be present");
+const turnaroundGuardIndex = imageRunBlock[0].indexOf("if (turnaroundFormatMismatch)");
+const imagePostIndex = imageRunBlock[0].indexOf("await fetch(");
+assert.ok(turnaroundGuardIndex >= 0, "turnaround format guard should be present");
+assert.ok(imagePostIndex >= 0, "image POST should be present");
+assert.ok(
+  turnaroundGuardIndex < imagePostIndex,
+  "the incompatible turnaround format must be blocked before the POST",
+);
+assert.doesNotMatch(
+  imageRunBlock[0],
+  /setFormat\(TURNAROUND_FORMAT\)/,
+  "submit must not hide a format override",
+);
+assert.match(
+  imageRunBlock[0],
+  /aspectFormat: selectedFormat\.value, width: selectedFormat\.width, height: selectedFormat\.height/,
+);
+assert.match(css, /\.image-turnaround-guidance[\s\S]*?grid-column:\s*1 \/ -1/);
+assert.match(css, /\.image-turnaround-warning\s*\{[^}]*border:/s);
+
+console.log("Preview layout and image turnaround UI: OK");

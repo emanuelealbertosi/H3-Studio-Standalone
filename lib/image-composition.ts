@@ -1,3 +1,12 @@
+export const CHARACTER_TURNAROUND_FORMAT = {
+  aspectFormat: "16:9",
+  width: 1792,
+  height: 1008,
+} as const;
+
+const CHARACTER_TURNAROUND_EXCLUSIONS =
+  "[STRICT EXCLUSIONS]\nNo extra people or characters. No fifth view, duplicate angle, inset, detail panel, close-up, headshot, bust-only crop, cropped head, cropped hands, cropped feet, action pose, perspective distortion, identity drift, different face, different body, costume variation, hairstyle variation, text, captions, labels, logos, watermark, panel borders or decorative frame.";
+
 export const IMAGE_COMPOSITION_PRESETS = [
   {
     value: "free",
@@ -10,9 +19,9 @@ export const IMAGE_COMPOSITION_PRESETS = [
     value: "character-turnaround",
     label: "Character sheet / turnaround",
     shortLabel: "Character sheet",
-    description: "Viste coerenti fronte, tre quarti, profilo e retro.",
+    description: "Un foglio 16:9, quattro viste intere bloccate e coerenti.",
     promptAddition:
-      "Composition: create a clean character turnaround sheet of the same character, with consistent front, three-quarter, side and back views. Show the full body in every view, in a neutral standing pose, with identical proportions, face, hairstyle and outfit. Arrange the views evenly on a simple neutral background. No text, labels, frames or cropped figures.",
+      "[COMPOSITION LOCK — HIGHEST PRIORITY]\nCreate ONE single 16:9 studio character-turnaround sheet, not a scene, poster or narrative illustration. Show EXACTLY FOUR non-overlapping full-body depictions of ONE identical character. LEFT-TO-RIGHT ORDER: (1) straight FRONT view, (2) FRONT THREE-QUARTER view turned toward the viewer's left, (3) exact LEFT PROFILE view, (4) straight BACK view.\n\n[IDENTITY LOCK]\nAll four depictions MUST have the same identity, face, age, body proportions, skin tone, hairstyle, outfit, colors, materials, accessories and footwear. Any named held prop must be identical in every view.\n\n[POSE LOCK]\nUse the same neutral A-pose in all four views: arms slightly away from the torso, hands visible, legs straight, feet parallel and fully visible.\n\n[SCALE AND CAMERA LOCK]\nUse equal body height, head size, ground line, camera height, near-orthographic perspective, focal length and lighting in every view. Keep equal spacing and no overlap.\n\n[BACKGROUND LOCK]\nUse one plain light-neutral seamless studio background with no environment, floor clutter or dramatic shadows.",
   },
   {
     value: "close-up",
@@ -79,6 +88,9 @@ export function composeImagePrompt(
 ) {
   const normalizedPrompt = userPrompt.trim();
   const addition = imageCompositionPreset(preset).promptAddition;
+  if (preset === "character-turnaround") {
+    return `${addition}\n\n[SUBJECT AND STYLE BRIEF — APPLY IDENTICALLY TO ALL FOUR VIEWS]\nUse the following brief only for character identity, wardrobe, materials and rendering style; it must not override the composition locks above.\n${normalizedPrompt}\n\n${CHARACTER_TURNAROUND_EXCLUSIONS}`;
+  }
   if (!normalizedPrompt) return addition;
   return addition ? `${normalizedPrompt}\n\n${addition}` : normalizedPrompt;
 }

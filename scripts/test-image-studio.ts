@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
+  CHARACTER_TURNAROUND_FORMAT,
   composeImagePrompt,
   IMAGE_COMPOSITION_PRESETS,
 } from "../lib/image-composition.js";
@@ -94,13 +95,31 @@ try {
   const userPrompt = "A silver-haired explorer in a weathered red coat";
   assert.equal(composeImagePrompt(userPrompt, "free"), userPrompt);
   const turnaroundPrompt = composeImagePrompt(userPrompt, "character-turnaround");
-  assert.ok(turnaroundPrompt.startsWith(userPrompt + "\n\n"));
-  assert.match(turnaroundPrompt, /front, three-quarter, side and back views/);
+  assert.match(turnaroundPrompt, /^\[COMPOSITION LOCK — HIGHEST PRIORITY\]/);
+  assert.match(turnaroundPrompt, /EXACTLY FOUR non-overlapping full-body depictions/);
+  assert.match(
+    turnaroundPrompt,
+    /\(1\) straight FRONT[\s\S]*\(2\) FRONT THREE-QUARTER[\s\S]*\(3\) exact LEFT PROFILE[\s\S]*\(4\) straight BACK/,
+  );
+  assert.match(turnaroundPrompt, /\[IDENTITY LOCK\]/);
+  assert.match(turnaroundPrompt, /\[POSE LOCK\]/);
+  assert.match(turnaroundPrompt, /\[SCALE AND CAMERA LOCK\]/);
+  assert.match(turnaroundPrompt, /\[BACKGROUND LOCK\]/);
+  assert.match(turnaroundPrompt, /\[STRICT EXCLUSIONS\]/);
+  assert.match(turnaroundPrompt, /No extra people or characters/);
+  assert.match(turnaroundPrompt, /No fifth view/);
+  assert.match(turnaroundPrompt, /close-up/);
+  assert.match(turnaroundPrompt, /cropped feet/);
+  assert.match(turnaroundPrompt, /text, captions, labels/);
+  const subjectSection = turnaroundPrompt.indexOf("[SUBJECT AND STYLE BRIEF");
+  const userBrief = turnaroundPrompt.indexOf(userPrompt);
+  const exclusions = turnaroundPrompt.indexOf("[STRICT EXCLUSIONS]");
+  assert.ok(subjectSection > 0 && userBrief > subjectSection && exclusions > userBrief);
   const normalizedComposition = normalizeImageRequest({
     projectId: "project-test",
     mode: "generate",
     prompt: userPrompt,
-    effectivePrompt: turnaroundPrompt,
+    effectivePrompt: `${userPrompt}\n\nLegacy square character sheet instructions.`,
     compositionPreset: "character-turnaround",
     candidateCount: 1,
     aspectFormat: "1:1",
@@ -113,11 +132,15 @@ try {
   assert.equal(normalizedComposition.prompt, userPrompt);
   assert.equal(normalizedComposition.effectivePrompt, turnaroundPrompt);
   assert.equal(normalizedComposition.compositionPreset, "character-turnaround");
+  assert.equal(normalizedComposition.aspectFormat, CHARACTER_TURNAROUND_FORMAT.aspectFormat);
+  assert.equal(normalizedComposition.width, CHARACTER_TURNAROUND_FORMAT.width);
+  assert.equal(normalizedComposition.height, CHARACTER_TURNAROUND_FORMAT.height);
   assert.throws(
     () => normalizeImageRequest({
       ...normalizedComposition,
       candidateCount: 1,
       effectivePrompt: userPrompt,
+      compositionPreset: "close-up",
     }),
     /prompt effettivo non corrisponde/i,
   );
@@ -145,13 +168,12 @@ try {
     path.join(process.cwd(), "workflows", "studio-krea2.api.json"),
     path.join(process.cwd(), "workflows", "studio-flux2-klein-edit.api.json"),
   );
-  const closeUpEffectivePrompt = composeImagePrompt(userPrompt, "close-up");
   const preparedComposition = await imageService.prepare({
     projectId: firstProject.id,
     mode: "generate",
     prompt: userPrompt,
-    effectivePrompt: closeUpEffectivePrompt,
-    compositionPreset: "close-up",
+    effectivePrompt: `${userPrompt}\n\nLegacy square character sheet instructions.`,
+    compositionPreset: "character-turnaround",
     candidateCount: 1,
     aspectFormat: "1:1",
     width: 1024,
@@ -162,14 +184,32 @@ try {
     tag: "character",
   });
   assert.equal(preparedComposition.prompt, userPrompt);
-  assert.equal(preparedComposition.effectivePrompt, closeUpEffectivePrompt);
-  assert.equal(preparedComposition.compositionPreset, "close-up");
-  assert.equal(preparedComposition.engine.compositionPreset, "close-up");
-  assert.equal(preparedComposition.engine.effectivePrompt, closeUpEffectivePrompt);
+  assert.equal(preparedComposition.effectivePrompt, turnaroundPrompt);
+  assert.equal(preparedComposition.compositionPreset, "character-turnaround");
+  assert.equal(preparedComposition.aspectFormat, "16:9");
+  assert.equal(preparedComposition.width, 1792);
+  assert.equal(preparedComposition.height, 1008);
+  assert.equal(preparedComposition.engine.compositionPreset, "character-turnaround");
+  assert.equal(preparedComposition.engine.effectivePrompt, turnaroundPrompt);
   assert.equal(
     preparedComposition.candidates[0].apiPrompt["4"].inputs.text,
-    closeUpEffectivePrompt,
+    turnaroundPrompt,
   );
+  assert.equal(preparedComposition.candidates[0].apiPrompt["7"].inputs.width, 1792);
+  assert.equal(preparedComposition.candidates[0].apiPrompt["7"].inputs.height, 1008);
+
+  const storedComposition = images.createPrepared(preparedComposition);
+  assert.equal(storedComposition.prompt, userPrompt);
+  assert.equal(storedComposition.effectivePrompt, turnaroundPrompt);
+  assert.equal(storedComposition.compositionPreset, "character-turnaround");
+  assert.equal(storedComposition.aspectFormat, "16:9");
+  assert.equal(storedComposition.width, 1792);
+  assert.equal(storedComposition.height, 1008);
+  const compositionCleanup = new DatabaseSync(jobs.databasePath);
+  compositionCleanup.exec("PRAGMA foreign_keys = ON");
+  compositionCleanup.prepare("DELETE FROM image_jobs WHERE id = ?").run(preparedComposition.id);
+  compositionCleanup.close();
+  assert.equal(images.get(preparedComposition.id), null);
 
   const schema = new DatabaseSync(jobs.databasePath);
   const migration = schema

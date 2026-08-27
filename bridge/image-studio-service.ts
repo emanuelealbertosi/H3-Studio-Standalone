@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import {
+  CHARACTER_TURNAROUND_FORMAT,
   composeImagePrompt,
   isImageCompositionPreset,
 } from "../lib/image-composition.js";
@@ -125,11 +126,13 @@ export function normalizeImageRequest(value: unknown) {
       ? value.compositionPreset
       : null;
   if (!compositionPreset) throw new Error("Preset di composizione immagine non valido");
+  const isCharacterTurnaround = compositionPreset === "character-turnaround";
   const effectivePrompt = composeImagePrompt(prompt, compositionPreset);
   if (effectivePrompt.length > 20_000) {
     throw new Error("Il prompt effettivo non può superare 20.000 caratteri");
   }
   if (
+    !isCharacterTurnaround &&
     value.effectivePrompt !== undefined &&
     (typeof value.effectivePrompt !== "string" ||
       value.effectivePrompt.trim() !== effectivePrompt)
@@ -140,11 +143,19 @@ export function normalizeImageRequest(value: unknown) {
   if (![1, 2, 3, 4].includes(candidateCount)) {
     throw new Error("candidateCount deve essere 1, 2, 3 o 4");
   }
-  const width = Number(value.width);
-  const height = Number(value.height);
+  // The bridge is authoritative for the turnaround canvas. Older browser
+  // bundles can still submit their previous square dimensions and prompt;
+  // normalize both before graph construction and persistence.
+  const width = isCharacterTurnaround
+    ? CHARACTER_TURNAROUND_FORMAT.width
+    : Number(value.width);
+  const height = isCharacterTurnaround
+    ? CHARACTER_TURNAROUND_FORMAT.height
+    : Number(value.height);
   assertImageDimensions(width, height);
-  const aspectFormat =
-    typeof value.aspectFormat === "string" && value.aspectFormat.trim()
+  const aspectFormat = isCharacterTurnaround
+    ? CHARACTER_TURNAROUND_FORMAT.aspectFormat
+    : typeof value.aspectFormat === "string" && value.aspectFormat.trim()
       ? value.aspectFormat.trim().slice(0, 60)
       : `${width}:${height}`;
   const seedMode: ImageSeedMode =

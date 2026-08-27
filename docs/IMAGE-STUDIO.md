@@ -29,6 +29,13 @@ La selezione attiva e la relativa descrizione sono sempre visibili. La voce
 completo prima di avviare il batch. Il bridge ricompone e valida lo stesso prompt
 prima di costruire il grafo ComfyUI, così un payload incoerente non entra in coda.
 
+Per **Character sheet / turnaround** il formato è vincolato a **16:9
+(1792 × 1008)**: un singolo foglio contiene quattro viste intere ordinate
+(frontale, tre quarti, profilo e retro), mentre il numero di generazioni indica
+quante varianti complete del foglio produrre. Il prompt esclude testo ed etichette,
+ma il modello immagini può occasionalmente inventare pseudo-testo o glifi: in quel
+caso è consigliabile rigenerare o scegliere un altro candidato.
+
 ## Reference Flux.2 Klein
 
 Le reference sono ordinate e limitate a quattro, come nel contratto ufficiale

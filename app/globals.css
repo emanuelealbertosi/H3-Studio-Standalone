@@ -3438,6 +3438,58 @@ a:focus-visible {
 }
 .image-composition-presets > p strong { color: var(--accent); font-size: 9px; }
 
+.image-turnaround-guidance,
+.image-turnaround-warning {
+  grid-column: 1 / -1;
+  border-radius: 9px;
+  padding: 9px 10px;
+}
+.image-turnaround-guidance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 12px;
+  border: 1px solid rgba(215, 255, 82, .22);
+  background: rgba(215, 255, 82, .055);
+}
+.image-turnaround-guidance strong {
+  color: var(--accent);
+  font-size: 10px;
+}
+.image-turnaround-guidance span {
+  color: #b6b9ae;
+  font-size: 8px;
+  line-height: 1.4;
+}
+.image-turnaround-warning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(255, 174, 82, .38);
+  background: rgba(255, 174, 82, .08);
+}
+.image-turnaround-warning > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.image-turnaround-warning strong { color: #ffc17b; font-size: 9px; }
+.image-turnaround-warning span { color: #cbb69e; font-size: 8px; line-height: 1.4; }
+.image-turnaround-warning button {
+  min-height: 30px;
+  margin-left: auto;
+  border: 1px solid rgba(255, 193, 123, .38);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(255, 193, 123, .1);
+  color: #ffd3a1;
+  font-size: 8px;
+  font-weight: 800;
+}
+.image-turnaround-warning button:hover { border-color: #ffd3a1; color: #fff; }
+
 .image-effective-prompt {
   margin: 0 18px 2px;
   border: 1px solid rgba(255, 255, 255, .07);

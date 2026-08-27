@@ -96,6 +96,8 @@ const formats = [
   { value: "3:4", label: "3:4 · Verticale", width: 1152, height: 1536 },
 ] as const;
 
+const TURNAROUND_FORMAT = "16:9" as const;
+
 const tags: Array<{ value: ImageTag; label: string }> = [
   { value: "untagged", label: "Senza tag" },
   { value: "character", label: "Personaggio" },
@@ -204,6 +206,8 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
   const loadGenerationRef = useRef(0);
   const selectedFormat = formats.find((item) => item.value === format) ?? formats[0];
   const selectedComposition = imageCompositionPreset(compositionPreset);
+  const turnaroundFormatMismatch =
+    compositionPreset === "character-turnaround" && format !== TURNAROUND_FORMAT;
   const effectivePrompt = useMemo(
     () => composeImagePrompt(prompt, compositionPreset),
     [compositionPreset, prompt],
@@ -331,8 +335,20 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
     });
   }
 
+  function selectCompositionPreset(preset: ImageCompositionPreset) {
+    setCompositionPreset(preset);
+    if (preset === "character-turnaround") {
+      setFormat(TURNAROUND_FORMAT);
+      setMessage("Character turnaround: formato impostato su 16:9.");
+    }
+  }
+
   async function run() {
     if (!projectId || !prompt.trim()) { setMessage(!projectId ? "Seleziona un progetto." : "Descrivi l'immagine."); return; }
+    if (turnaroundFormatMismatch) {
+      setMessage("Character turnaround richiede il formato 16:9. Ripristinalo prima di generare.");
+      return;
+    }
     if (!selectedEngineReady) { setMessage(engineStatusError ?? "Il motore immagini selezionato non è pronto: controlla Admin → Dipendenze."); return; }
     if (mode === "edit" && !references.length) { setMessage("Edit richiede almeno una reference."); return; }
     const numericSeed = Number(seedValue);
@@ -582,7 +598,7 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
                   aria-pressed={compositionPreset === preset.value}
                   className={compositionPreset === preset.value ? "selected" : ""}
                   key={preset.value}
-                  onClick={() => setCompositionPreset(preset.value)}
+                  onClick={() => selectCompositionPreset(preset.value)}
                   type="button"
                 >
                   {preset.label}
@@ -590,6 +606,33 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
               ))}
             </div>
             <p><strong>{selectedComposition.label}</strong><span>{selectedComposition.description}</span></p>
+            {compositionPreset === "character-turnaround" && (
+              <div className="image-turnaround-guidance" id="image-turnaround-guidance" role="status">
+                <strong>1 foglio = 4 viste complete</strong>
+                <span>
+                  {turnaroundFormatMismatch
+                    ? "Il formato era stato impostato su 16:9 per il turnaround, ma è stato cambiato."
+                    : "Formato impostato su 16:9 per il turnaround."}
+                </span>
+              </div>
+            )}
+            {turnaroundFormatMismatch && (
+              <div className="image-turnaround-warning" id="image-turnaround-warning" role="alert">
+                <div>
+                  <strong>Formato incompatibile con il turnaround</strong>
+                  <span>Per ottenere quattro viste complete, ripristina il foglio orizzontale 16:9.</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setFormat(TURNAROUND_FORMAT);
+                    setMessage("Formato 16:9 ripristinato per il character turnaround.");
+                  }}
+                  type="button"
+                >
+                  Ripristina 16:9
+                </button>
+              </div>
+            )}
           </fieldset>
 
           <details className="image-effective-prompt">
@@ -599,7 +642,17 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
 
           <div className="image-control-grid">
             <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => setMode("edit")} type="button">Edit</button></div></fieldset>
-            <label className="select-control"><span>Formato</span><select onChange={(event) => setFormat(event.target.value as typeof format)} value={format}>{formats.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            <label className="select-control">
+              <span>Formato</span>
+              <select
+                aria-describedby={compositionPreset === "character-turnaround" ? turnaroundFormatMismatch ? "image-turnaround-warning" : "image-turnaround-guidance" : undefined}
+                aria-invalid={turnaroundFormatMismatch || undefined}
+                onChange={(event) => setFormat(event.target.value as typeof format)}
+                value={format}
+              >
+                {formats.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </label>
             <fieldset className="segmented-control"><legend>Generazioni</legend><div>{[1, 2, 3, 4].map((value) => <button className={candidateCount === value ? "selected" : ""} key={value} onClick={() => setCandidateCount(value)} type="button">{value}</button>)}</div></fieldset>
             <fieldset className="segmented-control"><legend>Seed</legend><div>{(["random", "base", "fixed"] as SeedMode[]).map((value) => <button className={seedMode === value ? "selected" : ""} key={value} onClick={() => setSeedMode(value)} type="button">{value === "random" ? "Random" : value === "base" ? "Base +1" : "Bloccato"}</button>)}</div></fieldset>
             <label className="seed-input"><span>Valore seed</span><input disabled={seedMode === "random"} min="0" onChange={(event) => setSeedValue(event.target.value)} type="number" value={seedValue} /></label>
@@ -629,7 +682,7 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
             {selectedEngineReady ? "Motore immagini pronto" : engineStatusError ?? "Dipendenze motore mancanti"}
           </div>
           <div className="preset-note"><span className="fast-badge">{mode === "edit" ? "FLUX KLEIN EDIT" : "IMAGE"}</span>{selectedFormat.width} × {selectedFormat.height} · {(selectedFormat.width * selectedFormat.height / 1_000_000).toFixed(1)} MP · {selectedComposition.shortLabel}</div>
-          <div className="generation-cta"><div><span>Output</span><strong>{candidateCount} immagin{candidateCount === 1 ? "e" : "i"} · {tag === "untagged" ? "senza tag" : tags.find((item) => item.value === tag)?.label}</strong></div><button disabled={busy === "run" || active(job) || !projectId || !selectedEngineReady} onClick={() => void run()} type="button">{busy === "run" || active(job) ? "Generazione in corso" : !selectedEngineReady ? "Motore non pronto" : mode === "edit" ? "Crea " + candidateCount + " edit" : "Genera " + candidateCount + " immagini"}</button></div>
+          <div className="generation-cta"><div><span>Output</span><strong>{candidateCount} immagin{candidateCount === 1 ? "e" : "i"} · {tag === "untagged" ? "senza tag" : tags.find((item) => item.value === tag)?.label}</strong></div><button disabled={busy === "run" || active(job) || !projectId || !selectedEngineReady || turnaroundFormatMismatch} onClick={() => void run()} type="button">{busy === "run" || active(job) ? "Generazione in corso" : turnaroundFormatMismatch ? "Formato 16:9 richiesto" : !selectedEngineReady ? "Motore non pronto" : mode === "edit" ? "Crea " + candidateCount + " edit" : "Genera " + candidateCount + " immagini"}</button></div>
         </div>
         {message && <div className="run-message">{message}</div>}
       </section>
