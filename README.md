@@ -2,6 +2,13 @@
 
 H3 Studio è un client web local-first per orchestrare ComfyUI e i workflow MiniMax H3 senza gestire direttamente grafi complessi.
 
+> **Standalone engine branch.** Questa copia integra e gestisce un runtime
+> ComfyUI privato: l'utente avvia una sola console e non deve aprire né
+> configurare l'interfaccia ComfyUI. Il runtime resta escluso da Git, mentre i
+> modelli possono essere condivisi con archivi già esistenti per non duplicare
+> centinaia di GB. L'applicazione originale rimane nel repository/branch
+> principale e non viene modificata da questa variante.
+
 Copyright (C) 2026 Emanuele. Il codice originale H3 Studio è distribuito con
 licenza **GNU Affero General Public License v3.0 only** (`AGPL-3.0-only`): le
 versioni modificate distribuite o offerte tramite rete devono rendere disponibile
@@ -124,6 +131,22 @@ Il contratto completo Image Studio si verifica con `npm run test:images`.
 Il contratto della Chat locale si verifica con `npm run test:chat`.
 
 ## Avvio rapido
+
+### Variante standalone (Windows/NVIDIA)
+
+1. In fase di sviluppo, esegui una volta `INSTALL_STANDALONE_ENGINE.bat` e
+   indica una ComfyUI portable compatibile da cui importare Python, core e i
+   soli custom node richiesti. I modelli non vengono copiati.
+2. Avvia `START_H3_STUDIO_STANDALONE.bat`.
+3. Al primo avvio crea la password Admin; URL e cartella output del motore sono
+   già gestiti dall'app.
+4. Ctrl+C nella console arresta web app, bridge e motore incorporato.
+
+Il pacchetto pubblico finale sostituirà l'importazione di sviluppo con artefatti
+versionati e verificati tramite checksum. Il piano è in
+`docs/STANDALONE-ENGINE-PLAN.md`.
+
+### Variante con ComfyUI esterna
 
 1. Installa Node.js 22.16.0 o superiore e prepara una ComfyUI funzionante.
 2. Clona il repository ed esegui una volta `INSTALL_COMFY_DEPENDENCIES.bat`.

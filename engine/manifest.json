@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "0.1.0-dev",
+  "developmentImportSizeGiB": 5.58,
+  "distribution": "windows-nvidia",
+  "runtimeRoot": "engine/runtime",
+  "python": "python_embeded/python.exe",
+  "comfyRoot": "ComfyUI",
+  "components": [
+    {
+      "id": "comfy-core",
+      "source": "https://github.com/Comfy-Org/ComfyUI",
+      "version": "PIN_BEFORE_DISTRIBUTION",
+      "license": "GPL-3.0"
+    },
+    {
+      "id": "h3-studio-nodes",
+      "source": "../../comfyui_nodes/ComfyUI-H3-Multishot",
+      "version": "workspace",
+      "license": "see bundled notices"
+    },
+    {
+      "id": "h3-studio-chat",
+      "source": "../../comfyui_nodes/H3-Studio-Gemma4-Chat",
+      "version": "workspace",
+      "license": "AGPL-3.0-only"
+    },
+    {
+      "id": "workflow-custom-nodes",
+      "source": "scripts/INSTALL_STANDALONE_ENGINE.ps1",
+      "version": "source-runtime-snapshot",
+      "license": "mixed; retain each upstream license"
+    }
+  ]
+}

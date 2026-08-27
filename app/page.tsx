@@ -558,6 +558,14 @@ type SetupStatus = {
   authenticated: boolean;
   defaults: InstallSettings;
   workflowCatalog: WorkflowCatalogItem[];
+  engine: {
+    mode: "embedded" | "external";
+    installed: boolean;
+    running: boolean;
+    url: string;
+    rootDir: string;
+    error: string | null;
+  };
 };
 
 type RemoteJob = {
@@ -2891,12 +2899,13 @@ function SetupWizard({ status }: { status: SetupStatus }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [settings, setSettings] = useState(status.defaults);
-  const [message, setMessage] = useState("Collega H3 Studio alla tua ComfyUI locale.");
+  const [message, setMessage] = useState("Configura l’accesso e i workflow inclusi.");
   const [saving, setSaving] = useState(false);
   const [restartRequired, setRestartRequired] = useState(false);
 
-  const outputDirMissing = !settings.comfyOutputDir.trim()
-    || settings.comfyOutputDir.includes("comfy-output-not-configured");
+  const embeddedEngine = status.engine.mode === "embedded";
+  const outputDirMissing = !embeddedEngine && (!settings.comfyOutputDir.trim()
+    || settings.comfyOutputDir.includes("comfy-output-not-configured"));
   const setupBlockingMessage = password.length < 10
     ? `La password deve contenere almeno 10 caratteri (${password.length}/10).`
     : password !== confirmPassword
@@ -2938,7 +2947,7 @@ function SetupWizard({ status }: { status: SetupStatus }) {
           <p className="section-index">SETUP COMPLETATO</p>
           <h1>H3 Studio è configurato</h1>
           <p>{message}</p>
-          <strong>Chiudi le due console H3 Studio e rilancia START_H3_STUDIO.bat.</strong>
+          <strong>Chiudi questa console e rilancia START_H3_STUDIO_STANDALONE.bat.</strong>
         </section>
       </main>
     );
@@ -2965,7 +2974,23 @@ function SetupWizard({ status }: { status: SetupStatus }) {
           <span className="brand setup-brand">H3</span>
           <div><p className="section-index">PRIMO AVVIO</p><h1>Configura H3 Studio</h1></div>
         </header>
-        <p className="setup-intro">Crea l’accesso Admin e indica la ComfyUI già installata. La password viene salvata soltanto come hash locale.</p>
+        <p className="setup-intro">
+          Crea l’accesso Admin. Il motore ComfyUI è incorporato e viene gestito automaticamente;
+          la password viene salvata soltanto come hash locale.
+        </p>
+        <div className={status.engine.running ? "setup-engine setup-engine-ready" : "setup-engine setup-engine-warning"}>
+          <span>{status.engine.running ? "✓" : "!"}</span>
+          <div>
+            <strong>Motore H3 incorporato</strong>
+            <small>
+              {status.engine.running
+                ? `Pronto su ${status.engine.url}`
+                : status.engine.installed
+                  ? status.engine.error ?? "Installato, in attesa di avvio"
+                  : "Runtime non installato: esegui INSTALL_STANDALONE_ENGINE.bat"}
+            </small>
+          </div>
+        </div>
         <div className="setup-grid">
           <label>
             <span>Password Admin</span>
@@ -2976,14 +3001,18 @@ function SetupWizard({ status }: { status: SetupStatus }) {
             <span>Ripeti password</span>
             <input autoComplete="new-password" minLength={10} onChange={(event) => setConfirmPassword(event.target.value)} type="password" value={confirmPassword} />
           </label>
-          <label>
-            <span>URL ComfyUI</span>
-            <input onChange={(event) => setSettings({ ...settings, comfyUrl: event.target.value })} placeholder="http://127.0.0.1:8188" value={settings.comfyUrl} />
-          </label>
-          <label>
-            <span>Cartella output ComfyUI</span>
-            <input onChange={(event) => setSettings({ ...settings, comfyOutputDir: event.target.value })} placeholder="C:\\ComfyUI\\output" value={settings.comfyOutputDir} />
-          </label>
+          {!embeddedEngine && (
+            <>
+              <label>
+                <span>URL ComfyUI</span>
+                <input onChange={(event) => setSettings({ ...settings, comfyUrl: event.target.value })} placeholder="http://127.0.0.1:8188" value={settings.comfyUrl} />
+              </label>
+              <label>
+                <span>Cartella output ComfyUI</span>
+                <input onChange={(event) => setSettings({ ...settings, comfyOutputDir: event.target.value })} placeholder="C:\\ComfyUI\\output" value={settings.comfyOutputDir} />
+              </label>
+            </>
+          )}
           {workflowSelect("video", "videoWorkflowId")}
           {workflowSelect("fast", "fastWorkflowId")}
           {workflowSelect("image", "imageWorkflowId")}

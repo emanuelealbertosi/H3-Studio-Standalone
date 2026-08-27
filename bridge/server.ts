@@ -30,6 +30,7 @@ import {
 import { ImageStudioService } from "./image-studio-service.js";
 import { ChatRepository } from "./chat-repository.js";
 import { ChatService } from "./chat-service.js";
+import { EngineManager } from "./engine-manager.js";
 import {
   InstallSettingsStore,
   WORKFLOW_CATALOG,
@@ -41,6 +42,24 @@ const app = Fastify({
     level: process.env.H3_LOG_LEVEL?.trim() || "info",
   },
 });
+
+const engineManager = new EngineManager({
+  mode: config.engine.mode,
+  rootDir: config.engine.rootDir,
+  dataDir: config.dataDir,
+  host: config.engine.host,
+  port: config.engine.port,
+  pythonPath: config.engine.pythonPath,
+  comfyRoot: config.engine.comfyRoot,
+  startupTimeoutMs: config.engine.startupTimeoutMs,
+});
+const initialEngineStatus = await engineManager.ensureRunning();
+if (config.engine.mode === "embedded" && !initialEngineStatus.running) {
+  app.log.warn(
+    { engine: initialEngineStatus },
+    "Motore embedded non ancora disponibile; il bridge resta attivo per setup e diagnostica",
+  );
+}
 
 const installSettingsStore = new InstallSettingsStore(config.dataDir, {
   comfyUrl: config.comfyUrl,
@@ -233,6 +252,7 @@ app.get("/api/setup/status", async (request) => ({
   authenticated: adminAuth.isAuthenticated(request.headers.cookie),
   defaults: installSettings,
   workflowCatalog: WORKFLOW_CATALOG,
+  engine: await engineManager.status(),
 }));
 
 app.post<{ Body: { password?: unknown; settings?: unknown } }>(
@@ -292,11 +312,12 @@ app.addHook("onRequest", async (request, reply) => {
 });
 
 app.get("/api/health", async () => {
-  const [comfyui, workflow, engineSettings, imageSummary] = await Promise.all([
+  const [comfyui, workflow, engineSettings, imageSummary, embeddedEngine] = await Promise.all([
     comfy.health(),
     workflowStore.status(),
     runtimeSettings.get(),
     imageStudio.summary(),
+    engineManager.status(),
   ]);
 
   return {
@@ -310,6 +331,7 @@ app.get("/api/health", async () => {
       uptimeSeconds: Math.floor(process.uptime()),
     },
     comfyui,
+    engine: embeddedEngine,
     workflow,
     engineSettings,
     fastEngine: engineSettings.fast,
@@ -1410,6 +1432,21 @@ app.post("/api/admin/server/restart", async () => {
   };
 });
 
+app.get("/api/admin/engine/status", async () => ({
+  ok: true,
+  engine: await engineManager.status(),
+}));
+
+app.post("/api/admin/engine/start", async (_request, reply) => {
+  const engine = await engineManager.start();
+  return reply.status(engine.running ? 200 : 503).send({ ok: engine.running, engine });
+});
+
+app.post("/api/admin/engine/stop", async () => ({
+  ok: true,
+  engine: await engineManager.stop(),
+}));
+
 app.put<{ Body: { currentPassword?: unknown; nextPassword?: unknown } }>(
   "/api/admin/password",
   async (request, reply) => {
@@ -1566,6 +1603,7 @@ app.get("/api/admin/fast-settings", engineSettingsPayload);
 app.put("/api/admin/fast-settings", saveEngineSettings);
 
 app.addHook("onClose", async () => {
+  await engineManager.stop();
   progressTracker.stop();
   adminAuth.close();
   imageJobRepository.close();

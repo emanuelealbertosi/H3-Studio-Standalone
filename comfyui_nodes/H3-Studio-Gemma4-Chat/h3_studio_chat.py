@@ -344,6 +344,15 @@ class H3StudioGemma4VisionChat:
 if PromptServer is not None and getattr(PromptServer, "instance", None) is not None and web is not None:
     routes = PromptServer.instance.routes
 
+    @routes.get("/h3_studio/engine/identity")
+    async def h3_engine_identity(_request):
+        return web.json_response({
+            "ok": True,
+            "product": "h3-studio",
+            "embedded": os.environ.get("H3_STUDIO_EMBEDDED_ENGINE") == "1",
+            "pid": os.getpid(),
+        })
+
     @routes.get("/h3_studio/chat/status")
     async def h3_chat_status(_request):
         error, version, executable = _runtime_status()

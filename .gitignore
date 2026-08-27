@@ -49,3 +49,7 @@ next-env.d.ts
 *.log
 __pycache__/
 *.py[cod]
+
+# standalone engine binaries and model library
+/engine/runtime/
+/models/
