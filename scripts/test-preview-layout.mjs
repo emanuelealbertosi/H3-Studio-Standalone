@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [css, page] = await Promise.all([
+const [rawCss, rawPage] = await Promise.all([
   readFile("app/globals.css", "utf8"),
   readFile("app/page.tsx", "utf8"),
 ]);
+const normalizeNewlines = (value) => value.replace(/\r\n?/g, "\n");
+const css = normalizeNewlines(rawCss);
+const page = normalizeNewlines(rawPage);
 
 assert.match(css, /\.candidate-footer\s*\{[^}]*flex-direction:\s*column/s);
 assert.match(
@@ -19,9 +22,9 @@ assert.match(page, /className="candidate-primary-actions"/);
 assert.match(page, /sourceVariantId:\s*activeVariant\.id/);
 assert.match(page, /onClick=\{\(event\) => requestCandidateUpscale\(/);
 assert.match(page, /onClick=\{confirmCandidateUpscale\}/);
-const requestUpscaleBlock = page.match(
-  /function requestCandidateUpscale\([\s\S]*?\n  }\n\n  function confirmCandidateUpscale/,
-);
+const requestUpscalePattern =
+  /function requestCandidateUpscale\([\s\S]*?\n  }\n\n  function confirmCandidateUpscale/;
+const requestUpscaleBlock = page.match(requestUpscalePattern);
 assert.ok(requestUpscaleBlock, "requestCandidateUpscale should be present");
 assert.match(requestUpscaleBlock[0], /setPendingUpscaleRequest\(/);
 assert.doesNotMatch(
@@ -29,10 +32,19 @@ assert.doesNotMatch(
   /requireUpdatedPostprocessContract/,
   "the bridge guard must not prevent the confirmation modal from opening",
 );
-const runVariantBlock = page.match(
-  /async function runCandidateVariant\([\s\S]*?\n  }\n\n  function applyCandidateDeletion/,
-);
+const runVariantPattern =
+  /async function runCandidateVariant\([\s\S]*?\n  }\n\n  function applyCandidateDeletion/;
+const runVariantBlock = page.match(runVariantPattern);
 assert.ok(runVariantBlock, "runCandidateVariant should be present");
+const normalizedCrlfPage = normalizeNewlines(page.replace(/\n/g, "\r\n"));
+assert.ok(
+  normalizedCrlfPage.match(requestUpscalePattern),
+  "requestCandidateUpscale extraction should support CRLF checkouts",
+);
+assert.ok(
+  normalizedCrlfPage.match(runVariantPattern),
+  "runCandidateVariant extraction should support CRLF checkouts",
+);
 const guardIndex = runVariantBlock[0].indexOf(
   "requireUpdatedPostprocessContract()",
 );
