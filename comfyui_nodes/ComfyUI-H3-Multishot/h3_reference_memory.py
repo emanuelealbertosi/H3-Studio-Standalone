@@ -390,6 +390,12 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
                     ref_video_audio=edit_audio)
                 if bank:
                     print(bank.marker_map(), flush=True)
+            if operation_mode == "VIDEO EXTENSION":
+                # The boundary frame is a keyframe/memory item, not a numbered
+                # reference-video block. Avoid leaving a dangling <Video 1>
+                # marker in the structured prompt after removing that block.
+                prompt = prompt.replace(
+                    "<Video 1>", "the supplied previous-shot boundary")
             shot_bank, prompt, _active_pictures = (
                 h3_refs.prepare_shot_bank(bank, prompt))
             memory_context = []

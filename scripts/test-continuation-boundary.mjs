@@ -22,6 +22,11 @@ assert.match(
 );
 assert.match(
   source,
+  /prompt\.replace\([\s\S]*"<Video 1>"[\s\S]*"the supplied previous-shot boundary"/,
+  "the boundary-only prompt must not keep a dangling Video 1 marker",
+);
+assert.match(
+  source,
   /trim_boundary[\s\S]*operation_mode == "VIDEO EXTENSION"[\s\S]*images = images\[1:\]/,
   "the duplicate boundary frame must be trimmed like internal multishot shots",
 );
