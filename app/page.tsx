@@ -29,6 +29,7 @@ type CandidateVariant = {
   status: CandidateStatus | "prepared";
   phaseLabel?: string;
   progress?: number | null;
+  processingSeconds?: number | null;
   error?: string | null;
   output: { mediaPath: string; filename: string } | null;
 };
@@ -42,9 +43,17 @@ type Candidate = {
   mediaPath?: string | null;
   phaseLabel?: string;
   progressExact?: boolean;
+  processingSeconds?: number | null;
   error?: string | null;
   variants?: CandidateVariant[];
   activeVariantId?: string | null;
+};
+
+type PendingUpscaleRequest = {
+  jobId: string;
+  candidateId: number;
+  sourceMegapixels: number;
+  targetMegapixels: UpscaleTargetMegapixels;
 };
 
 type ConnectionState =
@@ -58,7 +67,7 @@ type GenerationPreset = "fast" | "8" | "12" | "20" | "30";
 type Megapixels = 0.5 | 0.7 | 0.98;
 
 type BridgeHealthPayload = {
-  bridge?: { status?: string };
+  bridge?: { status?: string; postprocessContract?: number };
   comfyui?: {
     connected?: boolean;
     error?: string | null;
@@ -268,6 +277,24 @@ function formatMegapixels(value: number) {
   return value === 0.98 ? "0.98" : value.toFixed(1);
 }
 
+function formatProcessingTime(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  if (value > 0 && value < 1) return "<1s";
+  const totalSeconds = Math.round(value);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  return `${seconds}s`;
+}
+
 type EngineLoraSlot = {
   name: string;
   strength: number;
@@ -431,6 +458,7 @@ type RemoteJob = {
     phaseLabel?: string;
     progress?: number | null;
     progressExact?: boolean;
+    processingSeconds?: number | null;
     error?: string | null;
     output: { mediaPath: string; filename: string } | null;
   }>;
@@ -1023,6 +1051,9 @@ function HistoryPanel({
               variant.sourceCandidateIndex === selectedCandidate?.index &&
               variant.status === "ready" && variant.output,
           );
+          const selectedCandidateTime = formatProcessingTime(
+            selectedCandidate?.processingSeconds,
+          );
           return (
             <article className="history-card" key={job.id}>
               <div className="history-preview">
@@ -1063,6 +1094,7 @@ function HistoryPanel({
                     Seed {job.request.seedMode === "fixed" ? "bloccato" : job.request.seedMode === "base" ? "base +1" : "random"}
                   </span>
                   <span>{job.candidates.length} candidat{job.candidates.length === 1 ? "o" : "i"}</span>
+                  {selectedCandidateTime && <span>Render {selectedCandidateTime}</span>}
                 </div>
                 <div className="history-footer">
                   <code>{job.id.slice(0, 8)}</code>
@@ -1085,6 +1117,9 @@ function HistoryPanel({
                         type="button"
                       >
                         + {variantLabel(variant.kind, variant.targetMegapixels)}
+                        {formatProcessingTime(variant.processingSeconds)
+                          ? ` · ${formatProcessingTime(variant.processingSeconds)}`
+                          : ""}
                       </button>
                     ))}
                   </div>
@@ -2977,6 +3012,9 @@ function StudioApp() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [currentJobMegapixels, setCurrentJobMegapixels] = useState<Megapixels>(0.5);
+  const [postprocessContract, setPostprocessContract] = useState(0);
+  const [pendingUpscaleRequest, setPendingUpscaleRequest] =
+    useState<PendingUpscaleRequest | null>(null);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [candidates, setCandidates] = useState(initialCandidates);
   const [connection, setConnection] = useState<{
@@ -2991,6 +3029,31 @@ function StudioApp() {
   const [fastSteps, setFastSteps] = useState(8);
   const [composerExpanded, setComposerExpanded] = useState(false);
   const candidateGridRef = useRef<HTMLDivElement>(null);
+  const upscaleCancelRef = useRef<HTMLButtonElement>(null);
+  const upscaleConfirmRef = useRef<HTMLButtonElement>(null);
+  const upscaleTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!pendingUpscaleRequest) return;
+    const previousOverflow = document.body.style.overflow;
+    const trigger = upscaleTriggerRef.current;
+    document.body.style.overflow = "hidden";
+    const focusFrame = window.requestAnimationFrame(() =>
+      upscaleCancelRef.current?.focus(),
+    );
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPendingUpscaleRequest(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+      window.requestAnimationFrame(() => {
+        if (trigger?.isConnected) trigger.focus();
+      });
+    };
+  }, [pendingUpscaleRequest]);
 
   const visibleCandidates = candidates.slice(0, candidateCount);
   const playableCandidates = visibleCandidates.filter(
@@ -3140,6 +3203,7 @@ function StudioApp() {
     setStudioProjectId(projectId);
     setSourceJobId(null);
     setCurrentJobId(null);
+    setPendingUpscaleRequest(null);
     setActiveJobId(null);
     setIsRunning(false);
     setSelected(null);
@@ -3165,6 +3229,7 @@ function StudioApp() {
 
   function openJob(job: RemoteJob, restored = false) {
     setStudioMediaMode("video");
+    setPendingUpscaleRequest(null);
     setCurrentJobId(job.id);
     setPrompt(job.request.prompt);
     setCandidateCount(job.request.candidateCount);
@@ -3228,6 +3293,7 @@ function StudioApp() {
           phaseLabel: remote.phaseLabel,
           error: remote.error,
           progressExact: remote.progressExact ?? status === "ready",
+          processingSeconds: remote.processingSeconds,
           variants: (job.variants ?? []).filter(
             (variant) => variant.sourceCandidateIndex === remote.index,
           ),
@@ -3270,6 +3336,11 @@ function StudioApp() {
         const health = (await response.json()) as BridgeHealthPayload;
         if (disposed) return;
 
+        setPostprocessContract(
+          typeof health.bridge?.postprocessContract === "number"
+            ? health.bridge.postprocessContract
+            : 0,
+        );
         if (typeof health.fastEngine?.steps === "number") {
           setFastSteps(health.fastEngine.steps);
         }
@@ -3294,6 +3365,7 @@ function StudioApp() {
         });
       } catch (error) {
         if (disposed) return;
+        setPostprocessContract(0);
         setConnection({
           state: "bridge-offline",
           label: "Bridge offline",
@@ -3367,6 +3439,7 @@ function StudioApp() {
               phaseLabel: remote.phaseLabel,
               error: remote.error,
               progressExact: remote.progressExact ?? remote.status === "ready",
+              processingSeconds: remote.processingSeconds,
               variants,
               activeVariantId: candidate.activeVariantId && variants.some(
                 (variant) => variant.id === candidate.activeVariantId,
@@ -3836,6 +3909,57 @@ function StudioApp() {
     }
   }
 
+  function requireUpdatedPostprocessContract() {
+    if (postprocessContract >= 2) return true;
+    setPendingUpscaleRequest(null);
+    setRunMessage("Bridge non aggiornato: riavvia H3 Studio");
+    return false;
+  }
+
+  function requestCandidateUpscale(
+    candidateId: number,
+    targetMegapixels: UpscaleTargetMegapixels,
+    trigger: HTMLButtonElement,
+  ) {
+    if (!currentJobId) {
+      setRunMessage("Apri prima un job completato");
+      return;
+    }
+    if (!requireUpdatedPostprocessContract()) return;
+    upscaleTriggerRef.current = trigger;
+    setPendingUpscaleRequest({
+      jobId: currentJobId,
+      candidateId,
+      sourceMegapixels: canonicalVideoMegapixels(currentJobMegapixels),
+      targetMegapixels,
+    });
+  }
+
+  function confirmCandidateUpscale() {
+    const request = pendingUpscaleRequest;
+    if (!request || !requireUpdatedPostprocessContract()) return;
+    if (request.jobId !== currentJobId) {
+      setPendingUpscaleRequest(null);
+      setRunMessage("Il job corrente è cambiato: riapri la conferma Upscale");
+      return;
+    }
+    const candidate = candidates.find((item) => item.id === request.candidateId);
+    const variantBusy = candidate?.variants?.some(
+      (variant) => variant.status !== "ready" && variant.status !== "failed",
+    );
+    if (!candidate || candidate.status !== "ready" || variantBusy) {
+      setPendingUpscaleRequest(null);
+      setRunMessage("Il candidato non è più disponibile per Upscale");
+      return;
+    }
+    setPendingUpscaleRequest(null);
+    void runCandidateVariant(
+      request.candidateId,
+      "upscale",
+      { targetMegapixels: request.targetMegapixels },
+    );
+  }
+
   async function runCandidateVariant(
     candidateId: number,
     kind: VariantKind,
@@ -3848,6 +3972,11 @@ function StudioApp() {
       setRunMessage("Apri prima un job completato");
       return;
     }
+    const requiresUpdatedContract =
+      kind === "upscale" ||
+      kind === "face_upscale" ||
+      Boolean(options.sourceVariantId);
+    if (requiresUpdatedContract && !requireUpdatedPostprocessContract()) return;
     const requestedLabel = variantLabel(kind, options.targetMegapixels);
     setRunMessage(`Avvio ${requestedLabel} sul candidato ${candidateId}…`);
     try {
@@ -4639,6 +4768,14 @@ function StudioApp() {
                 const activePostprocess = variants.find(
                   (variant) => variant.status !== "ready" && variant.status !== "failed",
                 );
+                const terminalProcessingTime =
+                  isReady || isFailed
+                    ? formatProcessingTime(
+                        activeVariant
+                          ? activeVariant.processingSeconds
+                          : candidate.processingSeconds,
+                      )
+                    : null;
                 return (
                   <article
                     className={`candidate-card ${isReady ? "ready" : isFailed ? "failed" : "processing"} ${isSelected ? "chosen" : ""}`}
@@ -4713,6 +4850,7 @@ function StudioApp() {
                             : candidate.seed
                               ? `Originale · Seed ${candidate.seed}`
                               : "Seed al lancio"}
+                          {terminalProcessingTime ? ` · ${terminalProcessingTime}` : ""}
                         </span>
                       </div>
                       {isReady ? (
@@ -4726,6 +4864,9 @@ function StudioApp() {
                               type="button"
                             >
                               Originale
+                              {formatProcessingTime(candidate.processingSeconds)
+                                ? ` · ${formatProcessingTime(candidate.processingSeconds)}`
+                                : ""}
                             </button>
                             {readyVariants.map((variant) => (
                               <button
@@ -4737,12 +4878,18 @@ function StudioApp() {
                                 type="button"
                               >
                                 {variantLabel(variant.kind, variant.targetMegapixels)}
+                                {formatProcessingTime(variant.processingSeconds)
+                                  ? ` · ${formatProcessingTime(variant.processingSeconds)}`
+                                  : ""}
                               </button>
                             ))}
                           </div>
                           {variants.filter((variant) => variant.status !== "ready").map((variant) => (
                             <span className={`variant-status ${variant.status}`} key={variant.id}>
                               {variantLabel(variant.kind, variant.targetMegapixels)} · {variant.phaseLabel ?? variant.error ?? variant.status}
+                              {variant.status === "failed" && formatProcessingTime(variant.processingSeconds)
+                                ? ` · ${formatProcessingTime(variant.processingSeconds)}`
+                                : ""}
                             </span>
                           ))}
                           <div className="postprocess-source">
@@ -4774,10 +4921,10 @@ function StudioApp() {
                               <button
                                 disabled={variantBusy}
                                 key={target}
-                                onClick={() => void runCandidateVariant(
+                                onClick={(event) => requestCandidateUpscale(
                                   candidate.id,
-                                  "upscale",
-                                  { targetMegapixels: target },
+                                  target,
+                                  event.currentTarget,
                                 )}
                                 title={
                                   target === 2
@@ -4848,6 +4995,85 @@ function StudioApp() {
           )}
         </div>
       </section>
+      {pendingUpscaleRequest && (
+        <div
+          className="upscale-confirm-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setPendingUpscaleRequest(null);
+            }
+          }}
+        >
+          <section
+            aria-describedby="upscale-confirm-warning"
+            aria-labelledby="upscale-confirm-title"
+            aria-modal="true"
+            className="upscale-confirm-dialog"
+            onKeyDown={(event) => {
+              if (event.key !== "Tab") return;
+              const first = upscaleCancelRef.current;
+              const last = upscaleConfirmRef.current;
+              if (!first || !last) return;
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+              }
+            }}
+            role="dialog"
+          >
+            <header>
+              <span aria-hidden="true">↗</span>
+              <div>
+                <small>Conferma richiesta</small>
+                <h2 id="upscale-confirm-title">
+                  Upscale a {pendingUpscaleRequest.targetMegapixels} MP
+                </h2>
+              </div>
+            </header>
+            <div className="upscale-confirm-route" aria-label="Riepilogo Upscale">
+              <div>
+                <span>Target</span>
+                <strong>{pendingUpscaleRequest.targetMegapixels} MP</strong>
+              </div>
+              <div>
+                <span>Sorgente</span>
+                <strong>
+                  Candidato {pendingUpscaleRequest.candidateId} · Originale{" "}
+                  {pendingUpscaleRequest.sourceMegapixels} MP
+                </strong>
+              </div>
+            </div>
+            <div className="upscale-confirm-warning">
+              <strong>Tempo e VRAM</strong>
+              <p id="upscale-confirm-warning">
+                {pendingUpscaleRequest.targetMegapixels === 2
+                  ? "Il render a 2 MP richiede sensibilmente più tempo ed è molto più pesante in VRAM. Una GPU già al limite può esaurire la memoria."
+                  : "L’upscale può richiedere diversi minuti e usa VRAM aggiuntiva. Evita altre elaborazioni GPU durante il render."}
+              </p>
+            </div>
+            <footer className="upscale-confirm-actions">
+              <button
+                onClick={() => setPendingUpscaleRequest(null)}
+                ref={upscaleCancelRef}
+                type="button"
+              >
+                Annulla
+              </button>
+              <button
+                className="confirm"
+                onClick={confirmCandidateUpscale}
+                ref={upscaleConfirmRef}
+                type="button"
+              >
+                Conferma Upscale {pendingUpscaleRequest.targetMegapixels} MP
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

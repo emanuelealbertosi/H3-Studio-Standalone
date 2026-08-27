@@ -290,6 +290,9 @@ app.get("/api/health", async () => {
     bridge: {
       status: "online" as const,
       version: "0.1.0",
+      postprocessContract: 2,
+      upscaleTargets: [1, 2] as const,
+      processingSeconds: true,
       uptimeSeconds: Math.floor(process.uptime()),
     },
     comfyui,

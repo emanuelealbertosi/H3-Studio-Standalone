@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import type { ComfyApiPrompt } from "./comfy-client.js";
 import type { MediaOutput } from "./studio-job.js";
+import { processingSeconds } from "./processing-time.js";
 
 export type CandidateVariantKind = "face" | "upscale" | "face_upscale";
 export type CandidateVariantStage = "face" | "upscale";
@@ -85,6 +86,11 @@ function mapRow(row: VariantRow) {
       row.intermediate_format,
     ),
     error: row.error,
+    processingSeconds: processingSeconds(
+      row.created_at,
+      row.updated_at,
+      row.status === "ready" || row.status === "failed",
+    ),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -137,7 +143,8 @@ export class CandidateVariantRepository {
   markQueued(id: string, promptId: string, queueNumber: number | null) {
     this.database.prepare(
       `UPDATE candidate_variants SET prompt_id = ?, queue_number = ?,
-       status = 'submitted', error = NULL, updated_at = ? WHERE id = ?`,
+       status = 'submitted', error = NULL, updated_at = ?
+       WHERE id = ? AND status NOT IN ('ready', 'failed')`,
     ).run(promptId, queueNumber, new Date().toISOString(), id);
   }
 
@@ -150,7 +157,7 @@ export class CandidateVariantRepository {
     this.database.prepare(
       `UPDATE candidate_variants SET status = ?, output_filename = ?,
        output_subfolder = ?, output_type = ?, output_format = ?, error = ?,
-       updated_at = ? WHERE id = ?`,
+       updated_at = ? WHERE id = ? AND status NOT IN ('ready', 'failed')`,
     ).run(
       status,
       output?.filename ?? null,
@@ -176,7 +183,7 @@ export class CandidateVariantRepository {
        prompt_id = ?, queue_number = ?, api_prompt_json = ?, filename_prefix = ?,
        intermediate_filename = ?, intermediate_subfolder = ?,
        intermediate_type = ?, intermediate_format = ?, error = NULL,
-       updated_at = ? WHERE id = ?`,
+       updated_at = ? WHERE id = ? AND status NOT IN ('ready', 'failed')`,
     ).run(
       promptId,
       queueNumber,

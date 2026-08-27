@@ -15,6 +15,7 @@ import type {
   StudioJob,
   StudioJobRequest,
 } from "./studio-job.js";
+import { processingSeconds } from "./processing-time.js";
 
 type PreparedJob = {
   jobId: string;
@@ -73,6 +74,8 @@ type CandidateRow = {
   output_type: MediaOutput["type"] | null;
   output_format: string | null;
   error: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 function mediaFromRow(row: CandidateRow): MediaOutput | null {
@@ -248,7 +251,8 @@ export class JobRepository {
       .prepare(
         `UPDATE candidates
          SET prompt_id = ?, queue_number = ?, status = 'submitted', error = NULL, updated_at = ?
-         WHERE job_id = ? AND candidate_index = ?`,
+         WHERE job_id = ? AND candidate_index = ?
+           AND status NOT IN ('ready', 'failed')`,
       )
       .run(promptId, queueNumber, now, jobId, candidateIndex);
   }
@@ -256,7 +260,8 @@ export class JobRepository {
   failCandidate(jobId: string, candidateIndex: number, error: string) {
     this.database.prepare(
       `UPDATE candidates SET status = 'failed', error = ?, updated_at = ?
-       WHERE job_id = ? AND candidate_index = ?`,
+       WHERE job_id = ? AND candidate_index = ?
+         AND status NOT IN ('ready', 'failed')`,
     ).run(error, new Date().toISOString(), jobId, candidateIndex);
   }
 
@@ -277,7 +282,8 @@ export class JobRepository {
         `UPDATE candidates SET
           status = ?, output_filename = ?, output_subfolder = ?,
           output_type = ?, output_format = ?, updated_at = ?
-         WHERE job_id = ? AND candidate_index = ?`,
+         WHERE job_id = ? AND candidate_index = ?
+           AND status NOT IN ('ready', 'failed')`,
       )
       .run(
         status,
@@ -376,6 +382,11 @@ export class JobRepository {
         promptId: candidate.prompt_id,
         queueNumber: candidate.queue_number,
         status: candidate.status,
+        processingSeconds: processingSeconds(
+          candidate.created_at,
+          candidate.updated_at,
+          candidate.status === "ready" || candidate.status === "failed",
+        ),
         output: mediaFromRow(candidate),
         error: candidate.error,
       })),

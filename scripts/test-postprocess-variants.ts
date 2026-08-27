@@ -97,6 +97,18 @@ try {
   insertJob("test-job", 0.5, 2);
   insertJob("native-job", 0.98, 1);
 
+  database.prepare(
+    `UPDATE candidates SET created_at = ?, updated_at = ?
+     WHERE job_id = 'test-job' AND candidate_index = 1`,
+  ).run("2026-08-27T08:00:00.000Z", "2026-08-27T08:01:30.500Z");
+  const completedCandidate = jobs.get("test-job")?.candidates[0];
+  assert.equal(completedCandidate?.processingSeconds, 90.5);
+  jobs.updateCandidate("test-job", 1, "failed", null);
+  const preservedCandidate = jobs.get("test-job")?.candidates[0];
+  assert.equal(preservedCandidate?.status, "ready");
+  assert.equal(preservedCandidate?.output?.filename, "test-job-candidate-1.mp4");
+  assert.equal(preservedCandidate?.processingSeconds, 90.5);
+
   const migration = database.prepare(
     "SELECT version FROM schema_migrations WHERE version = 16",
   ).get() as { version: number } | undefined;
@@ -128,6 +140,19 @@ try {
     format: "video/mp4",
     mediaPath: "/unused",
   });
+  database.prepare(
+    "UPDATE candidate_variants SET created_at = ?, updated_at = ? WHERE id = ?",
+  ).run(
+    "2026-08-27T09:00:00.000Z",
+    "2026-08-27T09:01:15.250Z",
+    readyUpscale.id,
+  );
+  assert.equal(variants.get(readyUpscale.id)?.processingSeconds, 75.25);
+  variants.updateStatus(readyUpscale.id, "failed", null, "Late duplicate update");
+  const preservedUpscale = variants.get(readyUpscale.id);
+  assert.equal(preservedUpscale?.status, "ready");
+  assert.equal(preservedUpscale?.output?.filename, "candidate-1-upscale.mp4");
+  assert.equal(preservedUpscale?.processingSeconds, 75.25);
 
   const service = new PostprocessService(comfy, progress, jobs, variants, outputDir);
   const chainedFace = await service.create(
@@ -200,6 +225,7 @@ try {
     prompt: originalPrompt,
     filenamePrefix: "test/pending-upscale",
   });
+  assert.equal(pendingUpscale.processingSeconds, null);
   await assert.rejects(
     service.create("test-job", 1, "face", pendingUpscale.id),
     /deve essere completata/,

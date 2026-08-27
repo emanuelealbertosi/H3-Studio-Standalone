@@ -62,7 +62,10 @@ l'upscale e conservando l'audio della variante scelta. L'originale rimane
 sempre disponibile; la versione attiva può essere usata per Continue/Edit
 oppure assegnata alla singola clip della timeline. Lineage, target e stato del
 post-process sono persistiti nel database e recuperati dopo il riavvio del
-bridge.
+bridge. Ogni Upscale richiede una conferma esplicita con target e avviso
+tempo/VRAM; un controllo di contratto blocca la coda se browser e bridge non
+sono aggiornati alla stessa versione. Le didascalie terminali mostrano inoltre
+il tempo trascorso, comprensivo dell'attesa in coda.
 
 Durante generazione, Face o Upscale, il pulsante **Interrompi** elimina dalla
 coda i prompt del job e ferma il prompt attivo soltanto se non risultano altri

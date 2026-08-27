@@ -98,6 +98,7 @@ export type StudioJob = {
       | "rendering"
       | "ready"
       | "failed";
+    processingSeconds: number | null;
     output: MediaOutput | null;
     error: string | null;
   }>;

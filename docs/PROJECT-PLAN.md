@@ -401,8 +401,9 @@ Legenda: `[x]` completato e verificato; `[~]` parziale o presente solo a livello
 - [~] Workflow API FaceRefine rettangolare/per-frame costruito e validato staticamente; manca il test GPU dopo il riavvio ComfyUI.
 - [~] Latent Upscaler 3D integrato nel sampler con target espliciti 0,98 e 1,96 MP, validazione source < target e test statici; manca il test GPU a 2 MP.
 - [x] Modello dati immutabile `CandidateVariant`: originale, face, upscale e face+upscale con lineage e target MP persistiti.
-- [~] Servizio derivati persistente con coda, progressi, recupero, errori indipendenti e cancellazione sicura; retry ed ETA calibrata restano da aggiungere.
+- [~] Servizio derivati persistente con coda, progressi, tempo terminale, recupero, errori indipendenti e cancellazione sicura; retry ed ETA calibrata restano da aggiungere.
 - [x] Pulsanti per clip/candidato e selezione esplicita della variante inviata a Studio o timeline.
+- [x] Conferma obbligatoria prima di Upscale e contratto health che blocca browser/bridge non allineati prima della coda.
 - [x] Render timeline `Originale` o con il derivato scelto per ciascuna clip.
 - [x] Cancellazione candidato dalla scheda o dalla Libreria con rimozione atomica da tutti i montaggi, varianti e file output.
 - [~] Ordine supportato fissato a upscale→face, con Face applicato al file Upscale pronto senza rigenerarlo; manca il confronto GPU qualità/tempo a 1 e 2 MP. Face→upscale è escluso perché perderebbe il ritocco tornando al latent originale.

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import type { MediaOutput } from "./studio-job.js";
+import { processingSeconds } from "./processing-time.js";
 
 type ProjectRow = { id: string; name: string; created_at: string; updated_at: string; clip_count: number; timeline_count: number; job_count: number; image_count: number };
 type TimelineRow = {
@@ -18,6 +19,9 @@ type ClipRow = {
   seed: string; source_duration: number; trim_start: number; trim_end: number | null;
   volume: number; output_filename: string; output_subfolder: string | null;
   output_type: MediaOutput["type"]; output_format: string | null;
+  candidate_status: string; candidate_created_at: string; candidate_updated_at: string;
+  variant_status: string | null; variant_created_at: string | null;
+  variant_updated_at: string | null;
 };
 
 function normalizeName(value: unknown, label = "progetto") {
@@ -51,7 +55,19 @@ function mapClip(row: ClipRow) {
     position: row.position, label: row.label, createdAt: row.created_at,
     seed: Number(row.seed), sourceDuration: row.source_duration,
     trimStart: row.trim_start, trimEnd: row.trim_end ?? row.source_duration,
-    volume: row.volume, output: mediaFromClip(row),
+    volume: row.volume,
+    processingSeconds: row.source_variant_id
+      ? processingSeconds(
+          row.variant_created_at ?? "",
+          row.variant_updated_at ?? "",
+          row.variant_status === "ready" || row.variant_status === "failed",
+        )
+      : processingSeconds(
+          row.candidate_created_at,
+          row.candidate_updated_at,
+          row.candidate_status === "ready" || row.candidate_status === "failed",
+        ),
+    output: mediaFromClip(row),
   };
 }
 function mapTimeline(row: TimelineRow) {
@@ -136,6 +152,12 @@ export class ProjectRepository {
        candidate_variants.target_megapixels AS variant_target_megapixels,
        project_clips.label, project_clips.created_at, project_clips.trim_start,
        project_clips.trim_end, project_clips.volume, candidates.seed,
+       candidates.status AS candidate_status,
+       candidates.created_at AS candidate_created_at,
+       candidates.updated_at AS candidate_updated_at,
+       candidate_variants.status AS variant_status,
+       candidate_variants.created_at AS variant_created_at,
+       candidate_variants.updated_at AS variant_updated_at,
        COALESCE(candidate_variants.output_filename, candidates.output_filename) AS output_filename,
        COALESCE(candidate_variants.output_subfolder, candidates.output_subfolder) AS output_subfolder,
        COALESCE(candidate_variants.output_type, candidates.output_type) AS output_type,
@@ -297,7 +319,8 @@ export class ProjectRepository {
   private clipVariants(jobId: string, candidateIndex: number) {
     const rows = this.database.prepare(
       `SELECT id, kind, source_variant_id, target_megapixels,
-              output_filename, output_subfolder, output_type, output_format
+              status, output_filename, output_subfolder, output_type, output_format,
+              created_at, updated_at
        FROM candidate_variants
        WHERE source_job_id = ? AND source_candidate_index = ?
          AND status = 'ready' AND output_filename IS NOT NULL
@@ -305,6 +328,7 @@ export class ProjectRepository {
     ).all(jobId, candidateIndex) as unknown as Array<{
       id: string; kind: "face" | "upscale" | "face_upscale";
       source_variant_id: string | null; target_megapixels: 1 | 2 | null;
+      status: string; created_at: string; updated_at: string;
       output_filename: string; output_subfolder: string | null;
       output_type: MediaOutput["type"]; output_format: string | null;
     }>;
@@ -314,6 +338,11 @@ export class ProjectRepository {
       sourceVariantId: row.source_variant_id,
       targetMegapixels: row.target_megapixels
         ?? (row.kind === "upscale" || row.kind === "face_upscale" ? 1 : null),
+      processingSeconds: processingSeconds(
+        row.created_at,
+        row.updated_at,
+        row.status === "ready" || row.status === "failed",
+      ),
       output: mediaFromClip({
         output_filename: row.output_filename,
         output_subfolder: row.output_subfolder,

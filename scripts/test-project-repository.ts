@@ -10,6 +10,10 @@ const dataDir = mkdtempSync(path.join(tmpdir(), "h3-studio-projects-"));
 const jobs = new JobRepository(dataDir);
 const database = new DatabaseSync(jobs.databasePath);
 const now = new Date().toISOString();
+const processingStarted = "2026-08-27T10:00:00.000Z";
+const candidateCompleted = "2026-08-27T10:01:03.250Z";
+const upscaleCompleted = "2026-08-27T10:00:45.000Z";
+const faceUpscaleCompleted = "2026-08-27T10:00:30.000Z";
 
 try {
   database
@@ -35,7 +39,7 @@ try {
         1, 'ready', '{}', 'candidate_1.mp4', '', 'output', 'video/mp4', ?, ?
       )`,
     )
-    .run(now, now);
+    .run(processingStarted, candidateCompleted);
   database
     .prepare(
       `INSERT INTO candidate_variants(
@@ -48,7 +52,7 @@ try {
         'output', 'video/mp4', ?, ?
       )`,
     )
-    .run(now, now);
+    .run(processingStarted, upscaleCompleted);
   database
     .prepare(
       `INSERT INTO candidate_variants(
@@ -63,7 +67,7 @@ try {
         'output', 'video/mp4', ?, ?
       )`,
     )
-    .run(now, now);
+    .run(processingStarted, faceUpscaleCompleted);
   database
     .prepare(
       `INSERT INTO jobs(
@@ -97,6 +101,7 @@ try {
     const withClip = projects.addClip(first.id, "test-job", 1, "Apertura");
     assert.equal(withClip?.clips.length, 1);
     assert.equal(withClip?.clips[0].position, 0);
+    assert.equal(withClip?.clips[0].processingSeconds, 63.25);
     assert.equal(first.timelines.length, 1);
 
     const alternate = projects.createTimeline(first.id, "Versione breve");
@@ -114,12 +119,14 @@ try {
     assert.equal(switched?.clips[0].sourceVariantId, "test-variant");
     assert.equal(switched?.clips[0].variantKind, "upscale");
     assert.equal(switched?.clips[0].targetMegapixels, 2);
+    assert.equal(switched?.clips[0].processingSeconds, 45);
     assert.equal(switched?.clips[0].output.filename, "candidate_1_upscale.mp4");
     const chained = switched?.clips[0].variants.find(
       (variant) => variant.id === "test-face-upscale",
     );
     assert.equal(chained?.sourceVariantId, "test-variant");
     assert.equal(chained?.targetMegapixels, 2);
+    assert.equal(chained?.processingSeconds, 30);
     const trimmed = projects.updateClip(switched!.clips[0].id, {
       trimStart: 0.5,
       trimEnd: 3.5,

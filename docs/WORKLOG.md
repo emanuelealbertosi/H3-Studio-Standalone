@@ -201,3 +201,8 @@
 - Bloccate lato server sorgenti di altro job/candidato, non pronte, non Upscale e target non superiori alla sorgente.
 - Aggiunti test dedicati per prompt 0,98/1,96 MP, catena Upscale→Face, audio del parent, migrazione, validazioni e cambio variante in timeline; CI Windows aggiornata.
 - Verificati typecheck, repository, export, Image Studio, Krea, FAST, cancellazione, restart, sanitizzazione e build Vinext. Resta il test GPU manuale di 2 MP e sincronizzazione A/V.
+- Diagnosticato un run richiesto a 2 MP ma realmente partito a 0,98 MP: il frontend aggiornato stava parlando con un bridge precedente che ignorava il nuovo target.
+- Aggiunto `postprocessContract: 2` all'health del bridge; Upscale e Face da variante vengono bloccati prima della coda se il contratto manca.
+- Aggiunto un dialog accessibile di conferma obbligatoria per ogni Upscale, con target, sorgente, avviso tempo/VRAM, Escape, focus trap e layout mobile.
+- Esposto `processingSeconds` per candidati e varianti terminali usando i timestamp persistiti; footer, versioni e cronologia mostrano il tempo comprensivo della coda.
+- Protetti i timestamp terminali da aggiornamenti tardivi e aggiunti test di regressione per durata storica, lineage timeline e immutabilità dello stato concluso.
