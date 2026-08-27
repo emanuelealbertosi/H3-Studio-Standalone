@@ -6,6 +6,7 @@
 - Il frame finale esterno segue ora lo stesso percorso di raccordo degli shot interni: keyframe al frame 0 e memoria visiva del text encoder; le Picture restano riferimenti espliciti separati.
 - Eliminato dal segmento di continuazione il frame di confine duplicato, come già avviene tra gli shot Multishot, conservando l'audio sorgente come riferimento solo-audio.
 - Aggiunto `test:continuation` per bloccare regressioni di questi tre invarianti.
+- Il Composer ora ripara in modo deterministico il difetto Gemma in cui il paragrafo `Continuity Bible` chiude prematuramente `description` e il successivo `[Shot 1]` viene emesso come stringa JSON senza chiave; aggiunto un test isolato che verifica riparazione e no-op sui JSON validi.
 
 ## 25 agosto 2026
 

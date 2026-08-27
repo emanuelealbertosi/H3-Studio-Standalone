@@ -15,6 +15,7 @@ from .h3_internal_timestamps import (
     ensure_internal_timestamps,
     timestamp_seconds as _timestamp_seconds,
 )
+from .h3_json_repair import repair_split_description
 
 _FULL_REFERENCE_MODES = {
     "R2V", "KEYFRAMES", "VIDEO EXTENSION", "VIDEO EDITING"}
@@ -31,9 +32,22 @@ def _extract_json_object(value):
     try:
         data = _extract_h3_json(value)
     except (TypeError, ValueError, json.JSONDecodeError) as error:
-        raise ValueError(
-            "Composer pre-validator could not recover the complete plan JSON: "
-            "%s" % error) from error
+        repaired, changed = repair_split_description(value)
+        if changed:
+            try:
+                data = _extract_h3_json(repaired)
+                print(
+                    "[H3Composer] repaired a split description/Shot field "
+                    "in planner JSON.", flush=True)
+            except (TypeError, ValueError, json.JSONDecodeError) as second_error:
+                raise ValueError(
+                    "Composer pre-validator repaired a split description but "
+                    "the remaining plan JSON is invalid: %s" % second_error
+                ) from second_error
+        else:
+            raise ValueError(
+                "Composer pre-validator could not recover the complete plan "
+                "JSON: %s" % error) from error
     if not isinstance(data, dict):
         raise ValueError(
             "Composer pre-validator requires one complete JSON object.")
