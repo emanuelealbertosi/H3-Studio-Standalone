@@ -254,14 +254,35 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
             return segment, segment_audio
 
         initial_video, initial_video_audio = operation_video_segment(0)
+        # VIDEO EXTENSION is a continuation boundary, not a reference-video
+        # generation task. Feeding the complete source clip back through
+        # minimax_refs makes H3 free to replay/reinterpret it and is the main
+        # behavioural difference from an internal multishot boundary. Match
+        # shot 2+ semantics instead: the exact final frame is supplied below
+        # both as frame-0 keyframe and encoder memory, while ordinary Picture
+        # references remain in the bank. Source audio may still be used as an
+        # audio-only reference so soundtrack continuity is not lost.
+        extension_audio = (
+            initial_video_audio
+            if operation_mode == "VIDEO EXTENSION" else None)
+        bank_video = (
+            None if operation_mode == "VIDEO EXTENSION" else initial_video)
+        bank_video_audio = (
+            None if operation_mode == "VIDEO EXTENSION"
+            else initial_video_audio)
         bank = h3_refs.build_ref_bank(
             video_vae, audio_vae, width, height, frames_per_shot,
             ref_image_size,
             ref_images=ref_images,
             voice_ref=voice_ref,
-            ref_audios=(ref_audio_0, ref_audio_1),
-            ref_video=initial_video,
-            ref_video_audio=initial_video_audio)
+            ref_audios=(ref_audio_0, ref_audio_1, extension_audio),
+            ref_video=bank_video,
+            ref_video_audio=bank_video_audio)
+        if operation_mode == "VIDEO EXTENSION":
+            print(
+                "[H3ReferenceMemory] VIDEO EXTENSION uses boundary memory "
+                "instead of source-video reference conditioning.",
+                flush=True)
         _auto_ctx["refsig"] = ""
         if bank:
             print(bank.marker_map(), flush=True)
@@ -372,7 +393,10 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
             shot_bank, prompt, _active_pictures = (
                 h3_refs.prepare_shot_bank(bank, prompt))
             memory_context = []
-            if anchor is not None and anchor_frames > 0:
+            external_boundary = (
+                operation_mode == "VIDEO EXTENSION" and shot_index == 0)
+            if anchor is not None and (
+                    anchor_frames > 0 or external_boundary):
                 memory_context.append(anchor)
             if history:
                 take = memory_frames if memory_frames > 0 else 1
@@ -614,7 +638,10 @@ class H3ReferenceMemorySampler(H3MultishotSampler):
             if len(history) > 8:
                 history.pop(0)
 
-            if shot_index > 0 and motion_trim_frames <= 0:
+            trim_boundary = (
+                shot_index > 0
+                or (operation_mode == "VIDEO EXTENSION" and shot_index == 0))
+            if trim_boundary and motion_trim_frames <= 0:
                 images = images[1:]
                 trim = int(round(sample_rate / 24.0))
                 waveform = waveform[..., trim:]

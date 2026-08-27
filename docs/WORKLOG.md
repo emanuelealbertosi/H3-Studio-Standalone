@@ -1,5 +1,12 @@
 # Worklog
 
+## 27 agosto 2026 — Continue allineato al Multishot
+
+- Corretto `VIDEO EXTENSION`: il video sorgente non viene più reinserito per intero nel reference bank, dove poteva essere reinterpretato o riprodotto invece di continuato.
+- Il frame finale esterno segue ora lo stesso percorso di raccordo degli shot interni: keyframe al frame 0 e memoria visiva del text encoder; le Picture restano riferimenti espliciti separati.
+- Eliminato dal segmento di continuazione il frame di confine duplicato, come già avviene tra gli shot Multishot, conservando l'audio sorgente come riferimento solo-audio.
+- Aggiunto `test:continuation` per bloccare regressioni di questi tre invarianti.
+
 ## 25 agosto 2026
 
 - Creato e installato lo scaffold H3 Studio in `F:\H3-Studio`.
