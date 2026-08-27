@@ -6,7 +6,9 @@ import { DatabaseSync } from "node:sqlite";
 import {
   CHARACTER_TURNAROUND_FORMAT,
   composeImagePrompt,
+  IMAGE_EDIT_KEEP_ASPECT_FORMAT,
   IMAGE_COMPOSITION_PRESETS,
+  imageEditKeepAspectDimensions,
 } from "../lib/image-composition.js";
 import { JobRepository } from "../bridge/job-repository.js";
 import {
@@ -55,6 +57,8 @@ try {
     /const roles:[\s\S]*?value: "background", label: "Sfondo"[\s\S]*?\];/,
   );
   assert.match(imageStudioSource, /IMAGE_COMPOSITION_PRESETS\.map/);
+  assert.match(imageStudioSource, /Mantieni proporzioni · Reference 1/);
+  assert.match(imageStudioSource, /imageEditKeepAspectDimensions/);
   assert.match(
     imageStudioSource,
     /JSON\.stringify\(\{[\s\S]*?effectivePrompt,[\s\S]*?compositionPreset,/,
@@ -68,12 +72,20 @@ try {
   assert.match(pageSource, /setImageStudioHandoff\(/);
   assert.match(pageSource, /setMediaAssets\(videoAttachments\)/);
   assert.match(pageSource, /<AssetLibraryPanel[\s\S]*?onSendToStudio=\{sendAssetImagesToStudio\}/);
+  assert.match(pageSource, /Mantieni proporzioni · Picture 1/);
   assert.doesNotMatch(pageSource, /<CreativeLibraryPanel/);
   assert.match(pageSource, />\s*Manda a Studio\s*<span>Allegato video<\/span>/);
   assert.match(
     pageSource,
     /function addRecentVideo\([\s\S]*?setStudioMediaMode\("video"\)[\s\S]*?setActiveView\("studio"\)/,
   );
+  const landscapeKeep = imageEditKeepAspectDimensions(1920, 1080);
+  assert.ok(landscapeKeep);
+  assert.equal(landscapeKeep.width % 16, 0);
+  assert.equal(landscapeKeep.height % 16, 0);
+  assert.ok(Math.abs(landscapeKeep.width / landscapeKeep.height - 16 / 9) < 0.02);
+  assert.equal(imageEditKeepAspectDimensions(null, 1080), null);
+  assert.equal(IMAGE_EDIT_KEEP_ASPECT_FORMAT, "keep-source-aspect");
   assert.match(imageStudioSource, /incomingReferences\?: ImageStudioIncomingReference\[\]/);
   assert.match(imageStudioSource, /incomingReferences\.length \? "edit" : "generate"/);
   assert.match(imageStudioSource, /asset ricevuti dalla libreria/);

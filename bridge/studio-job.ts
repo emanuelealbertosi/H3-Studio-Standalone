@@ -15,6 +15,7 @@ const MAX_SEED = 9_007_199_254_740_000;
 const BASE_SECONDS_5S_05MP = 172;
 const PLANNER_COLD_SECONDS = 28;
 const ASPECT_FORMATS = [
+  "keep source aspect",
   "16:9 landscape",
   "9:16 portrait",
   "1:1 square",
@@ -215,6 +216,9 @@ function normalizeRequest(value: unknown): StudioJobRequest {
       : "16:9 landscape";
   if (!ASPECT_FORMATS.includes(aspectFormat as AspectFormat)) {
     throw new Error("aspectFormat non è supportato dal nodo H3");
+  }
+  if (aspectFormat === "keep source aspect" && generationMode !== "I2V") {
+    throw new Error("Mantieni proporzioni sorgente è disponibile soltanto in I2V");
   }
 
   const requestedSeed = value.seed === undefined ? undefined : Number(value.seed);
@@ -495,9 +499,14 @@ export function prepareStudioJob(
     sampler.inputs.seed = candidateSeed;
     requireInput(model, "model_name");
     sampler.inputs.steps = resolvedEngine.steps;
-    size.inputs.size_mode = "megapixels + format";
+    const keepSourceAspect = request.aspectFormat === "keep source aspect";
+    size.inputs.size_mode = keepSourceAspect
+      ? "source aspect + megapixels"
+      : "megapixels + format";
     size.inputs.megapixels = request.megapixels;
-    size.inputs.aspect_format = request.aspectFormat;
+    size.inputs.aspect_format = keepSourceAspect
+      ? "16:9 landscape"
+      : request.aspectFormat;
     saver.inputs.filename_prefix = filenamePrefix;
     saver.inputs.prepend_source_video = false;
     media.inputs.media_state =

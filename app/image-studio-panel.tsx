@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   composeImagePrompt,
+  IMAGE_EDIT_KEEP_ASPECT_FORMAT,
   IMAGE_COMPOSITION_PRESETS,
+  imageEditKeepAspectDimensions,
   imageCompositionPreset,
   type ImageCompositionPreset,
 } from "../lib/image-composition";
@@ -135,6 +137,7 @@ const formats = [
 ] as const;
 
 const TURNAROUND_FORMAT = "16:9" as const;
+type ImageFormatValue = (typeof formats)[number]["value"] | typeof IMAGE_EDIT_KEEP_ASPECT_FORMAT;
 
 const tags: Array<{ value: ImageTag; label: string }> = [
   { value: "untagged", label: "Senza tag" },
@@ -233,7 +236,7 @@ export default function ImageStudioPanel({
   const [compositionPreset, setCompositionPreset] =
     useState<ImageCompositionPreset>("free");
   const [candidateCount, setCandidateCount] = useState(4);
-  const [format, setFormat] = useState<(typeof formats)[number]["value"]>("1:1");
+  const [format, setFormat] = useState<ImageFormatValue>("1:1");
   const [seedMode, setSeedMode] = useState<SeedMode>("random");
   const [seedValue, setSeedValue] = useState("1024");
   const [tag, setTag] = useState<ImageTag>("untagged");
@@ -265,7 +268,20 @@ export default function ImageStudioPanel({
   const composerRef = useRef<HTMLElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const loadGenerationRef = useRef(0);
-  const selectedFormat = formats.find((item) => item.value === format) ?? formats[0];
+  const keepAspectDimensions = imageEditKeepAspectDimensions(
+    references[0]?.width,
+    references[0]?.height,
+  );
+  const keepAspectUnavailable =
+    mode === "edit" && format === IMAGE_EDIT_KEEP_ASPECT_FORMAT && !keepAspectDimensions;
+  const selectedFormat = format === IMAGE_EDIT_KEEP_ASPECT_FORMAT && keepAspectDimensions
+    ? {
+        value: IMAGE_EDIT_KEEP_ASPECT_FORMAT,
+        label: "Mantieni proporzioni",
+        width: keepAspectDimensions.width,
+        height: keepAspectDimensions.height,
+      }
+    : formats.find((item) => item.value === format) ?? formats[0];
   const selectedComposition = imageCompositionPreset(compositionPreset);
   const turnaroundFormatMismatch =
     compositionPreset === "character-turnaround" && format !== TURNAROUND_FORMAT;
@@ -531,6 +547,7 @@ export default function ImageStudioPanel({
     }
     if (!selectedEngineReady) { setMessage(engineStatusError ?? "Il motore immagini selezionato non è pronto: controlla Admin → Dipendenze."); return; }
     if (mode === "edit" && !references.length) { setMessage("Edit richiede almeno una reference."); return; }
+    if (keepAspectUnavailable) { setMessage("Mantieni proporzioni richiede che la prima reference abbia dimensioni leggibili."); return; }
     const numericSeed = Number(seedValue);
     if (seedMode !== "random" && (!Number.isSafeInteger(numericSeed) || numericSeed < 0)) { setMessage("Seed non valido."); return; }
     setBusy("run"); setMessage("Invio al motore immagini…");
@@ -662,7 +679,7 @@ export default function ImageStudioPanel({
                   key={item.id}
                   onClick={() => {
                     setJob(item); setActiveJobId(active(item) ? item.id : null); setMode(item.mode); setPrompt(item.prompt); setCompositionPreset(item.compositionPreset ?? "free"); setCandidateCount(item.candidateCount);
-                    setFormat((formats.some((candidate) => candidate.value === item.aspectFormat) ? item.aspectFormat : "1:1") as typeof format);
+                    setFormat((item.aspectFormat === IMAGE_EDIT_KEEP_ASPECT_FORMAT || formats.some((candidate) => candidate.value === item.aspectFormat) ? item.aspectFormat : "1:1") as ImageFormatValue);
                     setSeedMode(item.seedMode);
                     setSeedValue(item.requestedSeed === null || item.requestedSeed === undefined ? "1024" : String(item.requestedSeed));
                     setReferences(item.mode === "edit"
@@ -821,15 +838,16 @@ export default function ImageStudioPanel({
           </details>
 
           <div className="image-control-grid">
-            <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => setMode("generate")} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => { setMode("edit"); if (!references.length) void openImageLibrary(); }} type="button">Edit</button></div></fieldset>
+            <fieldset className="segmented-control"><legend>Modalità</legend><div><button className={mode === "generate" ? "selected" : ""} onClick={() => { setMode("generate"); if (format === IMAGE_EDIT_KEEP_ASPECT_FORMAT) setFormat("1:1"); }} type="button">Genera</button><button className={mode === "edit" ? "selected" : ""} onClick={() => { setMode("edit"); if (!references.length) void openImageLibrary(); }} type="button">Edit</button></div></fieldset>
             <label className="select-control">
               <span>Formato</span>
               <select
                 aria-describedby={compositionPreset === "character-turnaround" ? turnaroundFormatMismatch ? "image-turnaround-warning" : "image-turnaround-guidance" : undefined}
                 aria-invalid={turnaroundFormatMismatch || undefined}
-                onChange={(event) => setFormat(event.target.value as typeof format)}
+                onChange={(event) => setFormat(event.target.value as ImageFormatValue)}
                 value={format}
               >
+                {mode === "edit" && <option value={IMAGE_EDIT_KEEP_ASPECT_FORMAT}>Mantieni proporzioni · Reference 1</option>}
                 {formats.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
             </label>
@@ -908,8 +926,8 @@ export default function ImageStudioPanel({
           <div className={selectedEngineReady ? "image-engine-state ready" : "image-engine-state blocked"}>
             {selectedEngineReady ? "Motore immagini pronto" : engineStatusError ?? "Dipendenze motore mancanti"}
           </div>
-          <div className="preset-note"><span className="fast-badge">{mode === "edit" ? "FLUX KLEIN EDIT" : "IMAGE"}</span>{selectedFormat.width} × {selectedFormat.height} · {(selectedFormat.width * selectedFormat.height / 1_000_000).toFixed(1)} MP · {selectedComposition.shortLabel}</div>
-          <div className="generation-cta"><div><span>Output</span><strong>{candidateCount} immagin{candidateCount === 1 ? "e" : "i"} · {tag === "untagged" ? "senza tag" : tags.find((item) => item.value === tag)?.label}</strong></div><button disabled={busy === "run" || active(job) || !projectId || !selectedEngineReady || turnaroundFormatMismatch} onClick={() => void run()} type="button">{busy === "run" || active(job) ? "Generazione in corso" : turnaroundFormatMismatch ? "Formato 16:9 richiesto" : !selectedEngineReady ? "Motore non pronto" : mode === "edit" ? "Crea " + candidateCount + " edit" : "Genera " + candidateCount + " immagini"}</button></div>
+          <div className="preset-note"><span className="fast-badge">{mode === "edit" ? "FLUX KLEIN EDIT" : "IMAGE"}</span>{keepAspectUnavailable ? "Reference 1 senza dimensioni" : `${selectedFormat.width} × ${selectedFormat.height} · ${(selectedFormat.width * selectedFormat.height / 1_000_000).toFixed(1)} MP`} · {selectedComposition.shortLabel}</div>
+          <div className="generation-cta"><div><span>Output</span><strong>{candidateCount} immagin{candidateCount === 1 ? "e" : "i"} · {tag === "untagged" ? "senza tag" : tags.find((item) => item.value === tag)?.label}</strong></div><button disabled={busy === "run" || active(job) || !projectId || !selectedEngineReady || turnaroundFormatMismatch || keepAspectUnavailable} onClick={() => void run()} type="button">{busy === "run" || active(job) ? "Generazione in corso" : turnaroundFormatMismatch ? "Formato 16:9 richiesto" : keepAspectUnavailable ? "Dimensioni reference mancanti" : !selectedEngineReady ? "Motore non pronto" : mode === "edit" ? "Crea " + candidateCount + " edit" : "Genera " + candidateCount + " immagini"}</button></div>
         </div>
         {message && <div className="run-message">{message}</div>}
       </section>

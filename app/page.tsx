@@ -345,6 +345,8 @@ const aspectFormats = [
   { value: "4:5 portrait", label: "4:5 · Verticale" },
 ] as const;
 
+const KEEP_SOURCE_ASPECT_FORMAT = "keep source aspect" as const;
+
 const initialCandidates: Candidate[] = [
   { id: 1, progress: 0, seed: 0, status: "idle" },
   { id: 2, progress: 0, seed: 0, status: "idle" },
@@ -5187,6 +5189,9 @@ function StudioApp() {
                   onChange={(event) => {
                     const nextMode = event.target.value as StudioMode;
                     setMode(nextMode);
+                    if (nextMode !== "i2v" && aspectFormat === KEEP_SOURCE_ASPECT_FORMAT) {
+                      setAspectFormat("16:9 landscape");
+                    }
                     if (nextMode !== "continue" && nextMode !== "edit") setSourceJobId(null);
                   }}
                 >
@@ -5204,6 +5209,9 @@ function StudioApp() {
                   value={aspectFormat}
                   onChange={(event) => setAspectFormat(event.target.value)}
                 >
+                  {mode === "i2v" && (
+                    <option value={KEEP_SOURCE_ASPECT_FORMAT}>Mantieni proporzioni · Picture 1</option>
+                  )}
                   {aspectFormats.map((item) => (
                     <option key={item.value} value={item.value}>
                       {item.label}

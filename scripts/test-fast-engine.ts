@@ -128,6 +128,39 @@ assert.equal(standard8.engineSettings.pddFile, null);
 assert.equal(standardSampler.inputs.steps, 8);
 assert.notEqual(standardSampler.inputs.pdd_acc_file, fast.engineSettings.pddFile);
 
+const keepAspectI2v = prepareStudioJob(
+  source,
+  {
+    ...baseRequest,
+    generationMode: "I2V",
+    aspectFormat: "keep source aspect",
+    mediaState: JSON.stringify([{ kind: "picture", file: "source.png [input]" }]),
+    qualityMode: "fast",
+    turboEnabled: false,
+  },
+  structuredClone(DEFAULT_RUNTIME_SETTINGS),
+  "00000000-0000-4000-8000-000000000007",
+);
+const keepAspectSize = uniqueNode(
+  keepAspectI2v.candidates[0].prompt,
+  "H3AspectMegapixelSize",
+);
+assert.equal(keepAspectSize.inputs.size_mode, "source aspect + megapixels");
+assert.equal(keepAspectSize.inputs.aspect_format, "16:9 landscape");
+assert.throws(
+  () => prepareStudioJob(
+    source,
+    {
+      ...baseRequest,
+      aspectFormat: "keep source aspect",
+      qualityMode: "fast",
+      turboEnabled: false,
+    },
+    structuredClone(DEFAULT_RUNTIME_SETTINGS),
+  ),
+  /soltanto in I2V/i,
+);
+
 const mismatch = structuredClone(DEFAULT_RUNTIME_SETTINGS);
 mismatch.fast.pddFile = fl2vaPair.pddFile;
 assert.throws(

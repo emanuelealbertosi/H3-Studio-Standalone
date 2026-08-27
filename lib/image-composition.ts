@@ -4,6 +4,32 @@ export const CHARACTER_TURNAROUND_FORMAT = {
   height: 1008,
 } as const;
 
+export const IMAGE_EDIT_KEEP_ASPECT_FORMAT = "keep-source-aspect" as const;
+const IMAGE_EDIT_TARGET_PIXELS = 1_806_336;
+
+export function imageEditKeepAspectDimensions(
+  sourceWidth: number | null | undefined,
+  sourceHeight: number | null | undefined,
+) {
+  if (
+    typeof sourceWidth !== "number" ||
+    typeof sourceHeight !== "number" ||
+    !Number.isFinite(sourceWidth) ||
+    !Number.isFinite(sourceHeight) ||
+    sourceWidth <= 0 ||
+    sourceHeight <= 0
+  ) {
+    return null;
+  }
+  const ratio = sourceWidth / sourceHeight;
+  const align = (value: number) =>
+    Math.min(4096, Math.max(64, Math.round(value / 16) * 16));
+  return {
+    width: align(Math.sqrt(IMAGE_EDIT_TARGET_PIXELS * ratio)),
+    height: align(Math.sqrt(IMAGE_EDIT_TARGET_PIXELS / ratio)),
+  };
+}
+
 const CHARACTER_TURNAROUND_EXCLUSIONS =
   "[STRICT EXCLUSIONS]\nNo extra people or characters. No fifth view, duplicate angle, inset, detail panel, close-up, headshot, bust-only crop, cropped head, cropped hands, cropped feet, action pose, perspective distortion, identity drift, different face, different body, costume variation, hairstyle variation, text, captions, labels, logos, watermark, panel borders or decorative frame.";
 
