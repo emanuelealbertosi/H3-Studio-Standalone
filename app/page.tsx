@@ -198,6 +198,9 @@ type AssetLibraryImage = {
   tag: ImageProjectTag;
   projectName?: string | null;
   source: "image-studio" | "legacy";
+  jobId?: string;
+  candidateIndex?: number;
+  referenceId?: string;
 };
 
 type MentionState = { start: number; end: number; query: string };
@@ -1891,6 +1894,9 @@ function AssetLibraryPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [message, setMessage] = useState("Caricamento immagini…");
   const [dragging, setDragging] = useState(false);
+  const [previewImage, setPreviewImage] = useState<AssetLibraryImage | null>(null);
+  const [previewZoomed, setPreviewZoomed] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -1946,6 +1952,15 @@ function AssetLibraryPanel({
     setFilter(initialKind);
   }, [initialKind]);
 
+  useEffect(() => {
+    if (!previewImage) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewImage(null);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [previewImage]);
+
   const images = useMemo(() => {
     const collected: AssetLibraryImage[] = [];
     const seen = new Set<string>();
@@ -1967,6 +1982,8 @@ function AssetLibraryPanel({
           tag: imageCandidateTag(candidate, "") ?? "untagged",
           projectName: job.originProjectName,
           source: "image-studio",
+          jobId: job.id,
+          candidateIndex: candidate.index,
         });
       }
     }
@@ -1985,6 +2002,7 @@ function AssetLibraryPanel({
           height: reference.height,
           tag: asset.kind,
           source: "legacy",
+          referenceId: reference.id,
         });
       }
     }
@@ -2026,6 +2044,60 @@ function AssetLibraryPanel({
   function addDroppedSelection(id: string) {
     if (!id || selectedIds.includes(id)) return;
     toggleSelection(id);
+  }
+
+  function openImagePreview(image: AssetLibraryImage) {
+    setPreviewZoomed(false);
+    setPreviewImage(image);
+  }
+
+  async function deleteAssetImage(image: AssetLibraryImage) {
+    const confirmed = window.confirm(
+      `Eliminare definitivamente “${image.name}” dagli Assets? Non sarà più disponibile nei progetti e nei picker dello Studio.`,
+    );
+    if (!confirmed) return;
+    setDeletingImageId(image.id);
+    setMessage(`Eliminazione di ${image.name}…`);
+    try {
+      const endpoint = image.source === "image-studio"
+        ? `/api/image-jobs/${image.jobId}/candidates/${image.candidateIndex}/delete`
+        : `/api/library-references/${image.referenceId}/delete`;
+      const response = await fetch(`${bridgeUrl}${endpoint}`, { method: "POST" });
+      const payload = (await response.json()) as {
+        error?: string;
+        jobDeleted?: boolean;
+        job?: ImagePickerJob | null;
+        asset?: CreativeAsset;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Bridge HTTP ${response.status}`);
+      }
+      if (image.source === "image-studio" && image.jobId) {
+        setImageJobs((current) => {
+          if (payload.jobDeleted) return current.filter((job) => job.id !== image.jobId);
+          if (payload.job) {
+            return current.map((job) => job.id === image.jobId ? payload.job! : job);
+          }
+          return current.map((job) => job.id === image.jobId
+            ? { ...job, candidates: job.candidates.filter((candidate) => candidate.index !== image.candidateIndex) }
+            : job);
+        });
+      } else if (image.referenceId) {
+        setLegacyAssets((current) => payload.asset
+          ? current.map((asset) => asset.id === payload.asset!.id ? payload.asset! : asset)
+          : current.map((asset) => ({
+              ...asset,
+              references: (asset.references ?? []).filter((reference) => reference.id !== image.referenceId),
+            })));
+      }
+      setSelectedIds((current) => current.filter((id) => id !== image.id));
+      if (previewImage?.id === image.id) setPreviewImage(null);
+      setMessage(`${image.name} rimossa dagli Assets`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Eliminazione immagine fallita");
+    } finally {
+      setDeletingImageId(null);
+    }
   }
 
   const filterOptions: Array<{ value: AssetFilter; label: string }> = [
@@ -2076,12 +2148,10 @@ function AssetLibraryPanel({
           {visibleImages.map((image) => {
             const selected = selectedIds.includes(image.id);
             return (
-              <button
-                aria-pressed={selected}
+              <article
                 className={`asset-library-card ${selected ? "selected" : ""}`}
                 draggable
                 key={image.id}
-                onClick={() => toggleSelection(image.id)}
                 onDragEnd={() => setDragging(false)}
                 onDragStart={(event) => {
                   setDragging(true);
@@ -2089,16 +2159,42 @@ function AssetLibraryPanel({
                   event.dataTransfer.setData("application/x-h3-asset-id", image.id);
                   event.dataTransfer.setData("text/plain", image.id);
                 }}
-                type="button"
               >
-                <div>
-                  <img alt={image.name} src={`${bridgeUrl}${image.mediaPath}`} />
-                  <span>{selected ? "✓ Selezionata" : image.tag === "background" ? "Paesaggio" : image.tag === "untagged" ? "Immagine" : image.tag === "character" ? "Personaggio" : "Oggetto"}</span>
+                <button
+                  aria-pressed={selected}
+                  className="asset-library-card-select"
+                  onClick={() => toggleSelection(image.id)}
+                  type="button"
+                >
+                  <div className="asset-library-thumbnail">
+                    <img alt={image.name} src={`${bridgeUrl}${image.mediaPath}`} />
+                    <span>{selected ? "✓ Selezionata" : image.tag === "background" ? "Paesaggio" : image.tag === "untagged" ? "Immagine" : image.tag === "character" ? "Personaggio" : "Oggetto"}</span>
+                  </div>
+                  <strong>{image.name}</strong>
+                  <small>{image.projectName ?? (image.source === "legacy" ? "Asset precedente" : "Senza progetto")}</small>
+                  <p>{image.detail}</p>
+                </button>
+                <div className="asset-library-card-actions">
+                  <button
+                    aria-label={`Ingrandisci ${image.name}`}
+                    onClick={() => openImagePreview(image)}
+                    title="Ingrandisci"
+                    type="button"
+                  >
+                    ⛶
+                  </button>
+                  <button
+                    aria-label={`Elimina ${image.name}`}
+                    className="danger"
+                    disabled={deletingImageId === image.id}
+                    onClick={() => void deleteAssetImage(image)}
+                    title="Elimina dagli Assets"
+                    type="button"
+                  >
+                    {deletingImageId === image.id ? "…" : "⌫"}
+                  </button>
                 </div>
-                <strong>{image.name}</strong>
-                <small>{image.projectName ?? (image.source === "legacy" ? "Asset precedente" : "Senza progetto")}</small>
-                <p>{image.detail}</p>
-              </button>
+              </article>
             );
           })}
           {!visibleImages.length && (
@@ -2168,6 +2264,37 @@ function AssetLibraryPanel({
           </button>
         </aside>
       </div>
+      {previewImage && (
+        <div
+          aria-label={`Anteprima ${previewImage.name}`}
+          aria-modal="true"
+          className="reference-lightbox asset-image-lightbox"
+          onMouseDown={() => setPreviewImage(null)}
+          role="dialog"
+        >
+          <div onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <strong>{previewImage.name}</strong>
+                <span>{previewImage.width && previewImage.height ? `${previewImage.width} × ${previewImage.height}` : "Anteprima asset"}</span>
+              </div>
+              <div>
+                <a download href={`${bridgeUrl}${previewImage.mediaPath}${previewImage.mediaPath.includes("?") ? "&" : "?"}download=1`}>⇩ Scarica</a>
+                <button onClick={() => setPreviewImage(null)} type="button">×</button>
+              </div>
+            </header>
+            <button
+              aria-label={previewZoomed ? "Adatta immagine alla finestra" : "Zoom immagine"}
+              className={`asset-image-lightbox-canvas ${previewZoomed ? "zoomed" : ""}`}
+              onClick={() => setPreviewZoomed((current) => !current)}
+              title={previewZoomed ? "Clicca per adattare" : "Clicca per ingrandire"}
+              type="button"
+            >
+              <img alt={previewImage.name} src={`${bridgeUrl}${previewImage.mediaPath}`} />
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
