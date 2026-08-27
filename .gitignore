@@ -47,3 +47,5 @@ next-env.d.ts
 *.sqlite.before-*
 *.tsbuildinfo
 *.log
+__pycache__/
+*.py[cod]
