@@ -3217,7 +3217,7 @@ function AdminPanel() {
     ? compatibleEngineOptions(
         data.capabilities.models,
         data.settings.anima.model,
-        /anima/i,
+        /(?:anima|nova.*am)/i,
       )
     : [];
   const kreaTextEncoders = data
@@ -3623,7 +3623,7 @@ function AdminPanel() {
               </div>
               <div className="admin-form anima-engine-form">
                 <label>
-                  <span>Modello Anima</span>
+                  <span>Modello Anima / Nova AM</span>
                   <select value={data.settings.anima.model} onChange={(event) => setData({
                     ...data,
                     settings: { ...data.settings, anima: { ...data.settings.anima, model: event.target.value } },

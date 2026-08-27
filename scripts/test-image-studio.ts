@@ -28,6 +28,7 @@ import {
 import { ProjectRepository } from "../bridge/project-repository.js";
 import {
   DEFAULT_RUNTIME_SETTINGS,
+  isAnimaModelFilename,
   RuntimeSettingsStore,
 } from "../bridge/runtime-settings.js";
 
@@ -63,6 +64,7 @@ try {
   assert.match(imageStudioSource, /api\/image-jobs\/\$\{job\.id\}\/regenerate/);
   assert.match(imageStudioSource, /Rigenera con nuovo seed/);
   assert.match(pageSource, /ANIME IMAGE ENGINE/);
+  assert.match(pageSource, /nova\.\*am/);
   assert.match(pageSource, /api\/jobs\/\$\{currentJobId\}\/regenerate/);
   assert.match(pageSource, /Rigenera batch/);
   assert.match(serverSource, /\/api\/jobs\/:jobId\/regenerate/);
@@ -624,6 +626,29 @@ try {
     updated.h3.model,
     DEFAULT_RUNTIME_SETTINGS.h3.model,
     "updating Flux Image Edit must not alter the H3 model",
+  );
+  assert.equal(isAnimaModelFilename("anima_turboV10.safetensors"), true);
+  assert.equal(isAnimaModelFilename("novaAnimeAM_v20.safetensors"), true);
+  assert.equal(isAnimaModelFilename("novaFurryAM_v10.safetensors"), true);
+  assert.equal(isAnimaModelFilename("novaOrangeAM_v15.safetensors"), true);
+  assert.equal(isAnimaModelFilename("novaCartoonXL_v50.safetensors"), false);
+  const novaAnimaUpdated = await runtime.update({
+    ...updated,
+    anima: {
+      ...updated.anima,
+      model: "novaAnimeAM_v20.safetensors",
+    },
+  });
+  assert.equal(novaAnimaUpdated.anima.model, "novaAnimeAM_v20.safetensors");
+  await assert.rejects(
+    runtime.update({
+      ...novaAnimaUpdated,
+      anima: {
+        ...novaAnimaUpdated.anima,
+        model: "novaCartoonXL_v50.safetensors",
+      },
+    }),
+    /non sembra compatibile con Anima/,
   );
   const snofsUpdated = await runtime.update({
     ...updated,

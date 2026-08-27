@@ -77,6 +77,10 @@ export function isFlux2Klein9BModelFilename(value: string) {
   return /(?:9b|snofs)/i.test(value);
 }
 
+export function isAnimaModelFilename(value: string) {
+  return /(?:anima|nova.*am)/i.test(value);
+}
+
 export const DEFAULT_RUNTIME_SETTINGS: RuntimeSettings = Object.freeze({
   h3: {
     model: "minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
@@ -262,7 +266,7 @@ function validateSettings(value: unknown): RuntimeSettings {
     throw new Error("Il CFG Flux.2 Klein Edit deve essere compreso fra 0 e 20");
   }
   if (!animaModel) throw new Error("Seleziona un modello Anima");
-  if (!/anima/i.test(animaModel)) {
+  if (!isAnimaModelFilename(animaModel)) {
     throw new Error(`Il modello ${animaModel} non sembra compatibile con Anima`);
   }
   if (!animaEncoder) throw new Error("Seleziona il text encoder Anima");
