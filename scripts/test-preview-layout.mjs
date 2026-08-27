@@ -123,4 +123,11 @@ assert.match(
 assert.match(css, /\.image-turnaround-guidance[\s\S]*?grid-column:\s*1 \/ -1/);
 assert.match(css, /\.image-turnaround-warning\s*\{[^}]*border:/s);
 
-console.log("Preview layout and image turnaround UI: OK");
+assert.match(css, /\.asset-library-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill,/s);
+assert.match(css, /\.asset-studio-dropzone\s*\{[^}]*border-left:/s);
+assert.match(css, /\.send-assets-to-studio\s*\{[^}]*display:\s*flex/s);
+assert.match(page, /className="asset-library-grid"/);
+assert.match(page, /className=\{`asset-studio-dropzone/);
+assert.match(page, /Manda a Studio/);
+
+console.log("Preview layout, image turnaround and Assets handoff UI: OK");

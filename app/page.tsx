@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import ImageStudioPanel from "./image-studio-panel";
+import ImageStudioPanel, {
+  type ImageStudioIncomingReference,
+} from "./image-studio-panel";
 import {
   compatiblePddFilesForModel,
   fastPddPairForModel,
@@ -182,6 +184,19 @@ type GeneratedImagePickerItem = {
   job: ImagePickerJob;
   candidate: ImagePickerCandidate & { output: ImagePickerOutput };
   sameProject: boolean;
+};
+
+type AssetLibraryImage = {
+  id: string;
+  name: string;
+  detail: string;
+  file: string;
+  mediaPath: string;
+  width?: number | null;
+  height?: number | null;
+  tag: ImageProjectTag;
+  projectName?: string | null;
+  source: "image-studio" | "legacy";
 };
 
 type MentionState = { start: number; end: number; query: string };
@@ -1800,12 +1815,311 @@ function MediaLibraryPanel({
                 </button>
               </div>
               <div><strong>{job.projectName ?? "Senza progetto"}</strong><small>{job.id.slice(0, 8)} · candidato {candidate.index}</small></div>
-              <button onClick={() => onUseVideo(job, candidate)} type="button">Usa nello Studio</button>
+              <button onClick={() => onUseVideo(job, candidate)} type="button">
+                Manda a Studio
+                <span>Allegato video</span>
+              </button>
             </article>
           ))}
           {!videos.length && <div className="media-library-empty">Nessun video completato</div>}
         </div>
       </section>
+    </section>
+  );
+}
+
+function AssetLibraryPanel({
+  initialKind,
+  onSendToStudio,
+}: {
+  initialKind: "all" | "character" | "object";
+  onSendToStudio: (images: AssetLibraryImage[]) => void;
+}) {
+  type AssetFilter = "all" | ImageProjectTag;
+  const [filter, setFilter] = useState<AssetFilter>(initialKind);
+  const [query, setQuery] = useState("");
+  const [imageJobs, setImageJobs] = useState<ImagePickerJob[]>([]);
+  const [legacyAssets, setLegacyAssets] = useState<CreativeAsset[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [message, setMessage] = useState("Caricamento immagini…");
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    let disposed = false;
+    const load = async () => {
+      try {
+        const [imageResponse, assetResponse] = await Promise.all([
+          fetch(`${bridgeUrl}/api/image-jobs?limit=200`, { cache: "no-store" }),
+          fetch(`${bridgeUrl}/api/library`, { cache: "no-store" }),
+        ]);
+        const imagePayload = (await imageResponse.json()) as {
+          jobs?: ImagePickerJob[];
+          error?: string;
+        };
+        const assetPayload = (await assetResponse.json()) as {
+          assets?: CreativeAsset[];
+          error?: string;
+        };
+        if (!imageResponse.ok) {
+          throw new Error(imagePayload.error ?? `Bridge HTTP ${imageResponse.status}`);
+        }
+        if (!assetResponse.ok) {
+          throw new Error(assetPayload.error ?? `Bridge HTTP ${assetResponse.status}`);
+        }
+        const details = await Promise.all(
+          (assetPayload.assets ?? []).map(async (asset) => {
+            const response = await fetch(`${bridgeUrl}/api/library/${asset.id}`, {
+              cache: "no-store",
+            });
+            if (!response.ok) return asset;
+            const payload = (await response.json()) as { asset?: CreativeAsset };
+            return payload.asset ?? asset;
+          }),
+        );
+        if (disposed) return;
+        setImageJobs(imagePayload.jobs ?? []);
+        setLegacyAssets(details);
+        setMessage("Seleziona fino a quattro immagini oppure trascinale nel box");
+      } catch (error) {
+        if (!disposed) {
+          setMessage(
+            error instanceof Error ? error.message : "Assets non disponibili",
+          );
+        }
+      }
+    };
+    void load();
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setFilter(initialKind);
+  }, [initialKind]);
+
+  const images = useMemo(() => {
+    const collected: AssetLibraryImage[] = [];
+    const seen = new Set<string>();
+    for (const job of imageJobs) {
+      for (const candidate of job.candidates) {
+        if (candidate.status !== "ready" || !candidate.output) continue;
+        const file = imageReferenceFile(candidate.output);
+        const key = file.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        collected.push({
+          id: `generated:${job.id}:${candidate.index}`,
+          name: `Immagine ${job.id.slice(0, 8)} · candidato ${candidate.index}`,
+          detail: job.prompt,
+          file,
+          mediaPath: candidate.output.mediaPath,
+          width: candidate.output.width ?? job.width,
+          height: candidate.output.height ?? job.height,
+          tag: imageCandidateTag(candidate, "") ?? "untagged",
+          projectName: job.originProjectName,
+          source: "image-studio",
+        });
+      }
+    }
+    for (const asset of legacyAssets) {
+      for (const reference of asset.references ?? []) {
+        const key = reference.file.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        collected.push({
+          id: `legacy:${reference.id}`,
+          name: `${asset.name} · ${reference.label}`,
+          detail: asset.description || reference.role.replaceAll("_", " "),
+          file: reference.file,
+          mediaPath: reference.mediaPath,
+          width: reference.width,
+          height: reference.height,
+          tag: asset.kind,
+          source: "legacy",
+        });
+      }
+    }
+    return collected;
+  }, [imageJobs, legacyAssets]);
+
+  useEffect(() => {
+    const available = new Set(images.map((image) => image.id));
+    setSelectedIds((current) => current.filter((id) => available.has(id)));
+  }, [images]);
+
+  const visibleImages = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return images.filter((image) => {
+      if (filter !== "all" && image.tag !== filter) return false;
+      if (!normalizedQuery) return true;
+      return `${image.name} ${image.detail} ${image.projectName ?? ""}`
+        .toLowerCase()
+        .includes(normalizedQuery);
+    });
+  }, [filter, images, query]);
+
+  const selectedImages = selectedIds.flatMap((id) => {
+    const image = images.find((item) => item.id === id);
+    return image ? [image] : [];
+  });
+
+  function toggleSelection(id: string) {
+    setSelectedIds((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id);
+      if (current.length >= 4) {
+        setMessage("Flux Klein accetta al massimo quattro immagini");
+        return current;
+      }
+      return [...current, id];
+    });
+  }
+
+  function addDroppedSelection(id: string) {
+    if (!id || selectedIds.includes(id)) return;
+    toggleSelection(id);
+  }
+
+  const filterOptions: Array<{ value: AssetFilter; label: string }> = [
+    { value: "all", label: "Tutte" },
+    { value: "character", label: "Personaggi" },
+    { value: "object", label: "Oggetti" },
+    { value: "background", label: "Paesaggi" },
+    { value: "untagged", label: "Senza tag" },
+  ];
+
+  return (
+    <section className="asset-library-panel">
+      <div className="library-heading">
+        <div>
+          <span className="section-index">ASSETS</span>
+          <h2>Immagini riutilizzabili</h2>
+          <p>{message}</p>
+        </div>
+        <span className="asset-library-count">{images.length} immagini</span>
+      </div>
+
+      <div className="asset-library-toolbar">
+        <div className="library-filters" aria-label="Filtra Assets">
+          {filterOptions.map((option) => (
+            <button
+              className={filter === option.value ? "active" : ""}
+              key={option.value}
+              onClick={() => setFilter(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <label>
+          <span>Cerca</span>
+          <input
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Nome, prompt o progetto"
+            type="search"
+            value={query}
+          />
+        </label>
+      </div>
+
+      <div className="asset-library-workspace">
+        <div className="asset-library-grid">
+          {visibleImages.map((image) => {
+            const selected = selectedIds.includes(image.id);
+            return (
+              <button
+                aria-pressed={selected}
+                className={`asset-library-card ${selected ? "selected" : ""}`}
+                draggable
+                key={image.id}
+                onClick={() => toggleSelection(image.id)}
+                onDragEnd={() => setDragging(false)}
+                onDragStart={(event) => {
+                  setDragging(true);
+                  event.dataTransfer.effectAllowed = "copy";
+                  event.dataTransfer.setData("application/x-h3-asset-id", image.id);
+                  event.dataTransfer.setData("text/plain", image.id);
+                }}
+                type="button"
+              >
+                <div>
+                  <img alt={image.name} src={`${bridgeUrl}${image.mediaPath}`} />
+                  <span>{selected ? "✓ Selezionata" : image.tag === "background" ? "Paesaggio" : image.tag === "untagged" ? "Immagine" : image.tag === "character" ? "Personaggio" : "Oggetto"}</span>
+                </div>
+                <strong>{image.name}</strong>
+                <small>{image.projectName ?? (image.source === "legacy" ? "Asset precedente" : "Senza progetto")}</small>
+                <p>{image.detail}</p>
+              </button>
+            );
+          })}
+          {!visibleImages.length && (
+            <div className="media-library-empty">
+              Nessuna immagine corrisponde al filtro.
+            </div>
+          )}
+        </div>
+
+        <aside
+          className={`asset-studio-dropzone ${dragging ? "dragging" : ""}`}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setDragging(false);
+            }
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragging(false);
+            addDroppedSelection(
+              event.dataTransfer.getData("application/x-h3-asset-id") ||
+                event.dataTransfer.getData("text/plain"),
+            );
+          }}
+        >
+          <div>
+            <span className="section-index">SELEZIONE</span>
+            <strong>Trascina qui le immagini</strong>
+            <small>Oppure cliccale nella griglia · massimo 4</small>
+          </div>
+          <div className="asset-studio-selection">
+            {selectedImages.map((image, index) => (
+              <article key={image.id}>
+                <img alt="" src={`${bridgeUrl}${image.mediaPath}`} />
+                <span>{index + 1}</span>
+                <button
+                  aria-label={`Rimuovi ${image.name}`}
+                  onClick={() => toggleSelection(image.id)}
+                  type="button"
+                >
+                  ×
+                </button>
+              </article>
+            ))}
+            {!selectedImages.length && <p>Nessun asset selezionato</p>}
+          </div>
+          <button
+            className="send-assets-to-studio"
+            disabled={!selectedImages.length}
+            onClick={() => onSendToStudio(selectedImages)}
+            type="button"
+          >
+            Manda a Studio
+            <span>
+              {selectedImages.length
+                ? `${selectedImages.length} allegati · Video Reference + Immagini Edit`
+                : "Seleziona almeno un’immagine"}
+            </span>
+          </button>
+        </aside>
+      </div>
     </section>
   );
 }
@@ -3057,6 +3371,10 @@ function StudioApp() {
   const [activeView, setActiveView] = useState<"studio" | "projects" | "montages" | "characters" | "library" | "admin">("studio");
   const [studioMediaMode, setStudioMediaMode] = useState<"video" | "image">("video");
   const [imageResetToken, setImageResetToken] = useState(0);
+  const [imageStudioHandoff, setImageStudioHandoff] = useState<{
+    token: number;
+    references: ImageStudioIncomingReference[];
+  } | null>(null);
   const [libraryInitialKind, setLibraryInitialKind] = useState<"all" | "character" | "object">("all");
   const [montageTarget, setMontageTarget] = useState<{ projectId: string; timelineId: string } | null>(null);
   const [studioProjects, setStudioProjects] = useState<ProjectSummary[]>([]);
@@ -3879,6 +4197,7 @@ function StudioApp() {
 
   function addRecentVideo(job: RemoteJob, candidate: RemoteJob["candidates"][number]) {
     if (!candidate.output) return;
+    setStudioMediaMode("video");
     const url = new URL(candidate.output.mediaPath, bridgeUrl);
     const filename = url.searchParams.get("filename") ?? candidate.output.filename;
     const subfolder = url.searchParams.get("subfolder") ?? "";
@@ -3903,7 +4222,8 @@ function StudioApp() {
     if (mode === "t2v") setMode("reference");
     insertPromptMention(mention);
     setMediaPickerOpen(false);
-    setRunMessage("Video della cronologia collegato senza nuovo upload");
+    setActiveView("studio");
+    setRunMessage("Video della libreria inviato allo Studio come allegato");
   }
 
   async function uploadAssetFiles(files: FileList | null) {
@@ -4036,6 +4356,50 @@ function StudioApp() {
     setActiveView("studio");
     setRunMessage(
       `${selectedReferences.length} reference di “${asset.name}” caricate nello Studio`,
+    );
+  }
+
+  function sendAssetImagesToStudio(images: AssetLibraryImage[]) {
+    const selectedImages = images.slice(0, 4);
+    if (!selectedImages.length) return;
+    const videoAttachments: MediaAsset[] = [];
+    const imageReferences: ImageStudioIncomingReference[] = [];
+    for (const [index, image] of selectedImages.entries()) {
+      const mention = uniqueMention(image.name, videoAttachments);
+      videoAttachments.push({
+        kind: "picture",
+        file: image.file,
+        name: image.name,
+        caption: image.detail.slice(0, 180),
+        mention,
+        mediaPath: image.mediaPath,
+        referenceRole: image.tag === "untagged" ? undefined : image.tag,
+        width: image.width,
+        height: image.height,
+        audio_mode: "off",
+        uid: crypto.randomUUID(),
+      });
+      imageReferences.push({
+        file: image.file,
+        name: image.name,
+        width: image.width,
+        height: image.height,
+        mediaPath: image.mediaPath,
+        role: index === 0 ? "base" : "other",
+      });
+    }
+    setMediaAssets(videoAttachments);
+    setReferenceRoles(buildReferenceRoles(videoAttachments, "AUTO"));
+    setMode("reference");
+    setSourceJobId(null);
+    setImageStudioHandoff({
+      token: Date.now(),
+      references: imageReferences,
+    });
+    setImageResetToken((current) => current + 1);
+    setActiveView("studio");
+    setRunMessage(
+      `${selectedImages.length} immagini inviate allo Studio: disponibili in Video Reference e Immagini Edit`,
     );
   }
 
@@ -4280,7 +4644,7 @@ function StudioApp() {
           <button
             className={`rail-item ${activeView === "characters" ? "active" : ""}`}
             onClick={() => {
-              setLibraryInitialKind("character");
+              setLibraryInitialKind("all");
               setActiveView("characters");
             }}
             type="button"
@@ -4326,7 +4690,7 @@ function StudioApp() {
                 : activeView === "library"
                   ? "Media riutilizzabili"
                 : activeView === "characters"
-                  ? "Asset persistenti / Krea 2"
+                  ? "Immagini riutilizzabili"
                   : `Progetto / ${studioProject?.name ?? "Caricamento…"}`}
             </div>
             <h1>
@@ -4339,7 +4703,7 @@ function StudioApp() {
                   : activeView === "library"
                     ? "Libreria"
                   : activeView === "characters"
-                    ? "Personaggi e oggetti"
+                    ? "Assets"
                   : studioMediaMode === "image" ? "Immagine 01" : "Shot 01"}
             </h1>
           </div>
@@ -4363,7 +4727,10 @@ function StudioApp() {
                 </label>
                 <button onClick={() => {
                   if (studioMediaMode === "video") beginNewGeneration(studioProjectId);
-                  else setImageResetToken((current) => current + 1);
+                  else {
+                    setImageStudioHandoff(null);
+                    setImageResetToken((current) => current + 1);
+                  }
                 }} type="button">{studioMediaMode === "video" ? "Nuovo shot" : "Nuova immagine"}</button>
                 <button onClick={() => void createStudioProject()} title="Crea un nuovo progetto" type="button">＋</button>
               </div>
@@ -4401,9 +4768,9 @@ function StudioApp() {
               onUseClip={(clip, operation) => prepareClipOperation(clip, operation)}
             />
           ) : activeView === "characters" ? (
-            <CreativeLibraryPanel
+            <AssetLibraryPanel
               initialKind={libraryInitialKind}
-              onUseReferences={useCreativeReferences}
+              onSendToStudio={sendAssetImagesToStudio}
             />
           ) : activeView === "library" ? (
             <MediaLibraryPanel
@@ -4420,7 +4787,8 @@ function StudioApp() {
           <div hidden={studioMediaMode !== "image"}>
             <ImageStudioPanel
               bridgeUrl={bridgeUrl}
-              key={imageResetToken}
+              incomingReferences={imageStudioHandoff?.references}
+              key={`${imageResetToken}-${imageStudioHandoff?.token ?? 0}`}
               projectId={studioProjectId}
               projectName={studioProject?.name}
               projects={studioProjects}

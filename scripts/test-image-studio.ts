@@ -60,6 +60,23 @@ try {
     /JSON\.stringify\(\{[\s\S]*?effectivePrompt,[\s\S]*?compositionPreset,/,
   );
   assert.match(pageSource, /<span className="rail-icon">◉<\/span>\s*Assets/);
+  assert.match(pageSource, /function AssetLibraryPanel\(/);
+  assert.match(pageSource, /fetch\(`\$\{bridgeUrl\}\/api\/image-jobs\?limit=200`/);
+  assert.match(pageSource, /application\/x-h3-asset-id/);
+  assert.match(pageSource, /onSendToStudio\(selectedImages\)/);
+  assert.match(pageSource, /function sendAssetImagesToStudio/);
+  assert.match(pageSource, /setImageStudioHandoff\(/);
+  assert.match(pageSource, /setMediaAssets\(videoAttachments\)/);
+  assert.match(pageSource, /<AssetLibraryPanel[\s\S]*?onSendToStudio=\{sendAssetImagesToStudio\}/);
+  assert.doesNotMatch(pageSource, /<CreativeLibraryPanel/);
+  assert.match(pageSource, />\s*Manda a Studio\s*<span>Allegato video<\/span>/);
+  assert.match(
+    pageSource,
+    /function addRecentVideo\([\s\S]*?setStudioMediaMode\("video"\)[\s\S]*?setActiveView\("studio"\)/,
+  );
+  assert.match(imageStudioSource, /incomingReferences\?: ImageStudioIncomingReference\[\]/);
+  assert.match(imageStudioSource, /incomingReferences\.length \? "edit" : "generate"/);
+  assert.match(imageStudioSource, /asset ricevuti dalla libreria/);
   assert.match(
     serverSource,
     /"\/api\/image-jobs"[\s\S]{0,500}request\.query\.projectId/,

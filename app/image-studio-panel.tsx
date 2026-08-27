@@ -81,6 +81,16 @@ type Props = {
   projects: ProjectOption[];
   projectId: string;
   projectName?: string | null;
+  incomingReferences?: ImageStudioIncomingReference[];
+};
+
+export type ImageStudioIncomingReference = {
+  file: string;
+  name?: string;
+  width?: number | null;
+  height?: number | null;
+  mediaPath?: string;
+  role?: ReferenceRole;
 };
 
 type ImageStudioStatus = {
@@ -181,8 +191,16 @@ function referenceMediaPath(file: string) {
   return "/api/media?" + query.toString();
 }
 
-export default function ImageStudioPanel({ bridgeUrl, projects, projectId, projectName }: Props) {
-  const [mode, setMode] = useState<ImageMode>("generate");
+export default function ImageStudioPanel({
+  bridgeUrl,
+  projects,
+  projectId,
+  projectName,
+  incomingReferences = [],
+}: Props) {
+  const [mode, setMode] = useState<ImageMode>(
+    incomingReferences.length ? "edit" : "generate",
+  );
   const [prompt, setPrompt] = useState("");
   const [compositionPreset, setCompositionPreset] =
     useState<ImageCompositionPreset>("free");
@@ -191,14 +209,25 @@ export default function ImageStudioPanel({ bridgeUrl, projects, projectId, proje
   const [seedMode, setSeedMode] = useState<SeedMode>("random");
   const [seedValue, setSeedValue] = useState("1024");
   const [tag, setTag] = useState<ImageTag>("untagged");
-  const [references, setReferences] = useState<ImageReference[]>([]);
+  const [references, setReferences] = useState<ImageReference[]>(() =>
+    incomingReferences.slice(0, 4).map((reference, index) => ({
+      ...reference,
+      mediaPath: reference.mediaPath ?? referenceMediaPath(reference.file),
+      role: reference.role ?? (index === 0 ? "base" : "other"),
+      uid: crypto.randomUUID(),
+    })),
+  );
   const [uploading, setUploading] = useState(false);
   const [jobs, setJobs] = useState<ImageJob[]>([]);
   const [job, setJob] = useState<ImageJob | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [shareTargets, setShareTargets] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(
+    incomingReferences.length
+      ? `${Math.min(incomingReferences.length, 4)} asset ricevuti dalla libreria`
+      : null,
+  );
   const [engineStatus, setEngineStatus] = useState<ImageStudioStatus | null>(null);
   const [engineStatusError, setEngineStatusError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
