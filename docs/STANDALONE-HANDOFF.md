@@ -17,7 +17,7 @@ stato reale, architettura, comandi, test, rischi e prossime attività.
 
 | Variante | Percorso locale | Scopo | Stato Git |
 |---|---|---|---|
-| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `2ea7a8d`, repository GitHub originale |
+| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `3bf5731`, repository GitHub originale |
 | H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, prerelease `1ac9396`, repository GitHub dedicato |
 
 Non modificare `F:\H3-Studio` mentre si lavora sulla variante standalone.
@@ -400,7 +400,7 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 ### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
 
 La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
-standalone. Il riferimento sorgente corrente è `2ea7a8d`. **Non importare ancora
+standalone. Il riferimento sorgente corrente è `3bf5731`. **Non importare ancora
 il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
 devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
 Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
@@ -431,10 +431,11 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - contratto stereo end-to-end: reference audio/video normalizzati a due canali prima di MiniMax H3, output TTS/musica verificati con FFprobe e convertiti con FFmpeg solo quando necessario (`fab28eb`).
 - Admin resiliente agli aggiornamenti non sincronizzati: un endpoint opzionale LLM assente nel bridge precedente non oscura più configurazione, modelli e workflow (`f767639`).
 - pannelli Immagini e Audio mantenuti montati durante la navigazione: job, card, polling e annullamento restano visibili tornando nello Studio (`e2b05cb`).
-- persistenza Admin del modello Anima/Nova AM resa resistente al salvataggio immediato, con conferma del modello restituito dal server e regressione su riapertura dello store (`2ea7a8d`).
-- `Mantieni proporzioni` esteso da I2V a Keyframes, Reference, Continue ed Edit: Picture 1 guida I2V/Keyframes, Video 1 guida Continue/Edit e il workflow usa il primo visual disponibile in Reference (`2ea7a8d`).
-- Libreria immagini allineata alla sorgente di Assets: Personaggi, Oggetti, Luoghi e immagini senza tag mostrano anche i job moderni, con rinomina, eliminazione multipla e invio allo Studio; etichetta Paesaggio rinominata Luogo mantenendo il valore interno `background` (`2ea7a8d`).
-- Terminologia pubblica resa indipendente dal modello: UI, errori e documentazione usano LLM/LLM Vision; catalogo Chat e nodo locale accettano qualunque GGUF non-projector, conservando i vecchi identificatori tecnici solo per compatibilità (`2ea7a8d`).
+- persistenza Admin del modello Anima/Nova AM resa resistente al salvataggio immediato, con conferma del modello restituito dal server e regressione su riapertura dello store (`3bf5731`).
+- `Mantieni proporzioni` esteso da I2V a Keyframes, Reference, Continue ed Edit: Picture 1 guida I2V/Keyframes, Video 1 guida Continue/Edit e il workflow usa il primo visual disponibile in Reference (`3bf5731`).
+- Libreria immagini allineata alla sorgente di Assets: Personaggi, Oggetti, Luoghi e immagini senza tag mostrano anche i job moderni, con rinomina, eliminazione multipla e invio allo Studio; etichetta Paesaggio rinominata Luogo mantenendo il valore interno `background` (`3bf5731`).
+- Terminologia pubblica resa indipendente dal modello: UI, errori e documentazione usano LLM/LLM Vision; catalogo Chat e nodo locale accettano qualunque GGUF non-projector, conservando i vecchi identificatori tecnici solo per compatibilità (`3bf5731`).
+- Libreria: eliminazione singola o multipla dei montaggi con conferma, cascata atomica dei soli collegamenti clip e conservazione di video sorgente, varianti e media (`3bf5731`).
 
 #### Gate di stabilizzazione sulla versione ComfyUI
 
@@ -647,7 +648,7 @@ La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
 è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
 nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5; lo split per
 GitHub Release è in 5b6a66c e la prerelease pubblicata è 1ac9396. La versione
-ComfyUI è avanzata fino a 2ea7a8d: leggi la coda di integrazione nella sezione 11
+ComfyUI è avanzata fino a 3bf5731: leggi la coda di integrazione nella sezione 11
 e non importarla prima che superi il gate di stabilizzazione e riceva il tag
 `v0.3.0-integration-base`. Il remote origin punta al repository standalone
 dedicato. Il remote source-snapshot può leggere F:\H3-Studio ma ha il push
