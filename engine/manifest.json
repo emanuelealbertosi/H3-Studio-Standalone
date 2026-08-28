@@ -1,16 +1,45 @@
 {
   "schemaVersion": 1,
+  "manifestVersion": "2026.08.28.1",
+  "releaseState": "unpublished",
   "engineVersion": "0.1.0-dev",
-  "developmentImportSizeGiB": 5.58,
-  "distribution": "windows-nvidia",
+  "distribution": "windows-nvidia-x64",
   "runtimeRoot": "engine/runtime",
-  "python": "python_embeded/python.exe",
-  "comfyRoot": "ComfyUI",
+  "installedSizeBytes": 5991479378,
+  "minimumFreeBytesAfterInstall": 10737418240,
+  "platform": {
+    "os": "windows",
+    "architecture": "x64",
+    "minimumWindowsBuild": 19045,
+    "gpuVendor": "nvidia"
+  },
+  "entrypoints": {
+    "python": "python_embeded/python.exe",
+    "comfy": "ComfyUI/main.py"
+  },
+  "requiredFiles": [
+    "python_embeded/python.exe",
+    "ComfyUI/main.py",
+    "ComfyUI/extra_model_paths.yaml",
+    "THIRD_PARTY_NOTICES.txt"
+  ],
+  "excludedArchivePrefixes": [
+    "ComfyUI/models/",
+    "ComfyUI/input/",
+    "ComfyUI/output/",
+    "ComfyUI/temp/",
+    "ComfyUI/user/"
+  ],
+  "artifacts": [],
+  "publication": {
+    "blockedReason": "Create the dedicated standalone repository and publish the vetted runtime archive before changing releaseState to published.",
+    "requiredArtifactFields": ["id", "fileName", "urls", "sha256", "sizeBytes", "archiveType"]
+  },
   "components": [
     {
       "id": "comfy-core",
       "source": "https://github.com/Comfy-Org/ComfyUI",
-      "version": "PIN_BEFORE_DISTRIBUTION",
+      "version": "PIN_BEFORE_PUBLICATION",
       "license": "GPL-3.0"
     },
     {
