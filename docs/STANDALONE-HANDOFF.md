@@ -5,6 +5,7 @@ Stato verificato: **foundation standalone funzionante sul PC di sviluppo**
 Branch: `standalone-engine`  
 Checkpoint iniziale: `a85f1fb` (`feat: bootstrap embedded standalone engine`)
 Checkpoint implementazione bootstrap: `9f9f5fb` (`feat: build reproducible standalone engine artifacts`)
+Checkpoint evidenza licenze: `4063be5` (`fix: resolve latent upscaler license evidence`)
 
 Questo documento è il punto di ingresso per una nuova chat o per un nuovo
 sviluppatore. È intenzionalmente autosufficiente: descrive obiettivo, confini,
@@ -15,7 +16,7 @@ stato reale, architettura, comandi, test, rischi e prossime attività.
 | Variante | Percorso locale | Scopo | Stato Git |
 |---|---|---|---|
 | H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `eb5d0cd`, repository GitHub originale |
-| H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, implementazione `9f9f5fb` |
+| H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, implementazione `4063be5` |
 
 Non modificare `F:\H3-Studio` mentre si lavora sulla variante standalone.
 La copia standalone ha un remote chiamato `source-snapshot` configurato così:
@@ -70,10 +71,10 @@ Anima, Chat Vision, Continue, Face e Latent Upscale.
   inventario componenti, SBOM Python e third-party notices.
 - Resume/retry, SHA-256, staging, swap, backup e rollback verificati.
 - Report diagnostico con Windows, spazio disco, GPU e driver verificato.
-- Artefatto reale da 3.351.733.854 byte costruito e reinstallato da zero.
+- Artefatto reale completo da 3.351.766.538 byte costruito e reinstallato da zero.
 - Start/health/stop del runtime reinstallato verificato sulla RTX 5070 Ti.
-- 14 componenti e 191 distribuzioni Python inventariati; resta una sola licenza
-  upstream irrisolta (`latent-upscaler`).
+- 14 componenti e 191 distribuzioni Python inventariati, con zero licenze
+  irrisolte e gate `--release` verificato da working tree pulito.
 - Import del runtime realmente eseguito da `D:\ComfyUI_NVMe`.
 - Runtime risultante: **5,58 GiB**.
 - Modelli non duplicati: viene riusato `extra_model_paths.yaml`.
@@ -413,8 +414,7 @@ Per pubblicare e chiudere il P0 restano soltanto attività che richiedono stato
 esterno o una decisione di distribuzione:
 
 - creare il repository standalone dedicato;
-- ottenere termini di licenza espliciti per `latent-upscaler`, oppure rimuoverlo
-  o sostituirlo dalla distribuzione;
+
 - costruire da un working tree pulito e caricare lo ZIP ufficiale su una release
   HTTPS immutabile;
 - inserire nel manifest tracciato URL, dimensione e SHA-256 dell'asset caricato;
@@ -515,12 +515,16 @@ L'MVP standalone è pronto quando un PC Windows/NVIDIA supportato può:
   `engine/components.lock.json`.
 - Pacchetti Python: inventario generato dai `METADATA`; le due correzioni con
   evidenza sono versionate in `engine/python-package-licenses.lock.json`.
-- `latent-upscaler`: `NOASSERTION`; questo blocca tecnicamente `--release`.
+- `latent-upscaler`: `Apache-2.0`, con testo ed evidenza associata versionati in
+  `third_party_licenses/latent-upscaler`; il repository GitHub del nodo non
+  contiene un proprio file `LICENSE`.
 - Modelli: esclusi dall'artefatto e condivisi tramite `extra_model_paths.yaml`;
   non assumere che siano redistribuibili.
 
 Il builder genera SBOM e `THIRD_PARTY_NOTICES.txt` e rifiuta una release se una
-licenza è irrisolta. Questo documento non è un parere legale.
+licenza è irrisolta. La validazione corrente restituisce zero voci irrisolte;
+la dichiarazione Apache associata non sostituisce una revisione legale. Questo
+documento non è un parere legale.
 
 ## 14. Rischi noti
 
@@ -566,7 +570,8 @@ F:\H3-Studio-Standalone\docs\STANDALONE-HANDOFF.md
 
 La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
 è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
-nel checkpoint 9f9f5fb. Il remote source-snapshot può leggere F:\H3-Studio ma
+nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5. Il remote
+source-snapshot può leggere F:\H3-Studio ma
 ha il push DISABLED: non riattivarlo e non pubblicare nulla senza chiedermelo.
 
 Il runtime embedded è già installato localmente in engine/runtime, è ignorato
@@ -574,8 +579,8 @@ da Git e ha superato il test reale di start/health/stop sulla RTX 5070 Ti. Il
 ciclo build/install/start/health/stop dell'artefatto è stato verificato. I
 modelli sono condivisi tramite extra_model_paths.yaml e non vanno duplicati.
 
-La pubblicazione del bootstrap attende il repository dedicato e la risoluzione
-della licenza del nodo latent-upscaler. La prima attività P0 implementabile in
+La pubblicazione del bootstrap attende il repository dedicato e un asset release
+HTTPS immutabile. La prima attività P0 implementabile in
 locale è incorporare e fissare Node e FFmpeg, con inventario licenze e launcher
 indipendente dal PATH. Mantieni funzionante il fallback external e non rompere
 i workflow/app esistenti. Prima di modificare, verifica git status, branch,

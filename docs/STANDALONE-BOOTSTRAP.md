@@ -4,7 +4,7 @@ Stato al 28 agosto 2026: bootstrap, builder riproducibile e verifica runtime
 implementati localmente. Un artefatto di sviluppo reale è stato costruito,
 installato in una destinazione pulita e avviato sulla RTX 5070 Ti. La
 pubblicazione resta bloccata fino alla creazione del repository standalone
-dedicato e alla risoluzione della licenza del nodo latent upscaler.
+dedicato e al caricamento di un asset HTTPS immutabile.
 
 ## Obiettivo
 
@@ -158,8 +158,8 @@ recente che contiene almeno Python portable e `ComfyUI/main.py`.
 Il builder ha creato un artefatto di sviluppo locale, ignorato da Git:
 
 - file: `engine/_artifacts/h3-engine-0.1.0-dev-windows-nvidia-x64.zip`;
-- dimensione: `3.351.733.854` byte;
-- SHA-256: `d5c42188f1ad73f1fc4e3ac8b622e2738dd3306ac8980cde673c1beb1a43c854`;
+- dimensione: `3.351.766.538` byte;
+- SHA-256: `e2de59f3060d880d9885ee109a9d1cd9e4cb9b4442aff1ba0477b3362a10887c`;
 - payload: 65.542 file, 5.871.160.883 byte;
 - modelli inclusi: no.
 
@@ -168,11 +168,14 @@ Il bootstrap ha installato questo ZIP in una destinazione pulita, ha generato
 stato avviato, verificato e fermato sulla RTX 5070 Ti usando la porta isolata
 19000. Dopo lo stop non erano rimasti listener o processi Python di test. Le
 directory temporanee della prova sono state eliminate; l'artefatto locale è
-stato conservato.
+stato conservato. La seconda prova, dopo la chiusura del gate licenze, ha
+ripetuto con successo checksum, installazione pulita, start/health/stop e
+controllo dell'assenza di `IMPORT FAILED`.
 
-La validazione corrente censisce 14 componenti e 191 distribuzioni Python. La
-sola voce irrisolta è `latent-upscaler`; pertanto lo ZIP esistente è una prova
-di sviluppo, non un asset pubblicabile.
+La validazione corrente censisce 14 componenti e 191 distribuzioni Python, con
+zero licenze irrisolte. La dichiarazione Apache-2.0 del latent upscaler e la
+relativa evidenza sono incluse nello ZIP. L'artefatto resta di sviluppo perché
+il repository standalone e l'URL release immutabile non esistono ancora.
 
 ## Verifica
 

@@ -37,8 +37,9 @@ backups. A fresh install generates model paths for the project `models`
 directory; an update preserves the existing `extra_model_paths.yaml`.
 
 The tracked manifest remains intentionally unpublished until the dedicated
-standalone repository exists, the remaining upstream license is resolved and a
-vetted immutable release archive has been uploaded. See
+standalone repository exists and a vetted immutable release archive has been
+uploaded. The current component and Python inventories have zero unresolved
+licenses. See
 `docs/STANDALONE-BOOTSTRAP.md` for the manifest contract and release gate.
 
 H3 Studio starts the engine on loopback, verifies a private identity endpoint,
