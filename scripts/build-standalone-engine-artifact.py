@@ -27,6 +27,9 @@ EXCLUDED_FILES = {
     "ComfyUI/extra_model_paths.yaml",
 }
 
+GITHUB_RELEASE_ASSET_LIMIT_BYTES = 2 * 1024**3
+TORCH_ARCHIVE_PREFIX = "python_embeded/Lib/site-packages/torch/"
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -44,6 +47,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-date-epoch", type=int, default=1787875200)
     parser.add_argument("--compression", choices=("stored", "fastest", "optimal"), default="fastest")
     parser.add_argument("--artifact-url")
+    parser.add_argument("--artifact-base-url")
+    parser.add_argument("--github-release", action="store_true")
     parser.add_argument("--release", action="store_true")
     parser.add_argument("--allow-incomplete-notices", action="store_true")
     parser.add_argument("--validate-only", action="store_true")
@@ -427,10 +432,16 @@ def main() -> int:
             f"License metadata incomplete for {len(incomplete)} entries: {preview}. "
             "Resolve them or use --allow-incomplete-notices for a development artifact."
         )
-    if args.release and not args.artifact_url:
-        raise ValueError("--release requires an immutable --artifact-url")
-    if args.release and not args.artifact_url.startswith("https://"):
-        raise ValueError("Release artifact URL must use HTTPS")
+    if args.release and args.github_release:
+        if not args.artifact_base_url:
+            raise ValueError("GitHub release builds require --artifact-base-url")
+        if not args.artifact_base_url.startswith("https://"):
+            raise ValueError("Release artifact base URL must use HTTPS")
+    elif args.release:
+        if not args.artifact_url:
+            raise ValueError("--release requires an immutable --artifact-url")
+        if not args.artifact_url.startswith("https://"):
+            raise ValueError("Release artifact URL must use HTTPS")
     if args.release and repo_dirty:
         raise ValueError("Release builds require a clean Git working tree")
 
@@ -476,31 +487,79 @@ def main() -> int:
         "sourceRoot": str(source_root),
         "unresolvedLicenseCount": len(incomplete),
         "unresolvedLicenses": incomplete,
+        "artifactLayout": "github-release" if args.github_release else "single",
     }
     if args.validate_only:
         report_path.write_bytes(stable_json(report))
         print(json.dumps(report, ensure_ascii=False))
         return 0
 
-    artifact_name = f"h3-engine-{engine_version}-windows-nvidia-x64.zip"
-    artifact_path = output_directory / artifact_name
-    if artifact_path.exists() and not args.force:
-        raise ValueError(f"Artifact already exists: {artifact_path}; use --force")
-    if artifact_path.exists():
-        artifact_path.unlink()
-    write_archive(
-        artifact_path,
-        payload,
-        virtual,
-        args.source_date_epoch,
-        args.compression,
-    )
-    artifact_size = artifact_path.stat().st_size
-    artifact_hash = sha256_file(artifact_path)
-    artifact_source = args.artifact_url if args.release else str(artifact_path)
+    artifact_stem = f"h3-engine-{engine_version}-windows-nvidia-x64"
+    if args.github_release:
+        core_payload = [item for item in payload if not item[0].startswith(TORCH_ARCHIVE_PREFIX)]
+        torch_payload = [item for item in payload if item[0].startswith(TORCH_ARCHIVE_PREFIX)]
+        if not core_payload or not torch_payload:
+            raise ValueError("GitHub release layout requires non-empty core and torch payloads")
+        artifact_specs = [
+            ("engine-runtime-core", f"{artifact_stem}-core.zip", core_payload, virtual),
+            ("engine-runtime-torch", f"{artifact_stem}-torch.zip", torch_payload, {}),
+        ]
+    else:
+        artifact_specs = [
+            ("engine-runtime", f"{artifact_stem}.zip", payload, virtual),
+        ]
+
+    artifact_paths = [output_directory / name for _, name, _, _ in artifact_specs]
+    existing = [path for path in artifact_paths if path.exists()]
+    if existing and not args.force:
+        names = ", ".join(str(path) for path in existing)
+        raise ValueError(f"Artifact already exists: {names}; use --force")
+    for path in existing:
+        path.unlink()
+
+    built_artifacts = []
+    for artifact_id, artifact_name, part_payload, part_virtual in artifact_specs:
+        artifact_path = output_directory / artifact_name
+        write_archive(
+            artifact_path,
+            part_payload,
+            part_virtual,
+            args.source_date_epoch,
+            args.compression,
+        )
+        artifact_size = artifact_path.stat().st_size
+        if args.github_release and artifact_size >= GITHUB_RELEASE_ASSET_LIMIT_BYTES:
+            raise ValueError(
+                f"GitHub release asset exceeds the 2 GiB limit: {artifact_name} "
+                f"({artifact_size} bytes)"
+            )
+        artifact_hash = sha256_file(artifact_path)
+        if args.release and args.github_release:
+            artifact_source = f"{args.artifact_base_url.rstrip('/')}/{artifact_name}"
+        elif args.release:
+            artifact_source = args.artifact_url
+        else:
+            artifact_source = str(artifact_path)
+        built_artifacts.append(
+            {
+                "id": artifact_id,
+                "fileName": artifact_name,
+                "urls": [artifact_source],
+                "sha256": artifact_hash,
+                "sizeBytes": artifact_size,
+                "archiveType": "zip",
+                "artifactPath": str(artifact_path),
+            }
+        )
+
+    manifest_digest = hashlib.sha256(
+        "".join(
+            f"{item['id']}:{item['sha256']}\n" for item in built_artifacts
+        ).encode("ascii")
+    ).hexdigest()
     generated_manifest = {
         **base_manifest,
-        "manifestVersion": f"{engine_version}+{artifact_hash[:12]}",
+        "manifestVersion": f"{engine_version}+{manifest_digest[:12]}",
         "releaseState": "published" if args.release else "unpublished",
         "engineVersion": engine_version,
         "installedSizeBytes": payload_bytes + sum(len(value) for value in virtual.values()),
@@ -514,13 +573,11 @@ def main() -> int:
         ],
         "artifacts": [
             {
-                "id": "engine-runtime",
-                "fileName": artifact_name,
-                "urls": [artifact_source],
-                "sha256": artifact_hash,
-                "sizeBytes": artifact_size,
-                "archiveType": "zip",
+                key: value
+                for key, value in item.items()
+                if key != "artifactPath"
             }
+            for item in built_artifacts
         ],
         "components": components,
         "publication": {
@@ -533,12 +590,18 @@ def main() -> int:
     report.update(
         {
             "status": "built",
-            "artifactPath": str(artifact_path),
-            "artifactBytes": artifact_size,
-            "artifactSha256": artifact_hash,
+            "artifacts": built_artifacts,
             "manifestPath": str(manifest_path),
         }
     )
+    if len(built_artifacts) == 1:
+        report.update(
+            {
+                "artifactPath": built_artifacts[0]["artifactPath"],
+                "artifactBytes": built_artifacts[0]["sizeBytes"],
+                "artifactSha256": built_artifacts[0]["sha256"],
+            }
+        )
     report_path.write_bytes(stable_json(report))
     print(json.dumps(report, ensure_ascii=False))
     return 0

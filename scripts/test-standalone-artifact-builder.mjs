@@ -59,6 +59,7 @@ function zipEntries(archive) {
 
 try {
   write("runtime/python_embeded/python.exe", "python");
+  write("runtime/python_embeded/Lib/site-packages/torch/__init__.py", "torch fixture");
   write("runtime/python_embeded/LICENSE.txt", "PSF fixture");
   write("runtime/ComfyUI/main.py", "# comfy fixture");
   write("runtime/ComfyUI/LICENSE", "GPL fixture");
@@ -219,6 +220,35 @@ try {
   const mystery = sbom.packages.find((item) => item.name === "mystery");
   assert.equal(mystery.license, "ISC");
   assert.equal(mystery.licenseEvidence, "python_embeded/Lib/site-packages/mystery-2.0.dist-info/COPYRIGHT.txt");
+
+  const splitOutput = path.join(fixtureRoot, "out-github");
+  runBuilder([
+    "--source-root", sourceRoot,
+    "--output-directory", splitOutput,
+    "--base-manifest", manifestPath,
+    "--components-lock", lockPath,
+    "--python-license-lock", pythonLicenseLockPath,
+    "--engine-version", "fixture-1",
+    "--compression", "stored",
+    "--source-date-epoch", "1787875200",
+    "--github-release",
+  ]);
+  const splitManifest = JSON.parse(readFileSync(path.join(splitOutput, "manifest.json"), "utf8"));
+  assert.equal(splitManifest.artifacts.length, 2);
+  assert.deepEqual(
+    splitManifest.artifacts.map((item) => item.id),
+    ["engine-runtime-core", "engine-runtime-torch"],
+  );
+  for (const artifact of splitManifest.artifacts) {
+    assert.ok(artifact.sizeBytes < 2 * 1024 ** 3);
+    assert.equal(artifact.sha256, sha256(path.join(splitOutput, artifact.fileName)));
+  }
+  const coreEntries = zipEntries(path.join(splitOutput, splitManifest.artifacts[0].fileName));
+  const torchEntries = zipEntries(path.join(splitOutput, splitManifest.artifacts[1].fileName));
+  assert.ok(coreEntries.includes("THIRD_PARTY_NOTICES.txt"));
+  assert.ok(!coreEntries.some((entry) => entry.startsWith("python_embeded/Lib/site-packages/torch/")));
+  assert.ok(torchEntries.length > 0);
+  assert.ok(torchEntries.every((entry) => entry.startsWith("python_embeded/Lib/site-packages/torch/")));
 
   const unresolvedLock = structuredClone(componentLock);
   unresolvedLock.components[2].license = "NOASSERTION";
