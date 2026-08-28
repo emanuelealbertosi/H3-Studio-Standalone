@@ -17,7 +17,12 @@ During development, `INSTALL_STANDALONE_ENGINE.bat` imports a known-good
 Windows portable installation with an atomic staging step. It copies Python,
 the ComfyUI core and only the custom nodes required by the bundled workflows;
 it reuses `extra_model_paths.yaml`, so model weights are not duplicated. The
-public release installer will instead use pinned, checksummed artifacts.
+public bootstrap is `INSTALL_H3_STUDIO_STANDALONE.bat`; it uses pinned,
+checksummed artifacts, resumable downloads, isolated staging and recoverable
+backups. The tracked manifest remains intentionally unpublished until the
+dedicated standalone repository and vetted release archive exist.
+
+See `docs/STANDALONE-BOOTSTRAP.md` for the manifest contract and release gate.
 
 H3 Studio starts the engine on loopback, verifies a private identity endpoint,
 owns its process and stores input, output and logs under `data/`. Users never

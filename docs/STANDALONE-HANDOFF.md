@@ -64,6 +64,9 @@ Anima, Chat Vision, Continue, Face e Latent Upscale.
 - Launcher unico per bridge, engine e frontend.
 - Chiusura verificata dell'intero process tree su Windows.
 - Installer di sviluppo selettivo e atomico.
+- Bootstrap pubblico guidato da manifest implementato e testato con fixture.
+- Resume/retry, SHA-256, staging, swap, backup e rollback verificati.
+- Report diagnostico con Windows, spazio disco, GPU e driver verificato.
 - Import del runtime realmente eseguito da `D:\ComfyUI_NVMe`.
 - Runtime risultante: **5,58 GiB**.
 - Modelli non duplicati: viene riusato `extra_model_paths.yaml`.
@@ -180,9 +183,13 @@ Una ComfyUI esterna sulla porta configurata viene trattata come conflitto.
 
 - `scripts/INSTALL_STANDALONE_ENGINE.ps1`: import atomico selettivo.
 - `INSTALL_STANDALONE_ENGINE.bat`: wrapper interattivo Windows.
+- `scripts/BOOTSTRAP_STANDALONE_ENGINE.ps1`: bootstrap pubblico riproducibile.
+- `INSTALL_H3_STUDIO_STANDALONE.bat`: wrapper del bootstrap pubblico.
+- `scripts/test-standalone-bootstrap.mjs`: test di installazione e rollback.
+- `docs/STANDALONE-BOOTSTRAP.md`: contratto manifest e gate di pubblicazione.
 - `scripts/standalone-launcher.mjs`: supervisore unico.
 - `START_H3_STUDIO_STANDALONE.bat`: entrypoint utente.
-- `engine/manifest.json`: metadati preliminari del runtime.
+- `engine/manifest.json`: manifest schema 1, intenzionalmente non pubblicato.
 
 ### UI e configurazione
 
@@ -358,17 +365,24 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 
 ### Priorità P0 — installer pubblico riproducibile
 
-L'installer attuale importa da una ComfyUI esistente. La release pubblica deve:
+Il framework del bootstrap è implementato localmente e copre:
 
-- scaricare artefatti ufficiali/versionati senza richiedere ComfyUI preinstallata;
-- usare URL e SHA-256 fissati in un manifest;
-- supportare resume e retry;
-- installare in staging e fare swap atomico;
-- mantenere un rollback recuperabile;
-- produrre log diagnostici leggibili;
-- verificare spazio disco, GPU, driver e versione Windows;
-- non includere modelli soggetti a licenze incompatibili;
-- conservare notice e licenze di ogni componente.
+- artefatti versionati descritti da manifest schema 1;
+- download HTTPS con resume, mirror, retry, dimensione e SHA-256;
+- staging isolato, swap atomico e ripristino automatico su errore;
+- backup recuperabili e rollback all'ultimo backup valido;
+- log testuale e report JSON diagnostico;
+- preflight di spazio, Windows, architettura, GPU e driver;
+- blocco degli archivi che contengono modelli o directory dati;
+- preservazione di `extra_model_paths.yaml`.
+
+Per chiudere il P0 restano:
+
+- creare il repository standalone dedicato;
+- costruire e pubblicare l'archivio runtime ufficiale immutabile;
+- sostituire i pin provvisori con versioni, URL, dimensione e SHA-256 reali;
+- completare `THIRD_PARTY_NOTICES`, inventario licenze e SBOM;
+- validare il bootstrap pubblicato su una macchina Windows/NVIDIA pulita.
 
 ### Priorità P0 — Node e FFmpeg incorporati
 
