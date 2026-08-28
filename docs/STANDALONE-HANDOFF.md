@@ -3,7 +3,8 @@
 Ultimo aggiornamento: **28 agosto 2026**  
 Stato verificato: **foundation standalone funzionante sul PC di sviluppo**  
 Branch: `standalone-engine`  
-Checkpoint: `a85f1fb` (`feat: bootstrap embedded standalone engine`)
+Checkpoint iniziale: `a85f1fb` (`feat: bootstrap embedded standalone engine`)
+Checkpoint implementazione bootstrap: `9f9f5fb` (`feat: build reproducible standalone engine artifacts`)
 
 Questo documento è il punto di ingresso per una nuova chat o per un nuovo
 sviluppatore. È intenzionalmente autosufficiente: descrive obiettivo, confini,
@@ -14,7 +15,7 @@ stato reale, architettura, comandi, test, rischi e prossime attività.
 | Variante | Percorso locale | Scopo | Stato Git |
 |---|---|---|---|
 | H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `eb5d0cd`, repository GitHub originale |
-| H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, checkpoint `a85f1fb` |
+| H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, implementazione `9f9f5fb` |
 
 Non modificare `F:\H3-Studio` mentre si lavora sulla variante standalone.
 La copia standalone ha un remote chiamato `source-snapshot` configurato così:
@@ -65,8 +66,14 @@ Anima, Chat Vision, Continue, Face e Latent Upscale.
 - Chiusura verificata dell'intero process tree su Windows.
 - Installer di sviluppo selettivo e atomico.
 - Bootstrap pubblico guidato da manifest implementato e testato con fixture.
+- Builder ZIP deterministico con commit sorgente, SHA-256, manifest generato,
+  inventario componenti, SBOM Python e third-party notices.
 - Resume/retry, SHA-256, staging, swap, backup e rollback verificati.
 - Report diagnostico con Windows, spazio disco, GPU e driver verificato.
+- Artefatto reale da 3.351.733.854 byte costruito e reinstallato da zero.
+- Start/health/stop del runtime reinstallato verificato sulla RTX 5070 Ti.
+- 14 componenti e 191 distribuzioni Python inventariati; resta una sola licenza
+  upstream irrisolta (`latent-upscaler`).
 - Import del runtime realmente eseguito da `D:\ComfyUI_NVMe`.
 - Runtime risultante: **5,58 GiB**.
 - Modelli non duplicati: viene riusato `extra_model_paths.yaml`.
@@ -101,6 +108,13 @@ ha rilevato correttamente:
 Dopo Ctrl+C, engine e bridge non erano più in ascolto e il PID Python non era
 più attivo.
 
+Il 28 agosto 2026 è stato inoltre provato il ciclo pubblico completo con un
+artefatto di sviluppo reale: build ZIP, verifica indipendente del checksum,
+installazione in `engine/_test/real-runtime`, generazione dei model path, avvio
+sulla porta isolata 19000, health/identity e stop. Non sono rimasti listener o
+processi Python di test. Le directory temporanee sono state eliminate e lo ZIP
+locale, ignorato da Git, è stato conservato in `engine/_artifacts`.
+
 ## 4. Layout locale
 
 ```text
@@ -115,10 +129,14 @@ F:\H3-Studio-Standalone\
     h3-studio.sqlite           dati applicativi, se configurato
   docs/
   engine/
-    manifest.json              metadati distribuzione
+    manifest.json              contratto distribuzione non pubblicato
+    components.lock.json       pin e licenze componenti runtime
+    python-package-licenses.lock.json
     runtime/                   Python + ComfyUI; ignorato da Git
       python_embeded/python.exe
       ComfyUI/main.py
+    _artifacts/                ZIP e manifest generati; ignorati
+    _downloads/                cache download/resume; ignorata
     _staging/                  staging installer; ignorato
     _backups/                  rollback installer; ignorato
   models/                      libreria opzionale; ignorata da Git
@@ -186,6 +204,12 @@ Una ComfyUI esterna sulla porta configurata viene trattata come conflitto.
 - `scripts/BOOTSTRAP_STANDALONE_ENGINE.ps1`: bootstrap pubblico riproducibile.
 - `INSTALL_H3_STUDIO_STANDALONE.bat`: wrapper del bootstrap pubblico.
 - `scripts/test-standalone-bootstrap.mjs`: test di installazione e rollback.
+- `scripts/build-standalone-engine-artifact.py`: builder ZIP deterministico.
+- `BUILD_STANDALONE_ENGINE_ARTIFACT.bat`: wrapper Windows del builder.
+- `engine/components.lock.json`: pin e inventario licenze dei componenti.
+- `engine/python-package-licenses.lock.json`: override di licenza con evidenza.
+- `scripts/test-standalone-artifact-builder.mjs`: test determinismo e gate.
+- `scripts/verify-standalone-runtime.ts`: test reale start/health/stop.
 - `docs/STANDALONE-BOOTSTRAP.md`: contratto manifest e gate di pubblicazione.
 - `scripts/standalone-launcher.mjs`: supervisore unico.
 - `START_H3_STUDIO_STANDALONE.bat`: entrypoint utente.
@@ -202,8 +226,11 @@ Una ComfyUI esterna sulla porta configurata viene trattata come conflitto.
 ### Test
 
 - `scripts/test-engine-manager.ts`.
+- `scripts/test-standalone-artifact-builder.mjs`.
+- `scripts/test-standalone-bootstrap.mjs`.
 - `scripts/test-standalone-installer.mjs`.
 - `scripts/test-standalone-launcher.mjs`.
+- `scripts/verify-standalone-runtime.ts`.
 
 ## 7. Configurazione
 
@@ -339,6 +366,8 @@ Comandi principali:
 npm run typecheck
 npm run build
 npm run test:engine
+npm run test:standalone-artifact
+npm run test:standalone-bootstrap
 npm run test:standalone-installer
 npm run test:standalone-launcher
 npm run test:setup
@@ -365,24 +394,32 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 
 ### Priorità P0 — installer pubblico riproducibile
 
-Il framework del bootstrap è implementato localmente e copre:
+L'implementazione locale è completata e verificata. Copre:
 
-- artefatti versionati descritti da manifest schema 1;
+- artefatti ZIP deterministici descritti da manifest schema 1;
+- pin reali di ComfyUI, custom node e Python embedded;
+- inventario di 14 componenti, SBOM di 191 distribuzioni Python e notice
+  generati dentro l'artefatto;
+- esclusione forzata di modelli e directory dati/macchina;
 - download HTTPS con resume, mirror, retry, dimensione e SHA-256;
 - staging isolato, swap atomico e ripristino automatico su errore;
 - backup recuperabili e rollback all'ultimo backup valido;
 - log testuale e report JSON diagnostico;
 - preflight di spazio, Windows, architettura, GPU e driver;
-- blocco degli archivi che contengono modelli o directory dati;
-- preservazione di `extra_model_paths.yaml`.
+- preservazione dei model path esistenti e generazione su installazione pulita;
+- prova reale build/install/start/health/stop sulla RTX 5070 Ti.
 
-Per chiudere il P0 restano:
+Per pubblicare e chiudere il P0 restano soltanto attività che richiedono stato
+esterno o una decisione di distribuzione:
 
 - creare il repository standalone dedicato;
-- costruire e pubblicare l'archivio runtime ufficiale immutabile;
-- sostituire i pin provvisori con versioni, URL, dimensione e SHA-256 reali;
-- completare `THIRD_PARTY_NOTICES`, inventario licenze e SBOM;
-- validare il bootstrap pubblicato su una macchina Windows/NVIDIA pulita.
+- ottenere termini di licenza espliciti per `latent-upscaler`, oppure rimuoverlo
+  o sostituirlo dalla distribuzione;
+- costruire da un working tree pulito e caricare lo ZIP ufficiale su una release
+  HTTPS immutabile;
+- inserire nel manifest tracciato URL, dimensione e SHA-256 dell'asset caricato;
+- validare il bootstrap pubblicato su una seconda macchina Windows/NVIDIA
+  pulita.
 
 ### Priorità P0 — Node e FFmpeg incorporati
 
@@ -473,14 +510,17 @@ L'MVP standalone è pronto quando un PC Windows/NVIDIA supportato può:
 ## 13. Licenze e distribuzione
 
 - Codice H3 Studio: `AGPL-3.0-only`.
-- ComfyUI core: GPL-3.0.
-- Custom node e runtime: licenze upstream da inventariare singolarmente.
-- Modelli: non assumere che siano redistribuibili; preferire download diretto
-  dalle fonti e accettazione delle rispettive licenze.
+- ComfyUI core: `GPL-3.0-only`.
+- Componenti runtime: fonti, versioni e licenze sono in
+  `engine/components.lock.json`.
+- Pacchetti Python: inventario generato dai `METADATA`; le due correzioni con
+  evidenza sono versionate in `engine/python-package-licenses.lock.json`.
+- `latent-upscaler`: `NOASSERTION`; questo blocca tecnicamente `--release`.
+- Modelli: esclusi dall'artefatto e condivisi tramite `extra_model_paths.yaml`;
+  non assumere che siano redistribuibili.
 
-Prima di una release pubblica completare SBOM, file `THIRD_PARTY_NOTICES`, fonti,
-versioni, checksum e verifica di compatibilità. Questo documento non è un parere
-legale.
+Il builder genera SBOM e `THIRD_PARTY_NOTICES.txt` e rifiuta una release se una
+licenza è irrisolta. Questo documento non è un parere legale.
 
 ## 14. Rischi noti
 
@@ -525,20 +565,23 @@ F:\H3-Studio. Leggi per intero prima di agire:
 F:\H3-Studio-Standalone\docs\STANDALONE-HANDOFF.md
 
 La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
-è a85f1fb. Il remote source-snapshot può leggere F:\H3-Studio ma ha il push
-DISABLED: non riattivarlo e non pubblicare nulla senza chiedermelo.
+è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
+nel checkpoint 9f9f5fb. Il remote source-snapshot può leggere F:\H3-Studio ma
+ha il push DISABLED: non riattivarlo e non pubblicare nulla senza chiedermelo.
 
 Il runtime embedded è già installato localmente in engine/runtime, è ignorato
-da Git e ha superato il test reale di start/health/stop sulla RTX 5070 Ti. I
+da Git e ha superato il test reale di start/health/stop sulla RTX 5070 Ti. Il
+ciclo build/install/start/health/stop dell'artefatto è stato verificato. I
 modelli sono condivisi tramite extra_model_paths.yaml e non vanno duplicati.
 
-Inizia dalla prima attività P0 ancora aperta: progettare e implementare il
-bootstrap pubblico riproducibile con manifest versionato, checksum SHA-256,
-resume, staging atomico, rollback e diagnostica. Mantieni funzionante il
-fallback external e non rompere i workflow/app esistenti. Prima di modificare,
-verifica git status, branch, commit, spazio disco e stato delle porte. Dopo ogni
-blocco esegui typecheck, test mirati e build; crea commit locali, ma non fare
-push finché non viene creato il repository standalone dedicato.
+La pubblicazione del bootstrap attende il repository dedicato e la risoluzione
+della licenza del nodo latent-upscaler. La prima attività P0 implementabile in
+locale è incorporare e fissare Node e FFmpeg, con inventario licenze e launcher
+indipendente dal PATH. Mantieni funzionante il fallback external e non rompere
+i workflow/app esistenti. Prima di modificare, verifica git status, branch,
+commit, spazio disco e stato delle porte. Dopo ogni blocco esegui typecheck,
+test mirati e build; crea commit locali, ma non fare push finché non viene
+creato il repository standalone dedicato.
 ```
 
 ## 17. Riferimenti interni
