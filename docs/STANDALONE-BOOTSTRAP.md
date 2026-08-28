@@ -1,10 +1,9 @@
 # Bootstrap pubblico del motore standalone
 
-Stato al 28 agosto 2026: bootstrap, builder riproducibile e verifica runtime
-implementati localmente. Un artefatto di sviluppo reale è stato costruito,
-installato in una destinazione pulita e avviato sulla RTX 5070 Ti. La
-pubblicazione resta bloccata fino alla creazione del repository standalone
-dedicato e al caricamento di un asset HTTPS immutabile.
+Stato al 28 agosto 2026: bootstrap, builder riproducibile, manifest pubblico e
+verifica runtime completati. La prerelease `v0.1.0-dev` usa due asset HTTPS
+immutabili nel repository standalone dedicato; l'installazione combinata è
+stata verificata fino al ciclo start/health/stop sulla RTX 5070 Ti.
 
 ## Obiettivo
 
@@ -27,11 +26,12 @@ File coinvolti:
 - `scripts/test-standalone-artifact-builder.mjs`: test di riproducibilità;
 - `scripts/test-standalone-bootstrap.mjs`: test end-to-end con fixture.
 
-## Stato intenzionale del manifest
+## Stato del manifest pubblico
 
-Il manifest tracciato ha `releaseState: unpublished` e nessun artefatto. Il
-bootstrap predefinito si ferma quindi con un errore leggibile. URL e checksum
-non vengono inventati e non puntano al repository H3 Studio originale.
+Il manifest tracciato ha `releaseState: published` e descrive i due asset
+ordinati `core` e `torch` della prerelease `v0.1.0-dev`. URL, dimensioni e
+checksum puntano esclusivamente al repository standalone dedicato, non al
+repository H3 Studio originale.
 
 Il passaggio a `published` è consentito soltanto dopo che:
 
@@ -41,8 +41,11 @@ Il passaggio a `published` è consentito soltanto dopo che:
 4. l'archivio del runtime è stato costruito e validato;
 5. l'asset è stato caricato su una release HTTPS immutabile;
 6. dimensione e SHA-256 corrispondono all'asset pubblicato;
-7. il bootstrap pubblicato è stato provato su una macchina Windows/NVIDIA
-   pulita.
+7. prima della promozione a release stabile, il bootstrap è stato provato anche
+   su una seconda macchina Windows/NVIDIA pulita.
+
+I punti 1-6 sono chiusi per la prerelease. Il punto 7 resta un gate di
+promozione alla release stabile e non viene dichiarato completato.
 
 `--release` rifiuta un working tree sporco, un URL non HTTPS e qualunque voce di
 licenza irrisolta. `--allow-incomplete-notices` è ammesso solo per artefatti di
@@ -90,11 +93,11 @@ Artefatto di sviluppo:
 
     BUILD_STANDALONE_ENGINE_ARTIFACT.bat --allow-incomplete-notices --compression fastest --force
 
-Release, soltanto dopo avere chiuso tutti i gate:
+Release GitHub suddivisa automaticamente sotto il limite di 2 GiB per asset:
 
-    BUILD_STANDALONE_ENGINE_ARTIFACT.bat --release ^
-      --artifact-url https://host/repository/releases/download/VERSION/h3-engine.zip ^
-      --force
+    BUILD_STANDALONE_ENGINE_ARTIFACT.bat --release --github-release ^
+      --artifact-base-url https://github.com/emanuelealbertosi/H3-Studio-Standalone/releases/download/v0.1.0-dev ^
+      --compression fastest --force
 
 ## Flusso di installazione
 
@@ -155,27 +158,30 @@ recente che contiene almeno Python portable e `ComfyUI/main.py`.
 
 ## Risultato reale del 28 agosto 2026
 
-Il builder ha creato un artefatto di sviluppo locale, ignorato da Git:
+Il builder ha creato da commit pulito `5b6a66c` i due asset ufficiali, ignorati
+da Git ma descritti dal manifest tracciato:
 
-- file: `engine/_artifacts/h3-engine-0.1.0-dev-windows-nvidia-x64.zip`;
-- dimensione: `3.351.766.538` byte;
-- SHA-256: `e2de59f3060d880d9885ee109a9d1cd9e4cb9b4442aff1ba0477b3362a10887c`;
-- payload: 65.542 file, 5.871.160.883 byte;
-- modelli inclusi: no.
+- `h3-engine-0.1.0-dev-windows-nvidia-x64-core.zip`:
+  `1.436.383.267` byte, SHA-256
+  `9c9c6259c423bd0ab1936e67c9e92c14bb037f2b7ab921f6ff8641e32b3b3134`;
+- `h3-engine-0.1.0-dev-windows-nvidia-x64-torch.zip`:
+  `1.915.310.943` byte, SHA-256
+  `c02d3b4bff7ce804412778c14addc0ccaef435036aea7a6a17887b19a033d110`.
 
-Il bootstrap ha installato questo ZIP in una destinazione pulita, ha generato
-`extra_model_paths.yaml` verso `F:/H3-Studio-Standalone/models` e il runtime è
-stato avviato, verificato e fermato sulla RTX 5070 Ti usando la porta isolata
-19000. Dopo lo stop non erano rimasti listener o processi Python di test. Le
-directory temporanee della prova sono state eliminate; l'artefatto locale è
-stato conservato. La seconda prova, dopo la chiusura del gate licenze, ha
-ripetuto con successo checksum, installazione pulita, start/health/stop e
-controllo dell'assenza di `IMPORT FAILED`.
+Ogni asset resta sotto 2 GiB. Gli archivi non hanno entry sovrapposte e la loro
+unione contiene 65.552 file. Il primo contiene il runtime generale, inventario,
+SBOM e notice; il secondo contiene soltanto
+`python_embeded/Lib/site-packages/torch/`. I modelli non sono inclusi.
 
-La validazione corrente censisce 14 componenti e 191 distribuzioni Python, con
-zero licenze irrisolte. La dichiarazione Apache-2.0 del latent upscaler e la
-relativa evidenza sono incluse nello ZIP. L'artefatto resta di sviluppo perché
-il repository standalone e l'URL release immutabile non esistono ancora.
+Il bootstrap ha verificato entrambi i checksum, estratto in ordine i due ZIP in
+una destinazione pulita e generato `extra_model_paths.yaml` verso
+`F:/H3-Studio-Standalone/models`. Il runtime combinato è stato avviato,
+verificato e fermato sulla RTX 5070 Ti usando la porta isolata 19000. Dopo lo
+stop non erano rimasti listener, processi Python di test o `IMPORT FAILED`.
+
+La validazione censisce 14 componenti e 191 distribuzioni Python, con zero
+licenze irrisolte. La dichiarazione Apache-2.0 del latent upscaler e la relativa
+evidenza sono incluse nell'asset core.
 
 ## Verifica
 

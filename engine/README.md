@@ -36,10 +36,10 @@ checksummed artifacts, resumable downloads, isolated staging and recoverable
 backups. A fresh install generates model paths for the project `models`
 directory; an update preserves the existing `extra_model_paths.yaml`.
 
-The tracked manifest remains intentionally unpublished until the dedicated
-standalone repository exists and a vetted immutable release archive has been
-uploaded. The current component and Python inventories have zero unresolved
-licenses. See
+The tracked manifest is published for prerelease `v0.1.0-dev` in the dedicated
+standalone repository. GitHub delivery is split into ordered `core` and `torch`
+archives so every asset remains below 2 GiB; both are pinned by size and SHA-256.
+The current component and Python inventories have zero unresolved licenses. See
 `docs/STANDALONE-BOOTSTRAP.md` for the manifest contract and release gate.
 
 H3 Studio starts the engine on loopback, verifies a private identity endpoint,

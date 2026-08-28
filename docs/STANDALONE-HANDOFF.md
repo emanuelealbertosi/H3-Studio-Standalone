@@ -1,11 +1,12 @@
 # H3 Studio Standalone — handoff completo
 
 Ultimo aggiornamento: **28 agosto 2026**  
-Stato verificato: **foundation standalone funzionante sul PC di sviluppo**  
+Stato verificato: **bootstrap standalone pubblico in prerelease e funzionante sul PC di sviluppo**<br>
 Branch: `standalone-engine`  
 Checkpoint iniziale: `a85f1fb` (`feat: bootstrap embedded standalone engine`)
 Checkpoint implementazione bootstrap: `9f9f5fb` (`feat: build reproducible standalone engine artifacts`)
 Checkpoint evidenza licenze: `4063be5` (`fix: resolve latent upscaler license evidence`)
+Checkpoint split GitHub Release: `5b6a66c` (`feat: split engine for GitHub releases`)
 
 Questo documento è il punto di ingresso per una nuova chat o per un nuovo
 sviluppatore. È intenzionalmente autosufficiente: descrive obiettivo, confini,
@@ -16,7 +17,7 @@ stato reale, architettura, comandi, test, rischi e prossime attività.
 | Variante | Percorso locale | Scopo | Stato Git |
 |---|---|---|---|
 | H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `eb5d0cd`, repository GitHub originale |
-| H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, implementazione `4063be5` |
+| H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, implementazione `5b6a66c`, repository GitHub dedicato |
 
 Non modificare `F:\H3-Studio` mentre si lavora sulla variante standalone.
 La copia standalone ha un remote chiamato `source-snapshot` configurato così:
@@ -26,9 +27,10 @@ fetch: F:\H3-Studio
 push:  DISABLED
 ```
 
-Questo impedisce un push accidentale sul repository pubblico originale. Prima
-di pubblicare la variante standalone bisogna creare un repository dedicato e
-aggiungere esplicitamente un nuovo remote.
+Questo impedisce un push accidentale sul repository pubblico originale. Il
+remote `origin` punta esclusivamente al repository pubblico dedicato:
+`https://github.com/emanuelealbertosi/H3-Studio-Standalone.git`. Non riattivare
+mai il push di `source-snapshot`.
 
 ## 2. Visione del prodotto
 
@@ -66,7 +68,7 @@ Anima, Chat Vision, Continue, Face e Latent Upscale.
 - Launcher unico per bridge, engine e frontend.
 - Chiusura verificata dell'intero process tree su Windows.
 - Installer di sviluppo selettivo e atomico.
-- Bootstrap pubblico guidato da manifest implementato e testato con fixture.
+- Bootstrap pubblico guidato da manifest implementato, testato e pubblicato.
 - Builder ZIP deterministico con commit sorgente, SHA-256, manifest generato,
   inventario componenti, SBOM Python e third-party notices.
 - Resume/retry, SHA-256, staging, swap, backup e rollback verificati.
@@ -109,12 +111,13 @@ ha rilevato correttamente:
 Dopo Ctrl+C, engine e bridge non erano più in ascolto e il PID Python non era
 più attivo.
 
-Il 28 agosto 2026 è stato inoltre provato il ciclo pubblico completo con un
-artefatto di sviluppo reale: build ZIP, verifica indipendente del checksum,
-installazione in `engine/_test/real-runtime`, generazione dei model path, avvio
-sulla porta isolata 19000, health/identity e stop. Non sono rimasti listener o
-processi Python di test. Le directory temporanee sono state eliminate e lo ZIP
-locale, ignorato da Git, è stato conservato in `engine/_artifacts`.
+Il 28 agosto 2026 è stato inoltre provato il ciclo pubblico completo con i due
+asset ufficiali `core` e `torch`: build da commit pulito, verifica indipendente
+dei checksum, installazione combinata in una destinazione vuota, generazione dei
+model path, avvio sulla porta isolata 19000, health/identity e stop. Non sono
+rimasti listener, processi Python di test o `IMPORT FAILED`. Le directory
+temporanee sono state eliminate; gli asset locali ignorati da Git sono in
+`engine/_artifacts`.
 
 ## 4. Layout locale
 
@@ -130,7 +133,7 @@ F:\H3-Studio-Standalone\
     h3-studio.sqlite           dati applicativi, se configurato
   docs/
   engine/
-    manifest.json              contratto distribuzione non pubblicato
+    manifest.json              contratto pubblico con due asset SHA-256
     components.lock.json       pin e licenze componenti runtime
     python-package-licenses.lock.json
     runtime/                   Python + ComfyUI; ignorato da Git
@@ -214,7 +217,7 @@ Una ComfyUI esterna sulla porta configurata viene trattata come conflitto.
 - `docs/STANDALONE-BOOTSTRAP.md`: contratto manifest e gate di pubblicazione.
 - `scripts/standalone-launcher.mjs`: supervisore unico.
 - `START_H3_STUDIO_STANDALONE.bat`: entrypoint utente.
-- `engine/manifest.json`: manifest schema 1, intenzionalmente non pubblicato.
+- `engine/manifest.json`: manifest pubblico schema 1 con asset `core` e `torch`.
 
 ### UI e configurazione
 
@@ -393,9 +396,9 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 
 ## 11. Cosa non è ancora completato
 
-### Priorità P0 — installer pubblico riproducibile
+### Priorità P0 — installer pubblico riproducibile (completata in prerelease)
 
-L'implementazione locale è completata e verificata. Copre:
+L'implementazione è completata, verificata e pubblicata. Copre:
 
 - artefatti ZIP deterministici descritti da manifest schema 1;
 - pin reali di ComfyUI, custom node e Python embedded;
@@ -410,16 +413,12 @@ L'implementazione locale è completata e verificata. Copre:
 - preservazione dei model path esistenti e generazione su installazione pulita;
 - prova reale build/install/start/health/stop sulla RTX 5070 Ti.
 
-Per pubblicare e chiudere il P0 restano soltanto attività che richiedono stato
-esterno o una decisione di distribuzione:
+Il repository standalone dedicato, il manifest `published` e la prerelease
+HTTPS immutabile `v0.1.0-dev` chiudono il P0 di pubblicazione. I due asset
+ufficiali sono entrambi sotto 2 GiB e fissati per dimensione e SHA-256.
 
-- creare il repository standalone dedicato;
-
-- costruire da un working tree pulito e caricare lo ZIP ufficiale su una release
-  HTTPS immutabile;
-- inserire nel manifest tracciato URL, dimensione e SHA-256 dell'asset caricato;
-- validare il bootstrap pubblicato su una seconda macchina Windows/NVIDIA
-  pulita.
+Resta un solo gate prima di promuovere la prerelease a release stabile:
+validare il bootstrap pubblicato su una seconda macchina Windows/NVIDIA pulita.
 
 ### Priorità P0 — Node e FFmpeg incorporati
 
@@ -570,23 +569,25 @@ F:\H3-Studio-Standalone\docs\STANDALONE-HANDOFF.md
 
 La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
 è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
-nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5. Il remote
-source-snapshot può leggere F:\H3-Studio ma
-ha il push DISABLED: non riattivarlo e non pubblicare nulla senza chiedermelo.
+nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5; lo split per
+GitHub Release è in 5b6a66c. Il remote origin punta al repository standalone
+dedicato. Il remote source-snapshot può leggere F:\H3-Studio ma ha il push
+DISABLED: non riattivarlo e non usarlo mai per pubblicare.
 
 Il runtime embedded è già installato localmente in engine/runtime, è ignorato
 da Git e ha superato il test reale di start/health/stop sulla RTX 5070 Ti. Il
 ciclo build/install/start/health/stop dell'artefatto è stato verificato. I
 modelli sono condivisi tramite extra_model_paths.yaml e non vanno duplicati.
 
-La pubblicazione del bootstrap attende il repository dedicato e un asset release
-HTTPS immutabile. La prima attività P0 implementabile in
+Il bootstrap è pubblicato con manifest versionato e due asset verificati nella
+prerelease v0.1.0-dev. Prima della promozione stabile resta la prova su una
+seconda macchina Windows/NVIDIA pulita. La prima attività P0 implementabile in
 locale è incorporare e fissare Node e FFmpeg, con inventario licenze e launcher
 indipendente dal PATH. Mantieni funzionante il fallback external e non rompere
 i workflow/app esistenti. Prima di modificare, verifica git status, branch,
 commit, spazio disco e stato delle porte. Dopo ogni blocco esegui typecheck,
-test mirati e build; crea commit locali, ma non fare push finché non viene
-creato il repository standalone dedicato.
+test mirati e build; crea commit locali coerenti e pubblica solo su `origin`
+quando espressamente autorizzato.
 ```
 
 ## 17. Riferimenti interni

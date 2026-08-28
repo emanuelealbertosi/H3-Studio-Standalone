@@ -146,8 +146,13 @@ function writeManifest(name, artifact, overrides = {}) {
 }
 
 try {
+  const v1 = createArchive("v1");
+  const unpublishedManifest = writeManifest("unpublished", v1, {
+    releaseState: "unpublished",
+    publication: { blockedReason: "Fixture intentionally unpublished." },
+  });
   const unpublished = runPowerShell([
-    "-ManifestPath", path.join(projectRoot, "engine", "manifest.json"),
+    "-ManifestPath", unpublishedManifest,
     "-DestinationRoot", path.join(fixtureRoot, "unpublished-runtime"),
   ], 1);
   assert.match(unpublished.report?.error ?? "", /Release engine non pubblicata/);
@@ -158,7 +163,6 @@ try {
   const privateModelPaths = "shared_models:\n  base_path: F:/shared-models\n";
   writeFileSync(path.join(runtimeRoot, "ComfyUI", "extra_model_paths.yaml"), privateModelPaths);
 
-  const v1 = createArchive("v1");
   const v1Manifest = writeManifest("v1", v1);
   mkdirSync(downloadRoot, { recursive: true });
   const partialPath = path.join(downloadRoot, path.basename(v1.archive) + ".partial");

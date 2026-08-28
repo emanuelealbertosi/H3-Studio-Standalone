@@ -136,17 +136,19 @@ Il contratto della Chat locale si verifica con `npm run test:chat`.
 
 ### Variante standalone (Windows/NVIDIA)
 
-1. In fase di sviluppo, esegui una volta `INSTALL_STANDALONE_ENGINE.bat` e
-   indica una ComfyUI portable compatibile da cui importare Python, core e i
-   soli custom node richiesti. I modelli non vengono copiati.
+1. Esegui una volta `INSTALL_H3_STUDIO_STANDALONE.bat`. Il bootstrap scarica i
+   due asset verificati della prerelease `v0.1.0-dev`, controlla dimensione e
+   SHA-256 e installa il runtime con staging atomico e rollback.
 2. Avvia `START_H3_STUDIO_STANDALONE.bat`.
 3. Al primo avvio crea la password Admin; URL e cartella output del motore sono
    già gestiti dall'app.
 4. Ctrl+C nella console arresta web app, bridge e motore incorporato.
 
-Il pacchetto pubblico finale sostituirà l'importazione di sviluppo con artefatti
-versionati e verificati tramite checksum. Il piano è in
-`docs/STANDALONE-ENGINE-PLAN.md`.
+Il codice standalone e gli asset del motore sono pubblicati nel
+[repository dedicato](https://github.com/emanuelealbertosi/H3-Studio-Standalone).
+I modelli restano esclusi dai pacchetti e sono condivisi tramite
+`extra_model_paths.yaml`, senza duplicazioni. Il contratto di distribuzione è
+in `docs/STANDALONE-BOOTSTRAP.md`.
 
 ### Variante con ComfyUI esterna
 

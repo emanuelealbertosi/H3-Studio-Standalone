@@ -1,28 +1,173 @@
 {
-  "schemaVersion": 1,
-  "manifestVersion": "2026.08.28.1",
-  "releaseState": "unpublished",
-  "engineVersion": "0.1.0-dev",
-  "distribution": "windows-nvidia-x64",
-  "runtimeRoot": "engine/runtime",
-  "installedSizeBytes": 5991479378,
-  "minimumFreeBytesAfterInstall": 10737418240,
-  "platform": {
-    "os": "windows",
-    "architecture": "x64",
-    "minimumWindowsBuild": 19045,
-    "gpuVendor": "nvidia"
-  },
-  "entrypoints": {
-    "python": "python_embeded/python.exe",
-    "comfy": "ComfyUI/main.py"
-  },
-  "requiredFiles": [
-    "python_embeded/python.exe",
-    "ComfyUI/main.py",
-    "ComfyUI/extra_model_paths.yaml",
-    "THIRD_PARTY_NOTICES.txt"
+  "artifacts": [
+    {
+      "archiveType": "zip",
+      "fileName": "h3-engine-0.1.0-dev-windows-nvidia-x64-core.zip",
+      "id": "engine-runtime-core",
+      "sha256": "9c9c6259c423bd0ab1936e67c9e92c14bb037f2b7ab921f6ff8641e32b3b3134",
+      "sizeBytes": 1436383267,
+      "urls": [
+        "https://github.com/emanuelealbertosi/H3-Studio-Standalone/releases/download/v0.1.0-dev/h3-engine-0.1.0-dev-windows-nvidia-x64-core.zip"
+      ]
+    },
+    {
+      "archiveType": "zip",
+      "fileName": "h3-engine-0.1.0-dev-windows-nvidia-x64-torch.zip",
+      "id": "engine-runtime-torch",
+      "sha256": "c02d3b4bff7ce804412778c14addc0ccaef435036aea7a6a17887b19a033d110",
+      "sizeBytes": 1915310943,
+      "urls": [
+        "https://github.com/emanuelealbertosi/H3-Studio-Standalone/releases/download/v0.1.0-dev/h3-engine-0.1.0-dev-windows-nvidia-x64-torch.zip"
+      ]
+    }
   ],
+  "componentLock": "engine/components.lock.json",
+  "components": [
+    {
+      "id": "python-embedded",
+      "license": "PSF-2.0",
+      "licensePath": "python_embeded/LICENSE.txt",
+      "licenseStatus": "verified",
+      "runtimePath": "python_embeded",
+      "source": "https://www.python.org/",
+      "version": "3.13.14"
+    },
+    {
+      "id": "comfy-core",
+      "license": "GPL-3.0-only",
+      "licensePath": "ComfyUI/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI",
+      "source": "https://github.com/Comfy-Org/ComfyUI",
+      "version": "c67885b14556cf3e4e061862925282d403d09862"
+    },
+    {
+      "id": "latent-upscaler",
+      "license": "Apache-2.0",
+      "licenseEvidencePath": "project:third_party_licenses/latent-upscaler/EVIDENCE.md",
+      "licenseEvidenceUrl": "https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler/blob/main/README.md#license",
+      "licenseNote": "The same-author official model card links this companion custom node and declares Apache-2.0; the GitHub code repository has no standalone LICENSE file.",
+      "licensePath": "project:third_party_licenses/latent-upscaler/APACHE-2.0.txt",
+      "licenseStatus": "verified-associated-project",
+      "runtimePath": "ComfyUI/custom_nodes/Comfyui_Minimax_h3_latent_Upscaler",
+      "source": "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler",
+      "version": "04f71594d11325be877b5ba05096fcb851c29048"
+    },
+    {
+      "id": "conditioning-rebalance",
+      "license": "Apache-2.0",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-Conditioning-Rebalance/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-Conditioning-Rebalance",
+      "source": "https://github.com/nova452/ComfyUI-ConditioningKrea2Rebalance",
+      "version": "1.1.0"
+    },
+    {
+      "id": "dasiwa-nodes",
+      "license": "GPL-3.0-only",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-DaSiWa-Nodes/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-DaSiWa-Nodes",
+      "source": "https://github.com/darksidewalker/ComfyUI-DaSiWa-Nodes",
+      "version": "0.4.8"
+    },
+    {
+      "id": "h3-prompt-builder",
+      "license": "MIT",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder",
+      "source": "https://github.com/Adudeguyman/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder",
+      "version": "c100a10818ad48013b54d13fd2f7a13c6bba07b1"
+    },
+    {
+      "id": "h3-face-refine",
+      "license": "MIT",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-H3-FaceRefine/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-H3-FaceRefine",
+      "source": "https://github.com/Carasibana/ComfyUI-H3-FaceRefine",
+      "version": "70325626120da40170caea8b9fa64515c0ee5bde"
+    },
+    {
+      "id": "h3-multishot",
+      "license": "MIT",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-H3-Multishot/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-H3-Multishot",
+      "runtimeTreeSha256": "fec8d3193645516acf7a14c089d70792284ae5aec7d00001018a9c90a648e9fb",
+      "source": "workspace:comfyui_nodes/ComfyUI-H3-Multishot",
+      "treeSha256": "fec8d3193645516acf7a14c089d70792284ae5aec7d00001018a9c90a648e9fb",
+      "version": "5b6a66c7a2f461a527f88021ff7ebbfb2b89f768",
+      "workspaceOverlayApplied": false
+    },
+    {
+      "id": "h3-native-audio-lock",
+      "license": "AGPL-3.0-only",
+      "licensePath": "project:LICENSE",
+      "licenseStatus": "project",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-H3-NativeAudioLock",
+      "runtimeTreeSha256": "383d7c53f115bcfe16f2d5b8dbf4cd48a51b10999d474ad2e1908ee6ef1e0342",
+      "source": "workspace:comfyui_nodes/ComfyUI-H3-NativeAudioLock",
+      "treeSha256": "8321ccdf9948fec189a48a8edec65f25bbee1420ef64e93b498a1ec3ea4ca24f",
+      "version": "5b6a66c7a2f461a527f88021ff7ebbfb2b89f768",
+      "workspaceOverlayApplied": true
+    },
+    {
+      "id": "kj-nodes",
+      "license": "GPL-3.0-only",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-KJNodes/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-KJNodes",
+      "source": "https://github.com/kijai/ComfyUI-KJNodes",
+      "version": "60cd6bc1870db94c6eeb05fbe455147a8e91c4e9"
+    },
+    {
+      "id": "h3-pdd-acc",
+      "license": "Apache-2.0",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-MiniMax-H3-PDD-Acc/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-MiniMax-H3-PDD-Acc",
+      "source": "https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc",
+      "version": "488895ff6a9efbd69d99f945ce81255e4053e3bd"
+    },
+    {
+      "id": "video-helper-suite",
+      "license": "GPL-3.0-only",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite",
+      "source": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+      "version": "1.7.9"
+    },
+    {
+      "id": "h3-studio-chat",
+      "license": "AGPL-3.0-only",
+      "licensePath": "project:LICENSE",
+      "licenseStatus": "project",
+      "runtimePath": "ComfyUI/custom_nodes/H3-Studio-Gemma4-Chat",
+      "runtimeTreeSha256": "1bfc92a4f1f61330b96dad91203d17e5f28a04c8e0cee765e6167b80443a4564",
+      "source": "workspace:comfyui_nodes/H3-Studio-Gemma4-Chat",
+      "treeSha256": "1bfc92a4f1f61330b96dad91203d17e5f28a04c8e0cee765e6167b80443a4564",
+      "version": "5b6a66c7a2f461a527f88021ff7ebbfb2b89f768",
+      "workspaceOverlayApplied": false
+    },
+    {
+      "id": "rgthree-comfy",
+      "license": "MIT",
+      "licensePath": "ComfyUI/custom_nodes/rgthree-comfy/LICENSE",
+      "licenseStatus": "verified",
+      "runtimePath": "ComfyUI/custom_nodes/rgthree-comfy",
+      "source": "https://github.com/rgthree/rgthree-comfy",
+      "version": "1.0.2605082257"
+    }
+  ],
+  "distribution": "windows-nvidia-x64",
+  "engineVersion": "0.1.0-dev",
+  "entrypoints": {
+    "comfy": "ComfyUI/main.py",
+    "python": "python_embeded/python.exe"
+  },
   "excludedArchivePrefixes": [
     "ComfyUI/models/",
     "ComfyUI/input/",
@@ -30,19 +175,29 @@
     "ComfyUI/temp/",
     "ComfyUI/user/"
   ],
-  "artifacts": [],
-  "publication": {
-    "blockedReason": "Create the dedicated standalone repository and publish the vetted runtime archive before changing releaseState to published.",
-    "requiredArtifactFields": [
-      "id",
-      "fileName",
-      "urls",
-      "sha256",
-      "sizeBytes",
-      "archiveType"
-    ]
+  "installedSizeBytes": 5871519603,
+  "manifestVersion": "0.1.0-dev+a95daef79ad7",
+  "minimumFreeBytesAfterInstall": 10737418240,
+  "platform": {
+    "architecture": "x64",
+    "gpuVendor": "nvidia",
+    "minimumWindowsBuild": 19045,
+    "os": "windows"
   },
-  "components": [],
-  "componentLock": "engine/components.lock.json",
-  "pythonPackageLicenseLock": "engine/python-package-licenses.lock.json"
+  "publication": {
+    "blockedReason": null,
+    "unresolvedLicenseCount": 0
+  },
+  "pythonPackageLicenseLock": "engine/python-package-licenses.lock.json",
+  "releaseState": "published",
+  "requiredFiles": [
+    "python_embeded/python.exe",
+    "ComfyUI/main.py",
+    "ComfyUI/extra_model_paths.yaml",
+    "THIRD_PARTY_NOTICES.txt",
+    "component-inventory.json",
+    "python-packages.sbom.json"
+  ],
+  "runtimeRoot": "engine/runtime",
+  "schemaVersion": 1
 }
