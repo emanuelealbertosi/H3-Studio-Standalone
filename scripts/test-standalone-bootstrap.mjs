@@ -180,6 +180,20 @@ try {
   assert.ok(existsSync(path.join(runtimeRoot, ".installed-manifest.json")));
   assert.equal(sha256(path.join(downloadRoot, path.basename(v1.archive))), v1.hash);
 
+  const freshRuntime = path.join(fixtureRoot, "fresh-runtime");
+  const fresh = runPowerShell([
+    "-ManifestPath", v1Manifest,
+    "-DestinationRoot", freshRuntime,
+    "-DownloadRoot", path.join(fixtureRoot, "fresh-downloads"),
+  ]);
+  assert.equal(fresh.report?.status, "installed");
+  const generatedModelPaths = readFileSync(
+    path.join(freshRuntime, "ComfyUI", "extra_model_paths.yaml"),
+    "utf8",
+  );
+  assert.match(generatedModelPaths, /h3_studio_models:/);
+  assert.ok(generatedModelPaths.includes(path.join(projectRoot, "models").replaceAll("\\", "/")));
+
   const badManifest = writeManifest("bad-hash", v1, {
     artifacts: [{
       id: "bad-hash",

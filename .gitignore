@@ -53,6 +53,7 @@ __pycache__/
 # standalone engine binaries and model library
 /engine/runtime/
 /engine/_backups/
+/engine/_artifacts/
 /engine/_downloads/
 /engine/_staging/
 /engine/_test/

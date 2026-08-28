@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "id": "python-embedded",
+      "runtimePath": "python_embeded",
+      "source": "https://www.python.org/",
+      "version": "3.13.14",
+      "license": "PSF-2.0",
+      "licenseStatus": "verified",
+      "licensePath": "python_embeded/LICENSE.txt"
+    },
+    {
+      "id": "comfy-core",
+      "runtimePath": "ComfyUI",
+      "source": "https://github.com/Comfy-Org/ComfyUI",
+      "version": "c67885b14556cf3e4e061862925282d403d09862",
+      "license": "GPL-3.0-only",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/LICENSE"
+    },
+    {
+      "id": "latent-upscaler",
+      "runtimePath": "ComfyUI/custom_nodes/Comfyui_Minimax_h3_latent_Upscaler",
+      "source": "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler",
+      "version": "04f71594d11325be877b5ba05096fcb851c29048",
+      "license": "NOASSERTION",
+      "licenseStatus": "unresolved",
+      "licensePath": null
+    },
+    {
+      "id": "conditioning-rebalance",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-Conditioning-Rebalance",
+      "source": "https://github.com/nova452/ComfyUI-ConditioningKrea2Rebalance",
+      "version": "1.1.0",
+      "license": "Apache-2.0",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-Conditioning-Rebalance/LICENSE"
+    },
+    {
+      "id": "dasiwa-nodes",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-DaSiWa-Nodes",
+      "source": "https://github.com/darksidewalker/ComfyUI-DaSiWa-Nodes",
+      "version": "0.4.8",
+      "license": "GPL-3.0-only",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-DaSiWa-Nodes/LICENSE"
+    },
+    {
+      "id": "h3-prompt-builder",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder",
+      "source": "https://github.com/Adudeguyman/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder",
+      "version": "c100a10818ad48013b54d13fd2f7a13c6bba07b1",
+      "license": "MIT",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder/LICENSE"
+    },
+    {
+      "id": "h3-face-refine",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-H3-FaceRefine",
+      "source": "https://github.com/Carasibana/ComfyUI-H3-FaceRefine",
+      "version": "70325626120da40170caea8b9fa64515c0ee5bde",
+      "license": "MIT",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-H3-FaceRefine/LICENSE"
+    },
+    {
+      "id": "h3-multishot",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-H3-Multishot",
+      "source": "workspace:comfyui_nodes/ComfyUI-H3-Multishot",
+      "version": "workspace",
+      "license": "MIT",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-H3-Multishot/LICENSE"
+    },
+    {
+      "id": "h3-native-audio-lock",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-H3-NativeAudioLock",
+      "source": "workspace:comfyui_nodes/ComfyUI-H3-NativeAudioLock",
+      "version": "workspace",
+      "license": "AGPL-3.0-only",
+      "licenseStatus": "project",
+      "licensePath": "project:LICENSE"
+    },
+    {
+      "id": "kj-nodes",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-KJNodes",
+      "source": "https://github.com/kijai/ComfyUI-KJNodes",
+      "version": "60cd6bc1870db94c6eeb05fbe455147a8e91c4e9",
+      "license": "GPL-3.0-only",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-KJNodes/LICENSE"
+    },
+    {
+      "id": "h3-pdd-acc",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-MiniMax-H3-PDD-Acc",
+      "source": "https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc",
+      "version": "488895ff6a9efbd69d99f945ce81255e4053e3bd",
+      "license": "Apache-2.0",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-MiniMax-H3-PDD-Acc/LICENSE"
+    },
+    {
+      "id": "video-helper-suite",
+      "runtimePath": "ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite",
+      "source": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+      "version": "1.7.9",
+      "license": "GPL-3.0-only",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite/LICENSE"
+    },
+    {
+      "id": "h3-studio-chat",
+      "runtimePath": "ComfyUI/custom_nodes/H3-Studio-Gemma4-Chat",
+      "source": "workspace:comfyui_nodes/H3-Studio-Gemma4-Chat",
+      "version": "workspace",
+      "license": "AGPL-3.0-only",
+      "licenseStatus": "project",
+      "licensePath": "project:LICENSE"
+    },
+    {
+      "id": "rgthree-comfy",
+      "runtimePath": "ComfyUI/custom_nodes/rgthree-comfy",
+      "source": "https://github.com/rgthree/rgthree-comfy",
+      "version": "1.0.2605082257",
+      "license": "MIT",
+      "licenseStatus": "verified",
+      "licensePath": "ComfyUI/custom_nodes/rgthree-comfy/LICENSE"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "name": "comfyui_frontend_package",
+      "version": "1.49.6",
+      "license": "GPL-3.0-only",
+      "source": "https://github.com/Comfy-Org/ComfyUI_frontend",
+      "licenseUrl": "https://github.com/Comfy-Org/ComfyUI_frontend/blob/main/LICENSE",
+      "evidencePath": "ComfyUI/LICENSE",
+      "note": "The installed wheel omits license metadata; the official frontend repository is GPL-3.0."
+    },
+    {
+      "name": "insightface",
+      "version": "1.0.1",
+      "license": "MIT",
+      "source": "https://github.com/deepinsight/insightface",
+      "licenseUrl": "https://github.com/deepinsight/insightface/blob/master/LICENSE",
+      "evidencePath": "python_embeded/Lib/site-packages/insightface-1.0.1.dist-info/METADATA",
+      "note": "The installed METADATA declares the Python code MIT. Pretrained models are restricted, but no model weights are packaged."
+    }
+  ]
+}

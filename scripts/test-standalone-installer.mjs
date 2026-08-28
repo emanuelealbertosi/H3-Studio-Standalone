@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -13,7 +13,6 @@ const requiredNodes = [
   "ComfyUI-MiniMax-H3-PDD-Acc",
   "ComfyUI-Conditioning-Rebalance",
   "ComfyUI-H3-FaceRefine",
-  "ComfyUI-H3-NativeAudioLock",
   "Comfyui_Minimax_h3_latent_Upscaler",
 ];
 
@@ -37,6 +36,13 @@ try {
     throw new Error(`Expected ${requiredNodes.length} nodes, got ${parsed.nodesFound.length}`);
   }
   if (parsed.nodesMissing.length !== 0) throw new Error("Unexpected missing nodes");
+  if (!existsSync(path.resolve(
+    "comfyui_nodes",
+    "ComfyUI-H3-NativeAudioLock",
+    "__init__.py",
+  ))) {
+    throw new Error("Bundled NativeAudioLock node is missing");
+  }
   console.log("standalone installer validation: ok");
 } finally {
   rmSync(fixture, { recursive: true, force: true });

@@ -218,6 +218,31 @@ function Assert-BasicRuntime {
   }
 }
 
+function Write-DefaultModelPaths {
+  param([string]$Path, [string]$ModelRoot)
+  $normalized = (Resolve-FullPath $ModelRoot).Replace("\", "/")
+  $yaml = @"
+h3_studio_models:
+    base_path: $normalized
+    checkpoints: checkpoints
+    diffusion_models: |
+        diffusion_models
+        unet
+    text_encoders: |
+        text_encoders
+        clip
+    clip_vision: clip_vision
+    loras: loras
+    vae: vae
+    audio_encoders: audio_encoders
+    upscale_models: upscale_models
+    latent_upscale_models: latent_upscale_models
+    model_patches: model_patches
+"@
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Path) | Out-Null
+  Set-Content -LiteralPath $Path -Value $yaml -Encoding UTF8
+}
+
 function Get-Diagnostics {
   param([string]$RuntimeRoot, [object]$Manifest)
   $os = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
@@ -375,6 +400,9 @@ try {
           New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stagedPaths) | Out-Null
           Copy-Item -LiteralPath $existingPaths -Destination $stagedPaths -Force
           Write-Log "Configurazione modelli preservata; nessun modello è stato copiato."
+        } else {
+          Write-DefaultModelPaths $stagedPaths (Join-Path $projectRoot "models")
+          Write-Log "Configurazione modelli creata per la libreria condivisa del progetto."
         }
         Assert-Runtime $staging $manifest
         Copy-Item -LiteralPath $manifestFull -Destination (Join-Path $staging ".installed-manifest.json") -Force

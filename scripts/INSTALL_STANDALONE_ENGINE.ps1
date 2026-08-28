@@ -74,7 +74,6 @@ $requiredNodeCandidates = @(
   @("ComfyUI-MiniMax-H3-PDD-Acc"),
   @("ComfyUI-Conditioning-Rebalance", "Rebalance-Pack"),
   @("ComfyUI-H3-FaceRefine"),
-  @("ComfyUI-H3-NativeAudioLock"),
   @("Comfyui_Minimax_h3_latent_Upscaler")
 )
 
@@ -148,7 +147,7 @@ try {
     Invoke-RobocopySafe -Source $node.Path -Destination (Join-Path $customTarget $node.Name) -ExcludeDirectories @(".git", "__pycache__", "node_modules")
   }
 
-  foreach ($bundledName in @("ComfyUI-H3-Multishot", "H3-Studio-Gemma4-Chat")) {
+  foreach ($bundledName in @("ComfyUI-H3-Multishot", "ComfyUI-H3-NativeAudioLock", "H3-Studio-Gemma4-Chat")) {
     $bundledSource = Join-Path $projectRoot ("comfyui_nodes\" + $bundledName)
     if (-not (Test-Path -LiteralPath (Join-Path $bundledSource "__init__.py") -PathType Leaf)) {
       throw "Nodo incluso mancante: $bundledSource"

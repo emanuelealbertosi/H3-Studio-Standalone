@@ -33,32 +33,16 @@
   "artifacts": [],
   "publication": {
     "blockedReason": "Create the dedicated standalone repository and publish the vetted runtime archive before changing releaseState to published.",
-    "requiredArtifactFields": ["id", "fileName", "urls", "sha256", "sizeBytes", "archiveType"]
+    "requiredArtifactFields": [
+      "id",
+      "fileName",
+      "urls",
+      "sha256",
+      "sizeBytes",
+      "archiveType"
+    ]
   },
-  "components": [
-    {
-      "id": "comfy-core",
-      "source": "https://github.com/Comfy-Org/ComfyUI",
-      "version": "PIN_BEFORE_PUBLICATION",
-      "license": "GPL-3.0"
-    },
-    {
-      "id": "h3-studio-nodes",
-      "source": "../../comfyui_nodes/ComfyUI-H3-Multishot",
-      "version": "workspace",
-      "license": "see bundled notices"
-    },
-    {
-      "id": "h3-studio-chat",
-      "source": "../../comfyui_nodes/H3-Studio-Gemma4-Chat",
-      "version": "workspace",
-      "license": "AGPL-3.0-only"
-    },
-    {
-      "id": "workflow-custom-nodes",
-      "source": "scripts/INSTALL_STANDALONE_ENGINE.ps1",
-      "version": "source-runtime-snapshot",
-      "license": "mixed; retain each upstream license"
-    }
-  ]
+  "components": [],
+  "componentLock": "engine/components.lock.json",
+  "pythonPackageLicenseLock": "engine/python-package-licenses.lock.json"
 }
