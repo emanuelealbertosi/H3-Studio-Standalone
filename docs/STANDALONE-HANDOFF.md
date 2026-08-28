@@ -7,6 +7,7 @@ Checkpoint iniziale: `a85f1fb` (`feat: bootstrap embedded standalone engine`)
 Checkpoint implementazione bootstrap: `9f9f5fb` (`feat: build reproducible standalone engine artifacts`)
 Checkpoint evidenza licenze: `4063be5` (`fix: resolve latent upscaler license evidence`)
 Checkpoint split GitHub Release: `5b6a66c` (`feat: split engine for GitHub releases`)
+Checkpoint prerelease pubblicata: `1ac9396`
 
 Questo documento è il punto di ingresso per una nuova chat o per un nuovo
 sviluppatore. È intenzionalmente autosufficiente: descrive obiettivo, confini,
@@ -16,8 +17,8 @@ stato reale, architettura, comandi, test, rischi e prossime attività.
 
 | Variante | Percorso locale | Scopo | Stato Git |
 |---|---|---|---|
-| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `eb5d0cd`, repository GitHub originale |
-| H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, implementazione `5b6a66c`, repository GitHub dedicato |
+| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `1597797`, repository GitHub originale |
+| H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, prerelease `1ac9396`, repository GitHub dedicato |
 
 Non modificare `F:\H3-Studio` mentre si lavora sulla variante standalone.
 La copia standalone ha un remote chiamato `source-snapshot` configurato così:
@@ -396,6 +397,66 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 
 ## 11. Cosa non è ancora completato
 
+### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
+
+La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
+standalone. Il riferimento sorgente corrente è `1597797`. **Non importare ancora
+il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
+devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
+Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
+riproducibili durante il porting.
+
+Delta funzionale da integrare successivamente, con commit sorgente di riferimento:
+
+- Chat con conversazioni persistenti per progetto, rinomina/eliminazione e
+  conservazione opzionale dei media (`e0bc2a9`, `f0f21ca`);
+- stato live delle generazioni in Chat, blocco input durante il job, arresto e
+  popolamento automatico della card col media prodotto (`052de3f`);
+- Audio Studio locale per TTS e musica, con picker Libreria, stato di coda,
+  output persistente e scaricamento dei modelli al termine (`70b2c7d`, `36b7b57`);
+- planner Gemma per musica, compilatore universale dei prompt e trascrizione
+  automatica del reference script TTS (`39dd0e1`, `532ee03`, `7e8b49c`);
+- azioni TTS e musica native nella Chat, compresi audio di riferimento e invio
+  del risultato alla Libreria/Studio (`4c5f20c`);
+- rinomina persistente di immagini, video, media esterni e montaggi (`ced7c31`);
+- selezione multipla ed eliminazione in blocco in Assets e Libreria, con
+  rimozione dei video anche dalle timeline e gestione esplicita dei fallimenti
+  parziali (`1597797`).
+
+#### Gate di stabilizzazione sulla versione ComfyUI
+
+Prima del porting eseguire almeno questi test reali:
+
+1. TTS italiano senza reference e cloning one-shot con audio caricato da disco;
+2. TTS con audio scelto dalla Libreria, reference script automatico e verifica
+   che il modello venga scaricato dalla VRAM prima del job successivo;
+3. musica da richiesta in italiano, planner attivo, con e senza reference audio;
+4. creazione TTS/musica dalla Chat, avanzamento visibile, annullamento e media
+   finale riutilizzabile;
+5. rigenerazione dalla Chat con prompt modificabile, senza perdere gli allegati;
+6. rinomina di ogni tipo di media e persistenza dopo riavvio;
+7. cancellazione multipla mista in Libreria e cancellazione multipla in Assets;
+8. cancellazione di un video presente in più montaggi, verificando l'integrità
+   delle timeline e l'assenza di card bloccate o progressi fantasma;
+9. regressione minima di Video H3, Krea, Anima, Flux Edit, Face, Upscale ed export.
+
+Il gate è superato quando i test sono verdi, non emergono regressioni per uno o
+due giorni di uso reale e `F:\H3-Studio` viene marcato con un tag stabile, nome
+proposto `v0.3.0-integration-base`.
+
+#### Ordine di porting nello standalone
+
+1. migrazioni database, repository e API di persistenza;
+2. Audio Studio e dipendenze runtime TTS/musica;
+3. planner e routing Chat, mantenendo l'unload dei modelli prima dei job media;
+4. UI Chat/Audio e stati di avanzamento/cancellazione;
+5. rinomina e cancellazione multipla di Assets/Libreria;
+6. aggiornamento manifest, allowlist custom node, SBOM, licenze e artefatti;
+7. typecheck, suite completa, build e QA GPU su porte isolate.
+
+Ogni blocco deve essere un commit autonomo e reversibile. Non copiare database,
+`data`, modelli o runtime dalla versione principale.
+
 ### Priorità P0 — installer pubblico riproducibile (completata in prerelease)
 
 L'implementazione è completata, verificata e pubblicata. Copre:
@@ -570,7 +631,10 @@ F:\H3-Studio-Standalone\docs\STANDALONE-HANDOFF.md
 La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
 è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
 nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5; lo split per
-GitHub Release è in 5b6a66c. Il remote origin punta al repository standalone
+GitHub Release è in 5b6a66c e la prerelease pubblicata è 1ac9396. La versione
+ComfyUI è avanzata fino a 1597797: leggi la coda di integrazione nella sezione 11
+e non importarla prima che superi il gate di stabilizzazione e riceva il tag
+`v0.3.0-integration-base`. Il remote origin punta al repository standalone
 dedicato. Il remote source-snapshot può leggere F:\H3-Studio ma ha il push
 DISABLED: non riattivarlo e non usarlo mai per pubblicare.
 
