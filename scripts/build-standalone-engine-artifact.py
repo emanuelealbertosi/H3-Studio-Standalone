@@ -176,15 +176,21 @@ def validate_components(
             raise ValueError(f"Locked component missing from runtime: {component['id']}")
         if component["runtimePath"].startswith("ComfyUI/custom_nodes/"):
             locked_node_names.add(Path(component["runtimePath"]).name.casefold())
-        license_path = component.get("licensePath")
-        if isinstance(license_path, str) and license_path.startswith("project:"):
-            candidate = PROJECT_ROOT / license_path.split(":", 1)[1]
-        elif license_path:
-            candidate = source_root / license_path
-        else:
-            candidate = None
-        if candidate is not None and not candidate.is_file():
-            raise ValueError(f"License file missing for {component['id']}: {candidate}")
+        for metadata_field in ("licensePath", "licenseEvidencePath"):
+            metadata_path = component.get(metadata_field)
+            if isinstance(metadata_path, str) and metadata_path.startswith("project:"):
+                candidate = resolved_child(
+                    PROJECT_ROOT,
+                    PROJECT_ROOT / metadata_path.split(":", 1)[1],
+                )
+            elif metadata_path:
+                candidate = resolved_child(source_root, source_root / metadata_path)
+            else:
+                candidate = None
+            if candidate is not None and not candidate.is_file():
+                raise ValueError(
+                    f"Component {metadata_field} missing for {component['id']}: {candidate}"
+                )
         if component.get("licenseStatus") == "unresolved" or component.get("license") == "NOASSERTION":
             unresolved.append(component["id"])
         source = component.get("source", "")
@@ -288,6 +294,28 @@ def read_python_packages(source_root: Path, license_lock: dict) -> tuple[list[di
     return packages, unresolved
 
 
+def component_license_files(components: list[dict]) -> dict[str, bytes]:
+    files = {}
+    for component in components:
+        component_id = component["id"]
+        if Path(component_id).name != component_id:
+            raise ValueError(f"Unsafe component id for license archive path: {component_id}")
+        for metadata_field in ("licensePath", "licenseEvidencePath"):
+            metadata_path = component.get(metadata_field)
+            if not isinstance(metadata_path, str) or not metadata_path.startswith("project:"):
+                continue
+            source = resolved_child(
+                PROJECT_ROOT,
+                PROJECT_ROOT / metadata_path.split(":", 1)[1],
+            )
+            archive_path = f"LICENSES/{component_id}/{source.name}"
+            data = source.read_bytes()
+            if archive_path in files and files[archive_path] != data:
+                raise ValueError(f"Conflicting component license archive path: {archive_path}")
+            files[archive_path] = data
+    return files
+
+
 def build_notices(engine_version: str, components: list[dict], packages: list[dict]) -> str:
     lines = [
         "H3 Studio Standalone - Third-Party Notices",
@@ -306,6 +334,8 @@ def build_notices(engine_version: str, components: list[dict], packages: list[di
                 f"  Source: {component['source']}",
                 f"  License: {component['license']} ({component['licenseStatus']})",
                 f"  License file: {component.get('licensePath') or 'MISSING'}",
+                f"  Evidence: {component.get('licenseEvidenceUrl') or component.get('licenseEvidencePath') or 'packaged metadata'}",
+                f"  Note: {component.get('licenseNote') or 'none'}",
             ]
         )
     lines.extend(
@@ -437,6 +467,7 @@ def main() -> int:
         "LICENSES/H3-Studio/LICENSE": (PROJECT_ROOT / "LICENSE").read_bytes(),
         "LICENSES/H3-Studio/NOTICE": (PROJECT_ROOT / "NOTICE").read_bytes(),
     }
+    virtual.update(component_license_files(components))
     output_directory.mkdir(parents=True, exist_ok=True)
     report_path = output_directory / "build-report.json"
     report = {

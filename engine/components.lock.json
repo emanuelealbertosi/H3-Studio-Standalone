@@ -24,9 +24,12 @@
       "runtimePath": "ComfyUI/custom_nodes/Comfyui_Minimax_h3_latent_Upscaler",
       "source": "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler",
       "version": "04f71594d11325be877b5ba05096fcb851c29048",
-      "license": "NOASSERTION",
-      "licenseStatus": "unresolved",
-      "licensePath": null
+      "license": "Apache-2.0",
+      "licenseStatus": "verified-associated-project",
+      "licensePath": "project:third_party_licenses/latent-upscaler/APACHE-2.0.txt",
+      "licenseEvidencePath": "project:third_party_licenses/latent-upscaler/EVIDENCE.md",
+      "licenseEvidenceUrl": "https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler/blob/main/README.md#license",
+      "licenseNote": "The same-author official model card links this companion custom node and declares Apache-2.0; the GitHub code repository has no standalone LICENSE file."
     },
     {
       "id": "conditioning-rebalance",

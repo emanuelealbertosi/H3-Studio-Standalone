@@ -115,6 +115,8 @@ try {
   };
   const manifestPath = write("base-manifest.json", JSON.stringify(baseManifest, null, 2));
   const workspaceRelative = path.relative(projectRoot, workspaceNode).replaceAll("\\", "/");
+  const evidencePath = write("license-evidence.md", "Official fixture evidence");
+  const evidenceRelative = path.relative(projectRoot, evidencePath).replaceAll("\\", "/");
   const componentLock = {
     schemaVersion: 1,
     components: [
@@ -144,6 +146,7 @@ try {
         license: "MIT",
         licenseStatus: "verified",
         licensePath: "ComfyUI/custom_nodes/example-node/LICENSE",
+        licenseEvidencePath: `project:${evidenceRelative}`,
       },
     ],
   };
@@ -187,6 +190,7 @@ try {
   assert.ok(entries.includes("component-inventory.json"));
   assert.ok(entries.includes("python-packages.sbom.json"));
   assert.ok(entries.includes("LICENSES/H3-Studio/LICENSE"));
+  assert.ok(entries.includes("LICENSES/example/license-evidence.md"));
   assert.ok(!entries.some((entry) => entry.startsWith("ComfyUI/models/")));
   assert.ok(!entries.some((entry) => entry.startsWith("ComfyUI/user/")));
   assert.ok(!entries.includes("ComfyUI/extra_model_paths.yaml"));
