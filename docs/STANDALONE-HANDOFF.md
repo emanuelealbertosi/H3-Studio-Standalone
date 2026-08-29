@@ -1,6 +1,6 @@
 # H3 Studio Standalone — handoff completo
 
-Ultimo aggiornamento: **28 agosto 2026**  
+Ultimo aggiornamento: **29 agosto 2026**<br>
 Stato verificato: **bootstrap standalone pubblico in prerelease e funzionante sul PC di sviluppo**<br>
 Branch: `standalone-engine`  
 Checkpoint iniziale: `a85f1fb` (`feat: bootstrap embedded standalone engine`)
@@ -400,7 +400,7 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 ### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
 
 La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
-standalone. Il riferimento sorgente corrente è `1461478`. **Non importare ancora
+standalone. Il riferimento sorgente corrente è `cff782d`. **Non importare ancora
 il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
 devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
 Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
@@ -436,9 +436,14 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - Libreria immagini allineata alla sorgente di Assets: Personaggi, Oggetti, Luoghi e immagini senza tag mostrano anche i job moderni, con rinomina, eliminazione multipla e invio allo Studio; etichetta Paesaggio rinominata Luogo mantenendo il valore interno `background` (`1461478`).
 - Terminologia pubblica resa indipendente dal modello: UI, errori e documentazione usano LLM/LLM Vision; catalogo Chat e nodo locale accettano qualunque GGUF non-projector, conservando i vecchi identificatori tecnici solo per compatibilità (`1461478`).
 - Libreria: eliminazione singola o multipla dei montaggi con conferma, cascata atomica dei soli collegamenti clip e conservazione di video sorgente, varianti e media (`1461478`).
-- Chat Music: rilevamento deterministico delle richieste vocali, conservazione letterale delle lyrics fornite e rigenerazione con caption/lyrics separate e modificabili (`1461478`).
-- Studio Immagini: azione **Video** sui candidati e sulle reference ricevute, con handoff diretto a Picture 1 in modalità Reference; rimosso il controllo visibile **Scegli** mantenendo compatibilità dati (`1461478`).
+- Chat Music: rilevamento deterministico delle richieste vocali, conservazione letterale delle lyrics fornite e rigenerazione con caption/lyrics separate e modificabili (`6cf3ca5`).
+- Studio Immagini: azione **Video** sui candidati e sulle reference ricevute, con handoff diretto a Picture 1 in modalità Reference; rimosso il controllo visibile **Scegli** mantenendo compatibilità dati (`f0a4b2c`).
 - Admin Anima/Nova AM: eliminata la race fra cambio della select e click immediato su Salva; il riferimento autorevole viene aggiornato in modo sincrono prima del payload (`1461478`).
+- Salvataggio Admin consolidato: Engine e collegamento usano un'unica operazione persistente, con verifica del profilo restituito dal server e messaggi espliciti anche in caso di fallimento (`8bd2f35`, `8c2b1e2`, `c8120f9`, `5ca32ab`).
+- Audio **Parlato → brano**: trascrizione STT, generazione di lyrics strutturate, musica H3 e conservazione del parlato originale nel mix (`5124631`).
+- Clonazione locale del solo timbro/canto e lip-sync H3: workflow separato, reference vocale opzionale e mapping video/audio verificato senza incorporare servizi esterni (`9eb4507`).
+- Video multishot esteso da 6 a 12 shot: selettore Studio `1–12`, routing automatico al workflow multishot solo oltre uno shot, planner con timestamp e assegnazione delle reference per shot (`41107d1`).
+- Libreria filtrabile per categoria con conteggi reali: Tutto, Montaggi, Asset, Immagini, Esterni e Video; selezione multipla e azioni sugli elementi restano coerenti durante il filtro (`cff782d`).
 
 #### Gate di stabilizzazione sulla versione ComfyUI
 
@@ -457,7 +462,10 @@ Prima del porting eseguire almeno questi test reali:
    delle timeline e l'assenza di card bloccate o progressi fantasma;
 9. salvataggio di ciascun Nova AM dall'Admin, ricarica pagina e verifica del modello effettivamente usato;
 10. Keep Aspect in I2V, Keyframes, Reference con immagine/video, Continue ed Edit;
-11. regressione minima di Video H3, Krea, Anima, Flux Edit, Face, Upscale ed export.
+11. regressione minima di Video H3, Krea, Anima, Flux Edit, Face, Upscale ed export;
+12. Parlato → brano, clonazione timbro e lip-sync con reference da disco e Libreria, verificando unload e riuso degli output;
+13. multishot con 1, 2, 6 e 12 shot, verificando routing del workflow, timestamp e reference assegnate allo shot corretto;
+14. filtro Libreria su tutte le categorie, conteggi, selezione multipla, rinomina e cancellazione dopo cambio filtro.
 
 Il gate è superato quando i test sono verdi, non emergono regressioni per uno o
 due giorni di uso reale e `F:\H3-Studio` viene marcato con un tag stabile, nome
@@ -469,9 +477,11 @@ proposto `v0.3.0-integration-base`.
 2. Audio Studio e dipendenze runtime TTS/musica;
 3. planner e routing Chat, mantenendo l'unload dei modelli prima dei job media;
 4. UI Chat/Audio e stati di avanzamento/cancellazione;
-5. rinomina e cancellazione multipla di Assets/Libreria;
-6. aggiornamento manifest, allowlist custom node, SBOM, licenze e artefatti;
-7. typecheck, suite completa, build e QA GPU su porte isolate.
+5. rinomina, cancellazione multipla e filtro categorie di Assets/Libreria;
+6. Parlato → brano, clonazione timbro e lip-sync;
+7. selettore e routing Video multishot fino a 12 shot;
+8. aggiornamento manifest, allowlist custom node, SBOM, licenze e artefatti;
+9. typecheck, suite completa, build e QA GPU su porte isolate.
 
 Ogni blocco deve essere un commit autonomo e reversibile. Non copiare database,
 `data`, modelli o runtime dalla versione principale.
@@ -651,7 +661,7 @@ La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
 è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
 nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5; lo split per
 GitHub Release è in 5b6a66c e la prerelease pubblicata è 1ac9396. La versione
-ComfyUI è avanzata fino a 1461478: leggi la coda di integrazione nella sezione 11
+ComfyUI è avanzata fino a cff782d: leggi la coda di integrazione nella sezione 11
 e non importarla prima che superi il gate di stabilizzazione e riceva il tag
 `v0.3.0-integration-base`. Il remote origin punta al repository standalone
 dedicato. Il remote source-snapshot può leggere F:\H3-Studio ma ha il push
@@ -685,4 +695,4 @@ quando espressamente autorizzato.
 - `docs/WORKLOG.md`: cronologia della versione principale.
 
 In caso di divergenza, questo documento descrive lo stato della variante
-standalone al 28 agosto 2026; i test e il codice hanno comunque precedenza.
+standalone al 29 agosto 2026; i test e il codice hanno comunque precedenza.
