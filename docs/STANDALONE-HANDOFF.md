@@ -400,7 +400,7 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 ### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
 
 La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
-standalone. Il riferimento sorgente corrente è `cff782d`. **Non importare ancora
+standalone. Il riferimento sorgente corrente è `df35639`. **Non importare ancora
 il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
 devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
 Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
@@ -444,6 +444,7 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - Clonazione locale del solo timbro/canto e lip-sync H3: workflow separato, reference vocale opzionale e mapping video/audio verificato senza incorporare servizi esterni (`9eb4507`).
 - Video multishot esteso da 6 a 12 shot: selettore Studio `1–12`, routing automatico al workflow multishot solo oltre uno shot, planner con timestamp e assegnazione delle reference per shot (`41107d1`).
 - Libreria filtrabile per categoria con conteggi reali: Tutto, Montaggi, Asset, Immagini, Esterni e Video; selezione multipla e azioni sugli elementi restano coerenti durante il filtro (`cff782d`).
+- Upscale H3 corretto per conservare l'aspect ratio del job sorgente: Keep Aspect mantiene il collegamento Picture/Video, i formati espliciti restano invariati e i job manuali vengono scalati sulla proporzione originale (`df35639`).
 
 #### Gate di stabilizzazione sulla versione ComfyUI
 
@@ -465,7 +466,8 @@ Prima del porting eseguire almeno questi test reali:
 11. regressione minima di Video H3, Krea, Anima, Flux Edit, Face, Upscale ed export;
 12. Parlato → brano, clonazione timbro e lip-sync con reference da disco e Libreria, verificando unload e riuso degli output;
 13. multishot con 1, 2, 6 e 12 shot, verificando routing del workflow, timestamp e reference assegnate allo shot corretto;
-14. filtro Libreria su tutte le categorie, conteggi, selezione multipla, rinomina e cancellazione dopo cambio filtro.
+14. filtro Libreria su tutte le categorie, conteggi, selezione multipla, rinomina e cancellazione dopo cambio filtro;
+15. Upscale 1/2 MP su 16:9, 9:16 e Keep Aspect, confrontando le dimensioni effettive prima e dopo il post-process.
 
 Il gate è superato quando i test sono verdi, non emergono regressioni per uno o
 due giorni di uso reale e `F:\H3-Studio` viene marcato con un tag stabile, nome
@@ -661,7 +663,7 @@ La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
 è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
 nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5; lo split per
 GitHub Release è in 5b6a66c e la prerelease pubblicata è 1ac9396. La versione
-ComfyUI è avanzata fino a cff782d: leggi la coda di integrazione nella sezione 11
+ComfyUI è avanzata fino a df35639: leggi la coda di integrazione nella sezione 11
 e non importarla prima che superi il gate di stabilizzazione e riceva il tag
 `v0.3.0-integration-base`. Il remote origin punta al repository standalone
 dedicato. Il remote source-snapshot può leggere F:\H3-Studio ma ha il push
