@@ -17,6 +17,12 @@ La scelta successiva fra continuare senza pesi, collegare cartelle esistenti o
 scaricare singoli elementi dall'Admin è definita in
 `docs/STANDALONE-MODEL-CATALOG.md`.
 
+L'interfaccia di installazione deve esporre sempre un comando evidente
+**Salta per ora / Continua senza modelli**. Deve essere possibile completare
+l'installazione senza selezionare alcun peso e indicare successivamente una
+libreria già presente tramite `extra_model_paths.yaml`; questa operazione non
+copia, sposta, riscarica o elimina i file dell'utente.
+
 File coinvolti:
 
 - `engine/manifest.json`: contratto versionato e distinta artefatti;

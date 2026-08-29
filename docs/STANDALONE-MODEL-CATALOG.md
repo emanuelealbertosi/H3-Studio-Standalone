@@ -20,6 +20,10 @@ La scelta predefinita è **Continua senza modelli**. Chi installa il solo runtim
 deve poter usare Admin, diagnostica e importazione anche se nessun workflow è
 ancora pronto.
 
+Il pulsante **Salta per ora** deve restare disponibile anche quando il catalogo
+propone modelli raccomandati o rileva dipendenze mancanti. Nessun avviso di
+workflow incompleto può trasformare il download in un passaggio obbligatorio.
+
 ## Catalogo nell'Admin
 
 La sezione **Admin → Modelli** deve mostrare per ogni voce:
@@ -75,10 +79,11 @@ installare automaticamente.
 - Una macchina pulita completa il bootstrap con zero byte di modelli scaricati.
 - Dopo il bootstrap l'Admin è raggiungibile anche con tutti i workflow non pronti.
 - L'utente può chiudere il catalogo senza selezionare nulla.
+- Il wizard espone **Salta per ora** e non nasconde né disabilita il comando
+  quando mancano tutti i modelli.
 - Un singolo modello può essere scaricato, interrotto, ripreso e verificato senza
   coinvolgere gli altri.
 - Un URL raccomandato può essere modificato e poi ripristinato.
 - Collegare una libreria esistente non duplica file.
 - Un URL malevolo non può scrivere fuori dai model root.
 - Update e rollback del runtime conservano modelli, override e file `.partial`.
-

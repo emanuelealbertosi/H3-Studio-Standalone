@@ -362,6 +362,9 @@ Nel primo avvio il wizard deve:
 - completarsi anche senza alcun modello e proporre, senza preselezioni:
   **Continua senza modelli**, **Collega libreria esistente** oppure
   **Scegli cosa scaricare nell'Admin**.
+- mostrare esplicitamente **Salta per ora**: il download dei modelli non è mai
+  obbligatorio, nemmeno quando tutti i workflow risultano incompleti; una
+  libreria esistente può essere collegata senza copiare o riscaricare i pesi.
 
 ## 10. Comandi di sviluppo e test
 
@@ -578,6 +581,11 @@ ufficiali sono entrambi sotto 2 GiB e fissati per dimensione e SHA-256.
 
 Resta un solo gate prima di promuovere la prerelease a release stabile:
 validare il bootstrap pubblicato su una seconda macchina Windows/NVIDIA pulita.
+
+Il prossimo delta applicativo può essere pubblicato come **nuova prerelease**
+per il collaudo integrato. Non promuoverlo a release stabile finché una seconda
+macchina non ha completato installazione senza modelli, collegamento di una
+libreria esistente e smoke test end-to-end.
 
 ### Priorità P0 — Node e FFmpeg incorporati
 

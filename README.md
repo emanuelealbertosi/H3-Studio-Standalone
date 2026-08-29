@@ -137,6 +137,13 @@ Il contratto della Chat locale si verifica con `npm run test:chat`.
 
 ### Variante standalone (Windows/NVIDIA)
 
+> **I modelli sono facoltativi durante l'installazione.** Il bootstrap scarica
+> soltanto il runtime H3 Studio; nella fase modelli puoi scegliere
+> **Salta per ora / Continua senza modelli**, collegare cartelle che possiedi già
+> oppure scaricare in seguito solo i singoli pesi desiderati dall'Admin. Nessun
+> checkpoint, LoRA, encoder, VAE o LLM viene preselezionato o scaricato
+> automaticamente.
+
 1. Esegui una volta `INSTALL_H3_STUDIO_STANDALONE.bat`. Il bootstrap scarica i
    due asset verificati della prerelease `v0.1.0-dev`, controlla dimensione e
    SHA-256 e installa il runtime con staging atomico e rollback.
