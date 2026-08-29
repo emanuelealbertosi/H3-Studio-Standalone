@@ -17,7 +17,7 @@ stato reale, architettura, comandi, test, rischi e prossime attività.
 
 | Variante | Percorso locale | Scopo | Stato Git |
 |---|---|---|---|
-| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `e69e25b`, repository GitHub originale |
+| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `1b9b73f`, repository GitHub originale |
 | H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, prerelease `1ac9396`, repository GitHub dedicato |
 
 Non modificare `F:\H3-Studio` mentre si lavora sulla variante standalone.
@@ -403,7 +403,7 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 ### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
 
 La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
-standalone. Il riferimento sorgente corrente è `e69e25b`. **Non importare ancora
+standalone. Il riferimento sorgente corrente è `1b9b73f`. **Non importare ancora
 il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
 devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
 Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
@@ -451,6 +451,7 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - Launcher ComfyUI idempotente dopo il riavvio Admin: riconosce anche il runtime `tsx` nel percorso fisico pnpm, riusa un bridge sano della stessa installazione e sostituisce solo quello non responsivo, continuando a rifiutare listener estranei (`5ea560c`, documentazione `fee9e3a`).
 - Video **Music video + lip-sync**: `Audio 1` selezionabile esplicitamente, shot calcolati dalla durata, sampler con slice `<Soundtrack>` temporali, memoria fra shot, trim esatto e audio sorgente invariato; PDD viene escluso automaticamente e FAST ricade sullo standard 8-step (`8cf6bbc`).
 - I2V con visual lock: Picture 1 viene inviata al planner Vision a 384 px senza modificare la sorgente H3; identità, outfit, scena, luce e camera restano vincolati e gli eventuali `[Shot 2+]` inventati in monoshot vengono appiattiti in beat continui (`e69e25b`).
+- Chat video multishot: la durata esplicita viene estratta deterministicamente dal testo (`30s`, secondi o minuti) e convertita in shot reali; 30 secondi diventano `3 × 10 s`, con default 10 secondi e massimo 12 shot/180 secondi (`1b9b73f`).
 
 #### Gate di stabilizzazione sulla versione ComfyUI
 
