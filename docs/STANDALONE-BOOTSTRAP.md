@@ -11,6 +11,12 @@ Il bootstrap installa o aggiorna il runtime incorporato senza richiedere una
 ComfyUI preesistente. Non installa modelli e non modifica installazioni ComfyUI
 esterne. La modalità `H3_ENGINE_MODE=external` resta indipendente.
 
+L'assenza dei modelli è una modalità supportata, non un errore di installazione:
+il bootstrap non mostra checkpoint preselezionati e non avvia download impliciti.
+La scelta successiva fra continuare senza pesi, collegare cartelle esistenti o
+scaricare singoli elementi dall'Admin è definita in
+`docs/STANDALONE-MODEL-CATALOG.md`.
+
 File coinvolti:
 
 - `engine/manifest.json`: contratto versionato e distinta artefatti;

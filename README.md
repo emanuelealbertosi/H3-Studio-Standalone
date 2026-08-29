@@ -117,6 +117,7 @@ video corrispondenti dall'output ComfyUI.
 - `docs/PROJECT-PLAN.md`: specifica e tracking principale.
 - `docs/STANDALONE-HANDOFF.md`: stato completo e prompt di ripresa della variante standalone.
 - `docs/STANDALONE-ENGINE-PLAN.md`: roadmap sintetica del motore incorporato.
+- `docs/STANDALONE-MODEL-CATALOG.md`: installazione senza pesi e catalogo Admin con download selettivi.
 - `docs/ARCHITECTURE.md`: componenti e flussi tecnici.
 - `docs/GENERATION-MODES.md`: mapping verificato di T2V, I2V, Reference, Keyframes, Continue ed Edit.
 - `docs/CREATIVE-LIBRARY.md`: personaggi, oggetti, reference e sheet Krea 2.
@@ -141,14 +142,17 @@ Il contratto della Chat locale si verifica con `npm run test:chat`.
    SHA-256 e installa il runtime con staging atomico e rollback.
 2. Avvia `START_H3_STUDIO_STANDALONE.bat`.
 3. Al primo avvio crea la password Admin; URL e cartella output del motore sono
-   già gestiti dall'app.
+   già gestiti dall'app. Nessun modello viene scaricato automaticamente: puoi
+   continuare senza pesi, collegare una libreria esistente oppure scegliere in
+   seguito i singoli modelli dal catalogo Admin.
 4. Ctrl+C nella console arresta web app, bridge e motore incorporato.
 
 Il codice standalone e gli asset del motore sono pubblicati nel
 [repository dedicato](https://github.com/emanuelealbertosi/H3-Studio-Standalone).
-I modelli restano esclusi dai pacchetti e sono condivisi tramite
+I modelli restano esclusi dai pacchetti e possono essere condivisi tramite
 `extra_model_paths.yaml`, senza duplicazioni. Il contratto di distribuzione è
-in `docs/STANDALONE-BOOTSTRAP.md`.
+in `docs/STANDALONE-BOOTSTRAP.md`; il catalogo selettivo previsto è specificato
+in `docs/STANDALONE-MODEL-CATALOG.md`.
 
 ### Variante con ComfyUI esterna
 

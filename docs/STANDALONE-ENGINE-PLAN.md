@@ -38,8 +38,10 @@ H3-Studio-Standalone/
 1. **Process manager** — discovery, start/stop, health, log e ownership sicura.
 2. **Bootstrap** — scaricamento con checksum, installazione atomica e rollback.
 3. **Launcher unico** — avvio motore, bridge e web; chiusura coordinata.
-4. **Wizard semplificato** — nessun URL Comfy richiesto in modalità embedded.
-5. **Model library** — importazione senza copia e download selettivo.
+4. **Wizard semplificato** — nessun URL Comfy richiesto in modalità embedded e
+   possibilità di completare l'installazione con zero modelli.
+5. **Model library** — importazione senza copia e catalogo Admin con download
+   selettivo, URL suggeriti visibili/modificabili e checksum.
 6. **Convalida funzionale** — Video standard/FAST, immagini, edit, Anima, Chat,
    Face, Upscale, Continue e timeline export.
 7. **Packaging** — installer Windows, disinstallazione non distruttiva e update.
@@ -54,6 +56,7 @@ H3-Studio-Standalone/
 
 - Nessuna modifica automatica a installazioni Comfy esterne.
 - Nessun modello duplicato senza scelta esplicita dell'utente.
+- Nessun peso scaricato automaticamente dal bootstrap, dal wizard o dagli update.
 - Il processo manager termina soltanto processi che ha avviato.
 - Runtime e modelli non entrano nel repository Git.
 - Ogni componente distribuito conserva licenza, sorgente e attribuzione.

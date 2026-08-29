@@ -355,6 +355,9 @@ Nel primo avvio il wizard deve:
 - non mostrare URL ComfyUI e cartella output in modalità embedded;
 - chiedere password Admin, workflow e FFmpeg;
 - suggerire `INSTALL_STANDALONE_ENGINE.bat` se il runtime manca.
+- completarsi anche senza alcun modello e proporre, senza preselezioni:
+  **Continua senza modelli**, **Collega libreria esistente** oppure
+  **Scegli cosa scaricare nell'Admin**.
 
 ## 10. Comandi di sviluppo e test
 
@@ -561,12 +564,23 @@ La API esiste, ma l'Admin deve mostrare chiaramente:
 
 Implementare una UI che permetta:
 
+- installazione core con zero download automatici di pesi;
 - collegare cartelle esistenti senza copiare;
 - importare con hardlink solo quando sicuro e sullo stesso volume;
 - copiare esplicitamente;
-- scaricare modelli selezionati con checksum;
+- mostrare un catalogo raccomandato con tutti i modelli inizialmente
+  deselezionati;
+- esporre l'URL suggerito, permetterne un override locale e ripristinare il
+  valore del catalogo;
+- scaricare soltanto i modelli confermati singolarmente, con `.partial`, resume,
+  spazio disco, destinazione esplicita e checksum;
+- distinguere file raccomandati verificati, URL personalizzati non verificati e
+  librerie collegate che H3 Studio non deve mai cancellare;
 - vedere dimensione, licenza e workflow che li richiede;
 - rilevare duplicati e file mancanti.
+
+Contratto completo e criteri di accettazione:
+`docs/STANDALONE-MODEL-CATALOG.md`.
 
 ### Priorità P1 — packaging e aggiornamenti
 
