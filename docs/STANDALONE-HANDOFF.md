@@ -9,6 +9,10 @@ Checkpoint evidenza licenze: `4063be5` (`fix: resolve latent upscaler license ev
 Checkpoint split GitHub Release: `5b6a66c` (`feat: split engine for GitHub releases`)
 Checkpoint prerelease pubblicata: `1ac9396`
 
+Versione sorgente ComfyUI da cui importare il delta applicativo: `ea3e953`
+(`Add voice-reference dialogue for I2V and keyframes`). Include il precedente
+checkpoint `858c240` (`Fix exact-audio lip sync conditioning`).
+
 Questo documento è il punto di ingresso per una nuova chat o per un nuovo
 sviluppatore. È intenzionalmente autosufficiente: descrive obiettivo, confini,
 stato reale, architettura, comandi, test, rischi e prossime attività.
@@ -403,7 +407,7 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 ### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
 
 La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
-standalone. Il riferimento sorgente corrente è `467a8ca`. **Non importare ancora
+standalone. Il riferimento sorgente corrente è `ea3e953`. **Non importare ancora
 il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
 devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
 Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
@@ -455,6 +459,16 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - Chat immagine → video disambiguata: “ultima/precedente immagine” recupera il media reale; anima/trasforma/video da immagine forza I2V, “come reference” forza R2V, audio forza Reference e “mantieni formato” usa l'aspect sorgente (`7288fd8`).
 - Chat → Keyframes multipli: frame iniziale/intermedio/finale forza `KEYFRAMES`; le Picture seguono l'ordine di allegato e vengono distribuite sull'intera timeline o solo all'interno, con override in percentuali o secondi convertiti sulla durata globale multishot. Il recall riconosce anche forme plurali e Keep Aspect copre Keyframes (`a8f9c77`).
 - TTS Chat protetto dalle istruzioni lette ad alta voce: il testo fra virgolette dopo “dice/pronuncia/recita” prevale sul prompt LLM; il servizio Higgs estrae difensivamente il contenuto dei tag `<d>[Lingua] ...</d>` e scarta descrizioni esterne. Le emozioni evidenti diventano token Higgs validi, mentre audio e trascrizione servono solo al cloning (`467a8ca`).
+- Lip-sync con audio esatto realmente condizionato nel latent AV: il soundtrack
+  sorgente viene codificato dall'Audio VAE e sostituisce il ramo audio target;
+  la noise mask mantiene denoise video=1 e audio=0, mentre il mux finale conserva
+  il file originale. Rimangono start frame I2V, slicing temporale multishot,
+  trim alla durata audio e fallback standard 8-step senza PDD/Turbo (`858c240`).
+- Modalità `Solo voce/timbro` per I2V e Keyframes: Audio 1 viene inoltrato come
+  `voice_ref`, la reference fornisce soltanto identità/timbro e il dialogo nuovo
+  resta quello scritto nel prompt. Chat distingue questa intenzione dall'audio
+  esatto e disabilita FAST/PDD per entrambi i percorsi sensibili al parlato
+  (`ea3e953`).
 
 #### Patch immediata da portare: I2V con planner text-only (`3793e76`)
 
@@ -508,6 +522,16 @@ Prima del porting eseguire almeno questi test reali:
 16. Music video con brano cantato di 20–30 secondi: controllo numero shot, lip-sync, continuità visiva, durata finale e identità byte/percepita del soundtrack rispetto alla sorgente.
 17. Chat Keyframes con 1 immagine finale, 2 immagini agli estremi, 3 immagini intermedie e posizioni esplicite in secondi/percentuale; verificare ordine Picture, durata multishot e Keep Aspect.
 18. TTS Chat con reference vocale e battuta italiana fra virgolette: verificare che l'output pronunci soltanto la battuta, mantenga il timbro e non legga tag `<d>`, lingua o descrizioni del planner.
+19. I2V + audio esatto breve (circa 2 s): verificare frame iniziale, movimento
+    labiale evidente, audio originale, durata identica e log
+    `native exact-audio latent locked; audio denoise mask=0, video denoise mask=1`.
+20. Stress I2V + audio esatto da 34,28 s in 4 shot: verificare lip-sync lungo,
+    identità, continuità ai confini, assenza di tagli audio e VRAM/tempo. Il
+    primo run valido è stato avviato il 29 agosto 2026 con Hybrid INT8, 0,5 MP,
+    8 step standard e nessun LoRA/PDD; l'esito visivo resta da registrare.
+21. `Solo voce/timbro` su I2V e Keyframes: usare una reference che pronuncia
+    parole diverse, scrivere una nuova battuta nel prompt e verificare timbro
+    coerente, lip-sync e assenza del testo originale della reference.
 
 Il gate è superato quando i test sono verdi, non emergono regressioni per uno o
 due giorni di uso reale e `F:\H3-Studio` viene marcato con un tag stabile, nome
@@ -715,7 +739,7 @@ La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
 è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
 nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5; lo split per
 GitHub Release è in 5b6a66c e la prerelease pubblicata è 1ac9396. La versione
-ComfyUI è avanzata fino a 3076916: leggi la coda di integrazione nella sezione 11
+ComfyUI è avanzata fino a ea3e953: leggi la coda di integrazione nella sezione 11
 e non importarla prima che superi il gate di stabilizzazione e riceva il tag
 `v0.3.0-integration-base`. Il remote origin punta al repository standalone
 dedicato. Il remote source-snapshot può leggere F:\H3-Studio ma ha il push
