@@ -17,7 +17,7 @@ stato reale, architettura, comandi, test, rischi e prossime attività.
 
 | Variante | Percorso locale | Scopo | Stato Git |
 |---|---|---|---|
-| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `1461478`, repository GitHub originale |
+| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `8cf6bbc`, repository GitHub originale |
 | H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, prerelease `1ac9396`, repository GitHub dedicato |
 
 Non modificare `F:\H3-Studio` mentre si lavora sulla variante standalone.
@@ -403,7 +403,7 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 ### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
 
 La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
-standalone. Il riferimento sorgente corrente è `3076916`. **Non importare ancora
+standalone. Il riferimento sorgente corrente è `8cf6bbc`. **Non importare ancora
 il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
 devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
 Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
@@ -449,6 +449,7 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - Libreria filtrabile per categoria con conteggi reali: Tutto, Montaggi, Asset, Immagini, Esterni e Video; selezione multipla e azioni sugli elementi restano coerenti durante il filtro (`cff782d`).
 - Upscale H3 corretto per conservare l'aspect ratio del job sorgente: Keep Aspect mantiene il collegamento Picture/Video, i formati espliciti restano invariati e i job manuali vengono scalati sulla proporzione originale (`df35639`).
 - Launcher ComfyUI idempotente dopo il riavvio Admin: riconosce anche il runtime `tsx` nel percorso fisico pnpm, riusa un bridge sano della stessa installazione e sostituisce solo quello non responsivo, continuando a rifiutare listener estranei (`5ea560c`, documentazione `fee9e3a`).
+- Video **Music video + lip-sync**: `Audio 1` selezionabile esplicitamente, shot calcolati dalla durata, sampler con slice `<Soundtrack>` temporali, memoria fra shot, trim esatto e audio sorgente invariato; PDD viene escluso automaticamente e FAST ricade sullo standard 8-step (`8cf6bbc`).
 
 #### Gate di stabilizzazione sulla versione ComfyUI
 
@@ -472,6 +473,7 @@ Prima del porting eseguire almeno questi test reali:
 13. multishot con 1, 2, 6 e 12 shot, verificando routing del workflow, timestamp e reference assegnate allo shot corretto;
 14. filtro Libreria su tutte le categorie, conteggi, selezione multipla, rinomina e cancellazione dopo cambio filtro;
 15. Upscale 1/2 MP su 16:9, 9:16 e Keep Aspect, confrontando le dimensioni effettive prima e dopo il post-process.
+16. Music video con brano cantato di 20–30 secondi: controllo numero shot, lip-sync, continuità visiva, durata finale e identità byte/percepita del soundtrack rispetto alla sorgente.
 
 Il gate è superato quando i test sono verdi, non emergono regressioni per uno o
 due giorni di uso reale e `F:\H3-Studio` viene marcato con un tag stabile, nome
@@ -486,8 +488,9 @@ proposto `v0.3.0-integration-base`.
 5. rinomina, cancellazione multipla e filtro categorie di Assets/Libreria;
 6. Parlato → brano, clonazione timbro e lip-sync;
 7. selettore e routing Video multishot fino a 12 shot;
-8. aggiornamento manifest, allowlist custom node, SBOM, licenze e artefatti;
-9. typecheck, suite completa, build e QA GPU su porte isolate.
+8. Music video/lip-sync con sampler temporale e soundtrack originale;
+9. aggiornamento manifest, allowlist custom node, SBOM, licenze e artefatti;
+10. typecheck, suite completa, build e QA GPU su porte isolate.
 
 Ogni blocco deve essere un commit autonomo e reversibile. Non copiare database,
 `data`, modelli o runtime dalla versione principale.
