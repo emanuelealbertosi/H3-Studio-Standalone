@@ -400,7 +400,7 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 ### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
 
 La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
-standalone. Il riferimento sorgente corrente è `df35639`. **Non importare ancora
+standalone. Il riferimento sorgente corrente è `fee9e3a`. **Non importare ancora
 il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
 devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
 Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
@@ -445,6 +445,7 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - Video multishot esteso da 6 a 12 shot: selettore Studio `1–12`, routing automatico al workflow multishot solo oltre uno shot, planner con timestamp e assegnazione delle reference per shot (`41107d1`).
 - Libreria filtrabile per categoria con conteggi reali: Tutto, Montaggi, Asset, Immagini, Esterni e Video; selezione multipla e azioni sugli elementi restano coerenti durante il filtro (`cff782d`).
 - Upscale H3 corretto per conservare l'aspect ratio del job sorgente: Keep Aspect mantiene il collegamento Picture/Video, i formati espliciti restano invariati e i job manuali vengono scalati sulla proporzione originale (`df35639`).
+- Launcher ComfyUI idempotente dopo il riavvio Admin: riconosce anche il runtime `tsx` nel percorso fisico pnpm, riusa un bridge sano della stessa installazione e sostituisce solo quello non responsivo, continuando a rifiutare listener estranei (`5ea560c`, documentazione `fee9e3a`).
 
 #### Gate di stabilizzazione sulla versione ComfyUI
 
@@ -663,7 +664,7 @@ La variante standalone è sul branch standalone-engine. Il checkpoint iniziale
 è a85f1fb; il bootstrap riproducibile e il builder artefatti sono implementati
 nel checkpoint 9f9f5fb; il gate licenze è chiuso in 4063be5; lo split per
 GitHub Release è in 5b6a66c e la prerelease pubblicata è 1ac9396. La versione
-ComfyUI è avanzata fino a df35639: leggi la coda di integrazione nella sezione 11
+ComfyUI è avanzata fino a fee9e3a: leggi la coda di integrazione nella sezione 11
 e non importarla prima che superi il gate di stabilizzazione e riceva il tag
 `v0.3.0-integration-base`. Il remote origin punta al repository standalone
 dedicato. Il remote source-snapshot può leggere F:\H3-Studio ma ha il push
