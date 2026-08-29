@@ -17,7 +17,7 @@ stato reale, architettura, comandi, test, rischi e prossime attività.
 
 | Variante | Percorso locale | Scopo | Stato Git |
 |---|---|---|---|
-| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `a8f9c77`, repository GitHub originale |
+| H3 Studio originale | `F:\H3-Studio` | Prodotto corrente basato su ComfyUI esterna | `467a8ca`, repository GitHub originale |
 | H3 Studio Standalone | `F:\H3-Studio-Standalone` | Nuova variante con motore incorporato invisibile | branch `standalone-engine`, prerelease `1ac9396`, repository GitHub dedicato |
 
 Non modificare `F:\H3-Studio` mentre si lavora sulla variante standalone.
@@ -403,7 +403,7 @@ Typecheck e build di produzione sono verdi dopo l'import del runtime.
 ### Priorità P0 — stabilizzare e importare il delta della versione ComfyUI
 
 La versione principale `F:\H3-Studio` è avanzata dopo la separazione dello
-standalone. Il riferimento sorgente corrente è `a8f9c77`. **Non importare ancora
+standalone. Il riferimento sorgente corrente è `467a8ca`. **Non importare ancora
 il delta con un merge o un cherry-pick indiscriminato**: le funzioni recenti
 devono prima superare un breve ciclo di utilizzo reale sulla versione ComfyUI.
 Il runtime standalone, il packaging e la prerelease `v0.1.0-dev` devono restare
@@ -454,6 +454,7 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - Chat video multishot: la durata esplicita viene estratta deterministicamente dal testo (`30s`, secondi o minuti) e convertita in shot reali; 30 secondi diventano `3 × 10 s`, con default 10 secondi e massimo 12 shot/180 secondi (`1b9b73f`).
 - Chat immagine → video disambiguata: “ultima/precedente immagine” recupera il media reale; anima/trasforma/video da immagine forza I2V, “come reference” forza R2V, audio forza Reference e “mantieni formato” usa l'aspect sorgente (`7288fd8`).
 - Chat → Keyframes multipli: frame iniziale/intermedio/finale forza `KEYFRAMES`; le Picture seguono l'ordine di allegato e vengono distribuite sull'intera timeline o solo all'interno, con override in percentuali o secondi convertiti sulla durata globale multishot. Il recall riconosce anche forme plurali e Keep Aspect copre Keyframes (`a8f9c77`).
+- TTS Chat protetto dalle istruzioni lette ad alta voce: il testo fra virgolette dopo “dice/pronuncia/recita” prevale sul prompt LLM; il servizio Higgs estrae difensivamente il contenuto dei tag `<d>[Lingua] ...</d>` e scarta descrizioni esterne. Le emozioni evidenti diventano token Higgs validi, mentre audio e trascrizione servono solo al cloning (`467a8ca`).
 
 #### Patch immediata da portare: I2V con planner text-only (`3793e76`)
 
@@ -506,6 +507,7 @@ Prima del porting eseguire almeno questi test reali:
 15. Upscale 1/2 MP su 16:9, 9:16 e Keep Aspect, confrontando le dimensioni effettive prima e dopo il post-process.
 16. Music video con brano cantato di 20–30 secondi: controllo numero shot, lip-sync, continuità visiva, durata finale e identità byte/percepita del soundtrack rispetto alla sorgente.
 17. Chat Keyframes con 1 immagine finale, 2 immagini agli estremi, 3 immagini intermedie e posizioni esplicite in secondi/percentuale; verificare ordine Picture, durata multishot e Keep Aspect.
+18. TTS Chat con reference vocale e battuta italiana fra virgolette: verificare che l'output pronunci soltanto la battuta, mantenga il timbro e non legga tag `<d>`, lingua o descrizioni del planner.
 
 Il gate è superato quando i test sono verdi, non emergono regressioni per uno o
 due giorni di uso reale e `F:\H3-Studio` viene marcato con un tag stabile, nome
