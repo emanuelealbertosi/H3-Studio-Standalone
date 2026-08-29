@@ -454,6 +454,33 @@ Delta funzionale da integrare successivamente, con commit sorgente di riferiment
 - Chat video multishot: la durata esplicita viene estratta deterministicamente dal testo (`30s`, secondi o minuti) e convertita in shot reali; 30 secondi diventano `3 × 10 s`, con default 10 secondi e massimo 12 shot/180 secondi (`1b9b73f`).
 - Chat immagine → video disambiguata: “ultima/precedente immagine” recupera il media reale; anima/trasforma/video da immagine forza I2V, “come reference” forza R2V, audio forza Reference e “mantieni formato” usa l'aspect sorgente (`7288fd8`).
 
+#### Patch immediata da portare: I2V con planner text-only (`3793e76`)
+
+Questa patch sostituisce definitivamente il tentativo Vision del commit
+`e69e25b`. Non collegare Picture 1 all'input del planner: con il backend
+DaSiWa/llama.cpp e il GGUF corrente il job termina prima del sampling con
+`The llama.cpp backend currently supports text-only GGUF models`.
+
+Applicazione manuale consigliata, senza merge indiscriminato:
+
+1. in `bridge/studio-job.ts`, dentro `audioPolicyPrompt`, aggiungere per `I2V`
+   una direttiva che dichiari Picture 1 frame iniziale esatto e vieti cambi non
+   richiesti di identità, volto, corpo, capelli, outfit, colori, ambiente,
+   composizione, stile, camera e soggetti;
+2. nel builder del prompt impostare sempre
+   `requestNode.inputs.llm_media_context = "OFF - text only"` e
+   `requestNode.inputs.context_resolution = 512`;
+3. lasciare Picture 1 collegata al Media Loader/conditioning H3: viene esclusa
+   solo dall'LLM, non dal render I2V;
+4. conservare il flattening monoshot di `h3_internal_timestamps.py`, che
+   trasforma eventuali `[Shot 2+]` inventati in beat continui dello Shot 1;
+5. aggiornare `scripts/test-fast-engine.ts` verificando modalità text-only,
+   contesto 512 e presenza di `I2V CONTINUITY LOCK` nel `natural_prompt`.
+
+Verifica minima del porting: TypeScript, `test:fast`, `test:chat` e build devono
+essere verdi; un I2V reale deve arrivare al sampling senza errore llama.cpp,
+usare Picture 1 come frame zero e non trasformarla in una semplice reference.
+
 #### Gate di stabilizzazione sulla versione ComfyUI
 
 Prima del porting eseguire almeno questi test reali:
