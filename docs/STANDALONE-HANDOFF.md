@@ -525,10 +525,11 @@ Prima del porting eseguire almeno questi test reali:
 19. I2V + audio esatto breve (circa 2 s): verificare frame iniziale, movimento
     labiale evidente, audio originale, durata identica e log
     `native exact-audio latent locked; audio denoise mask=0, video denoise mask=1`.
-20. Stress I2V + audio esatto da 34,28 s in 4 shot: verificare lip-sync lungo,
-    identità, continuità ai confini, assenza di tagli audio e VRAM/tempo. Il
-    primo run valido è stato avviato il 29 agosto 2026 con Hybrid INT8, 0,5 MP,
-    8 step standard e nessun LoRA/PDD; l'esito visivo resta da registrare.
+20. Stress I2V + audio esatto da 34,28 s in 4 shot: il primo run valido è stato
+    completato il 29 agosto 2026 con Hybrid INT8, 0,5 MP, 8 step standard e
+    nessun LoRA/PDD. Output oggettivo: 544×960, 24 fps, 34,125 s, AAC stereo
+    48 kHz; elaborazione 1.063,9 s. Restano da verificare visivamente lip-sync,
+    identità, continuità ai confini e assenza di tagli percepibili.
 21. `Solo voce/timbro` su I2V e Keyframes: usare una reference che pronuncia
     parole diverse, scrivere una nuova battuta nel prompt e verificare timbro
     coerente, lip-sync e assenza del testo originale della reference.
